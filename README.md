@@ -1,3 +1,3 @@
-Small minimal animal like AGI named Jen. 
+Small minimal animal like AGI named Jenbina. 
 
 "What do you mean?"
