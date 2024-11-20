@@ -1,16 +1,28 @@
 import json
 
-def fix_llm_json(broken_json: str) -> dict:
+import json
+import re
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain.llms.base import BaseLLM
+from typing import Dict, Any
+
+def fix_llm_json(broken_json: str, llm_json_mode: BaseLLM) -> Dict[str, Any]:
     """
     Attempts to fix and parse JSON from LLM output that may be malformed.
-    Returns parsed JSON dict or raises JSONDecodeError if unfixable.
+    
+    Args:
+        broken_json: The potentially malformed JSON string
+        llm_json_mode: Language model instance configured for JSON output
+        
+    Returns:
+        Dict containing the parsed JSON
     """
     # First try direct parsing
     try:
         return json.loads(broken_json)
     except json.JSONDecodeError:
         # Try to extract JSON-like content between braces if present
-        import re
         json_pattern = r'\{.*\}'
         match = re.search(json_pattern, broken_json, re.DOTALL)
         
@@ -27,7 +39,7 @@ def fix_llm_json(broken_json: str) -> dict:
         )
         
         fix_json_chain = LLMChain(
-            llm=llm_json_mode,  # Use JSON mode LLM
+            llm=llm_json_mode,
             prompt=fix_json_prompt
         )
         
