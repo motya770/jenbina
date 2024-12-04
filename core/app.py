@@ -39,20 +39,20 @@ with col1:
                 with st.chat_message(message["role"]):
                     st.write(message["content"])
 
-with col2:
-    # Internal state visualization
-    st.subheader("Jenbina's Internal State")
-    st.write("Current Emotional State:", st.session_state.person.emotional_state)
-    st.write("Decision Making Process:")
+# with col2:
+#     # Internal state visualization
+#     st.subheader("Jenbina's Internal State")
+#     st.write("Current Emotional State:", st.session_state.person.emotional_state)
+#     st.write("Decision Making Process:")
     
-    # Display the reasoning chain
-    if st.session_state.action_history:
-        with st.expander("Latest Decision Chain", expanded=True):
-            chain = state_analysis_chain(st.session_state.person)
-            st.write(chain)
+#     # Display the reasoning chain
+#     if st.session_state.action_history:
+#         with st.expander("Latest Decision Chain", expanded=True):
+#             chain = state_analysis_chain(st.session_state.person)
+#             st.write(chain)
             
-    # Display Asimov compliance status
-    compliance_status = check_asimov_compliance(st.session_state.person)
-    st.metric("Asimov Compliance", value=f"{compliance_status}%")
+#     # Display Asimov compliance status
+#     compliance_status = check_asimov_compliance(st.session_state.person)
+#     st.metric("Asimov Compliance", value=f"{compliance_status}%")
 
 
