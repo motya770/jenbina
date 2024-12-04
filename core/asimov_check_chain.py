@@ -3,7 +3,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.llms.base import BaseLLM
 from typing import Dict, Any, Callable
-from core.utils import fix_llm_json
+from fix_llm_json import fix_llm_json
 
 def create_asimov_check_system(llm: BaseLLM) -> Callable:
     """
