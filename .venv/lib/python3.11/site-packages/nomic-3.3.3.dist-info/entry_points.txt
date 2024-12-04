@@ -1,0 +1,2 @@
+[console_scripts]
+nomic = nomic.cli:cli

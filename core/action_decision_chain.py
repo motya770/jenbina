@@ -3,7 +3,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.llms.base import BaseLLM
 from typing import Dict, Any
-from core.basic_needs import BasicNeeds  # Import instead of defining
+from basic_needs import BasicNeeds  # Import instead of defining
 
 def create_action_decision_chain(llm: BaseLLM) -> LLMChain:
     # Create prompt for action decision
