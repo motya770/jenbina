@@ -28,16 +28,39 @@ st.title("Conversation with Jenbina")
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    # Dialog interface
-    st.subheader("Conversation")
+    # Display all stages and responses
+    st.subheader("System Stages and Responses")
     user_input = st.text_input("Your message to Jenbina:", key="user_input")
     if st.button("Send"):
         if user_input:
+            # Add user input to history
             st.session_state.action_history.append({"role": "user", "content": user_input})
-            # Display the conversation history
-            for message in st.session_state.action_history:
-                with st.chat_message(message["role"]):
-                    st.write(message["content"])
+            
+            # Display all stages
+            st.write("### Processing Stages:")
+            
+            # Basic needs analysis
+            st.write("**1. Basic Needs Analysis:**")
+            needs_response = create_basic_needs_chain(llm_json_mode)
+            st.write(needs_response)
+            
+            # State analysis
+            st.write("**3. State Analysis:**") 
+            state_response = create_state_analysis_system(llm)
+            st.write(state_response)
+            
+            # Asimov compliance check
+            st.write("**4. Asimov Compliance Check:**")
+            asimov_response = create_asimov_check_system(llm)
+            st.write(asimov_response)
+            
+            # Final action decision
+            st.write("**5. Final Action Decision:**")
+            action_response = create_action_decision_chain(llm)
+            st.write(action_response)
+            
+            # Add system response to history
+            st.session_state.action_history.append({"role": "assistant", "content": action_response})
 
 # with col2:
 #     # Internal state visualization

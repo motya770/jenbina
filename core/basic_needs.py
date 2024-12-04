@@ -48,3 +48,5 @@ def create_basic_needs_chain(llm_json_mode):
     response = needs_chain.run(hunger_level=person.hunger)
     print(f"Current state: {person.hunger}")
     print(f"AI Decision: {response}")
+    return response
+    
