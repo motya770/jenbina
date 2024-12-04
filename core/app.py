@@ -2,13 +2,12 @@ import streamlit as st
 from datetime import datetime
  # Import your other components
 from action_decision_chain import create_action_decision_chain
-from basic_needs import BasicNeeds
+from basic_needs import BasicNeeds, create_basic_needs_chain
 from asimov_check_chain import create_asimov_check_system 
 from state_analysis_chain import create_state_analysis_system
 
 # Initialize LLM
 import os
-from langchain_ollama import Ollama
 
 ### LLM
 from langchain_ollama import ChatOllama
@@ -16,6 +15,7 @@ local_llm = 'llama3.2:3b-instruct-fp16'
 llm = ChatOllama(model=local_llm, temperature=0)
 llm_json_mode = ChatOllama(model=local_llm, temperature=0, format='json')
 
+person = create_basic_needs_chain(llm_json_mode=llm_json_mode)
 
 # Initialize session state for person's state if not already done
 if 'person' not in st.session_state:
