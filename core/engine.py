@@ -1,9 +1,8 @@
-from langchain.llms.base import BaseLLM
-from core.basic_needs import BasicNeeds
-from core.world_state import WorldState, create_world_description_system
-from core.action_decision_chain import process_action_decision
-from core.asimov_check_chain import create_asimov_check_system
-from core.state_analysis_chain import create_state_analysis_system
+from basic_needs import BasicNeeds
+from world_state import WorldState, create_world_description_system
+from action_decision_chain import process_action_decision
+from asimov_check_chain import create_asimov_check_system
+from state_analysis_chain import create_state_analysis_system
 from langchain_ollama import ChatOllama
 
 
