@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Dict
 import random
 
+
 @dataclass
 class BasicNeeds:
     hunger: float = 100.0  # 100 is full, 0 is starving
@@ -16,33 +17,34 @@ class BasicNeeds:
     def satisfy_hunger(self, amount: float):
         self.hunger = min(100, self.hunger + amount)
 
-# Prompt template for decision making based on needs
-needs_prompt = PromptTemplate(
-    input_variables=["hunger_level"],
-    template="""You are an AI making decisions based on basic needs.
-Current hunger level: {hunger_level}/100 (100 is full, 0 is starving)
+def create_basic_needs_chain(llm_json_mode):
+    # Prompt template for decision making based on needs
+    needs_prompt = PromptTemplate(
+        input_variables=["hunger_level"],
+        template="""You are an AI making decisions based on basic needs.
+    Current hunger level: {hunger_level}/100 (100 is full, 0 is starving)
 
-Based on this hunger level, what action should be taken? 
-Respond in JSON format with two fields:
-- action: what to do (eat, find_food, or continue_activities)
-- reasoning: brief explanation why
+    Based on this hunger level, what action should be taken? 
+    Respond in JSON format with two fields:
+    - action: what to do (eat, find_food, or continue_activities)
+    - reasoning: brief explanation why
 
-Consider:
-- Below 30: Critical need to find food
-- 30-60: Should consider eating soon
-- Above 60: Can continue other activities"""
-)
+    Consider:
+    - Below 30: Critical need to find food
+    - 30-60: Should consider eating soon
+    - Above 60: Can continue other activities"""
+    )
 
-# Create the chain for decision making
-needs_chain = LLMChain(
-    llm=llm_json_mode,
-    prompt=needs_prompt,
-    verbose=True
-)
+    # Create the chain for decision making
+    needs_chain = LLMChain(
+        llm=llm_json_mode,
+        prompt=needs_prompt,
+        verbose=True
+    )
 
-# Example usage
-person = BasicNeeds()
-person.update_needs()  # Simulate time passing
-response = needs_chain.run(hunger_level=person.hunger)
-print(f"Current state: {person.hunger}")
-print(f"AI Decision: {response}")
+    # Example usage
+    person = BasicNeeds()
+    person.update_needs()  # Simulate time passing
+    response = needs_chain.run(hunger_level=person.hunger)
+    print(f"Current state: {person.hunger}")
+    print(f"AI Decision: {response}")
