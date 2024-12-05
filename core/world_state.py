@@ -3,7 +3,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.llms.base import BaseLLM
 from typing import List, Callable
-from core.basic_needs import BasicNeeds
+from basic_needs import BasicNeeds
 
 @dataclass
 class WorldState:
@@ -22,7 +22,7 @@ class WorldState:
         if len(self.last_descriptions) > 5:
             self.last_descriptions.pop(0)
 
-def create_world_description_system(llm: BaseLLM) -> Callable:
+def create_world_description_system(llm: BaseLLM, person: BasicNeeds, world: WorldState) -> Callable:
     """
     Creates and returns a function that generates world descriptions.
     
@@ -90,4 +90,4 @@ def create_world_description_system(llm: BaseLLM) -> Callable:
         world.add_description(description)
         return description
 
-    return get_world_description
+    return get_world_description(person=person, world=world)

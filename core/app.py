@@ -5,6 +5,7 @@ from action_decision_chain import create_action_decision_chain
 from basic_needs import BasicNeeds, create_basic_needs_chain
 from asimov_check_chain import create_asimov_check_system 
 from state_analysis_chain import create_state_analysis_system
+from world_state import WorldState, create_world_description_system
 
 # Initialize LLM
 import os
@@ -38,11 +39,32 @@ with col1:
             
             # Display all stages
             st.write("### Processing Stages:")
+
+            # Example usage
+            person = BasicNeeds()
+            person.update_needs()  # Simulate time passing
             
             # Basic needs analysis
             st.write("**1. Basic Needs Analysis:**")
-            needs_response = create_basic_needs_chain(llm_json_mode)
+            needs_response = create_basic_needs_chain(llm_json_mode, person)
             st.write(needs_response)
+
+
+            # World state
+            st.write("**2. World State:**")
+            world = WorldState()
+
+            # World description
+            st.write("**2. World Description:**")
+            world_description = create_world_description_system(llm, person, world)
+            st.write(world_description)
+
+
+            # Action decision
+            st.write("**3. Action Decision:**")
+            action_decision = create_action_decision_chain(llm)
+            st.write(action_decision)
+
             
             # State analysis
             st.write("**3. State Analysis:**") 
