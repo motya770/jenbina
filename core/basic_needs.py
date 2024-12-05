@@ -17,7 +17,7 @@ class BasicNeeds:
     def satisfy_hunger(self, amount: float):
         self.hunger = min(100, self.hunger + amount)
 
-def create_basic_needs_chain(llm_json_mode):
+def create_basic_needs_chain(llm_json_mode, person: BasicNeeds):
     # Prompt template for decision making based on needs
     needs_prompt = PromptTemplate(
         input_variables=["hunger_level"],
@@ -42,9 +42,6 @@ def create_basic_needs_chain(llm_json_mode):
         verbose=True
     )
 
-    # Example usage
-    person = BasicNeeds()
-    person.update_needs()  # Simulate time passing
     response = needs_chain.run(hunger_level=person.hunger)
     print(f"Current state: {person.hunger}")
     print(f"AI Decision: {response}")
