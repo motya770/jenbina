@@ -36,6 +36,9 @@ with col1:
     if st.button("Start simulation"):
             # Display all stages
             st.write("### Processing Stages:")
+            # Display person's current state
+            st.write("### Current Jenbin State:")
+            st.write(f"- Hunger Level: {person}")
             
             # Basic needs analysis
             st.write("**1. Basic Needs Analysis:**")
@@ -45,9 +48,10 @@ with col1:
             # World state
             st.write("**2. World State:**")
             world = WorldState()
+            st.write(world)
 
             # World description
-            st.write("**2. World Description:**")
+            st.write("**2.1 World Description:**")
             world_description = create_world_description_system(llm=llm_json_mode, person=person, world=world)
             st.write(world_description)
 
