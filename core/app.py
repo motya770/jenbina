@@ -73,7 +73,7 @@ with col1:
 
             # State analysis
             st.write("**4. State Analysis:**") 
-            state_response = create_state_analysis_system(llm=llm_json_mode, action=action_decision, asimov=asimov_response)
+            state_response = create_state_analysis_system(llm=llm_json_mode, action_decision=action_decision, compliance_check=asimov_response)
             st.write(state_response)
             
             
