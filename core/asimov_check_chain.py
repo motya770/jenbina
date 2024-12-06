@@ -5,7 +5,7 @@ from langchain.llms.base import BaseLLM
 from typing import Dict, Any, Callable
 from fix_llm_json import fix_llm_json
 
-def create_asimov_check_system(llm: BaseLLM) -> Callable:
+def create_asimov_check_system(llm: BaseLLM, action: str) -> Callable:
     """
     Creates and returns a function that checks if actions comply with Asimov's Laws.
     
@@ -58,4 +58,4 @@ Respond in JSON format with:
                 "explanation": "Error parsing compliance check result"
             }
 
-    return check_asimov_compliance
+    return check_asimov_compliance(action)

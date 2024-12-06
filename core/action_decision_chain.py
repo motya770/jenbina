@@ -4,6 +4,7 @@ from langchain.chains import LLMChain
 from langchain.llms.base import BaseLLM
 from typing import Dict, Any
 from basic_needs import BasicNeeds  # Import instead of defining
+from fix_llm_json import fix_llm_json
 
 
 def create_action_decision_chain(llm: BaseLLM, person: BasicNeeds, world_description: str) -> LLMChain:
