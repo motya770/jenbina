@@ -16,7 +16,9 @@ local_llm = 'llama3.2:3b-instruct-fp16'
 llm = ChatOllama(model=local_llm, temperature=0)
 llm_json_mode = ChatOllama(model=local_llm, temperature=0, format='json')
 
-person = create_basic_needs_chain(llm_json_mode=llm_json_mode)
+# Example usage
+person = BasicNeeds()
+person.update_needs()  
 
 # Initialize session state for person's state if not already done
 if 'person' not in st.session_state:
@@ -40,13 +42,11 @@ with col1:
             # Display all stages
             st.write("### Processing Stages:")
 
-            # Example usage
-            person = BasicNeeds()
-            person.update_needs()  # Simulate time passing
+            # Simulate time passing
             
             # Basic needs analysis
             st.write("**1. Basic Needs Analysis:**")
-            needs_response = create_basic_needs_chain(llm_json_mode, person)
+            needs_response = create_basic_needs_chain(llm_json_mode=llm_json_mode, person=person)
             st.write(needs_response)
 
 
