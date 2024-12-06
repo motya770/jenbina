@@ -56,24 +56,24 @@ with col1:
 
             # World description
             st.write("**2. World Description:**")
-            world_description = create_world_description_system(llm, person, world)
+            world_description = create_world_description_system(llm=llm_json_mode, person=person, world=world)
             st.write(world_description)
 
 
             # Action decision
             st.write("**3. Action Decision:**")
-            action_decision = create_action_decision_chain(llm, person, world_description)
+            action_decision = create_action_decision_chain(llm=llm_json_mode, person=person, world_description=world_description)
             st.write(action_decision)
 
             
             # Asimov compliance check
             st.write("**5. Asimov Compliance Check:**")
-            asimov_response = create_asimov_check_system(llm, action_decision)
+            asimov_response = create_asimov_check_system(llm=llm_json_mode, action=action_decision)
             st.write(asimov_response)
 
             # State analysis
             st.write("**4. State Analysis:**") 
-            state_response = create_state_analysis_system(llm, action_decision, asimov_response)
+            state_response = create_state_analysis_system(llm=llm_json_mode, action=action_decision, asimov=asimov_response)
             st.write(state_response)
             
             

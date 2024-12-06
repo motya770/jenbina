@@ -7,7 +7,7 @@ from basic_needs import BasicNeeds  # Import instead of defining
 from fix_llm_json import fix_llm_json
 
 
-def create_action_decision_chain(llm: BaseLLM, person: BasicNeeds, world_description: str) -> LLMChain:
+def create_action_decision_chain(llm: BaseLLM, person: BasicNeeds, world_description) -> LLMChain:
     # Create prompt for action decision
     action_prompt = PromptTemplate(
         input_variables=["descriptions", "actions", "hunger_level", "energy_level", "comfort_level"],
@@ -51,7 +51,6 @@ def create_action_decision_chain(llm: BaseLLM, person: BasicNeeds, world_descrip
         Returns:
             Dict containing the chosen action and reasoning
         """
-        action_decision_chain = create_action_decision_chain(llm)
         
         # Parse the world description JSON to get lists
         description_data = json.loads(world_description)
