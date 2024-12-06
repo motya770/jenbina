@@ -25,7 +25,7 @@ if 'person' not in st.session_state:
     st.session_state.person = person
     st.session_state.action_history = []
 
-st.title("Conversation with Jenbina")
+st.title("Jenbin:")
 
 # Create columns for the interface layout
 col1, col2 = st.columns([2, 1])
@@ -33,22 +33,14 @@ col1, col2 = st.columns([2, 1])
 with col1:
     # Display all stages and responses
     st.subheader("System Stages and Responses")
-    user_input = st.text_input("Your message to Jenbina:", key="user_input")
-    if st.button("Send"):
-        if user_input:
-            # Add user input to history
-            st.session_state.action_history.append({"role": "user", "content": user_input})
-            
+    if st.button("Start simulation"):
             # Display all stages
             st.write("### Processing Stages:")
-
-            # Simulate time passing
             
             # Basic needs analysis
             st.write("**1. Basic Needs Analysis:**")
             needs_response = create_basic_needs_chain(llm_json_mode=llm_json_mode, person=person)
             st.write(needs_response)
-
 
             # World state
             st.write("**2. World State:**")
