@@ -56,4 +56,4 @@ def create_state_analysis_system(llm: BaseLLM, action_decision: str) -> Callable
             print("\nError analyzing state changes after action")
             return None
 
-    return analyze_state_changes
+    return analyze_state_changes(action_decision=action_decision)

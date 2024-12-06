@@ -62,27 +62,23 @@ with col1:
 
             # Action decision
             st.write("**3. Action Decision:**")
-            action_decision = create_action_decision_chain(llm)
+            action_decision = create_action_decision_chain(llm, person, world_description)
             st.write(action_decision)
 
             
+            # Asimov compliance check
+            st.write("**5. Asimov Compliance Check:**")
+            asimov_response = create_asimov_check_system(llm, action_decision)
+            st.write(asimov_response)
+
             # State analysis
-            st.write("**3. State Analysis:**") 
-            state_response = create_state_analysis_system(llm)
+            st.write("**4. State Analysis:**") 
+            state_response = create_state_analysis_system(llm, action_decision, asimov_response)
             st.write(state_response)
             
-            # Asimov compliance check
-            st.write("**4. Asimov Compliance Check:**")
-            asimov_response = create_asimov_check_system(llm)
-            st.write(asimov_response)
-            
-            # Final action decision
-            st.write("**5. Final Action Decision:**")
-            action_response = create_action_decision_chain(llm)
-            st.write(action_response)
             
             # Add system response to history
-            st.session_state.action_history.append({"role": "assistant", "content": action_response})
+            st.session_state.action_history.append({"role": "assistant", "content": action_decision})
 
 # with col2:
 #     # Internal state visualization
