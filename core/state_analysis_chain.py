@@ -4,7 +4,7 @@ from langchain.chains import LLMChain
 from langchain.llms.base import BaseLLM
 from typing import Dict, Any, Callable, Optional
 
-def create_state_analysis_system(llm: BaseLLM, action_decision: str) -> Callable:
+def create_state_analysis_system(llm: BaseLLM, action_decision: str, compliance_check: Dict[str, Any]) -> Callable:
     """
     Creates and returns a function that analyzes state changes after actions.
     
@@ -56,4 +56,4 @@ def create_state_analysis_system(llm: BaseLLM, action_decision: str) -> Callable
             print("\nError analyzing state changes after action")
             return None
 
-    return analyze_state_changes(action_decision=action_decision)
+    return analyze_state_changes(action_decision=action_decision, compliance_check=compliance_check)
