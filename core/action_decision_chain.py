@@ -60,12 +60,12 @@ def create_action_decision_chain(llm: BaseLLM, person: BasicNeeds, world_descrip
             descriptions=description_data["list_of_descriptions"],
             actions=description_data["list_of_actions"],
             hunger_level=person.hunger,
-            energy_level=person.energy,
-            comfort_level=person.comfort
+            energy_level=100,
+            comfort_level=100
         )
         
         # Fix and parse the JSON response
-        fixed_action_decision = fix_llm_json(action_decision)
+        fixed_action_decision = fix_llm_json(broken_json=action_decision, llm_json_mode=llm)
         fixed_action_decision = json.dumps(fixed_action_decision, indent=2)
         
         return json.loads(fixed_action_decision)
