@@ -17,6 +17,7 @@ class BasicNeeds:
     def satisfy_hunger(self, amount: float):
         self.hunger = min(100, self.hunger + amount)
 
+
 def create_basic_needs_chain(llm_json_mode, person: BasicNeeds):
     # Prompt template for decision making based on needs
     needs_prompt = PromptTemplate(
