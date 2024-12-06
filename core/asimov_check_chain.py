@@ -49,7 +49,7 @@ Respond in JSON format with:
         result = asimov_check_chain.run(action=action)
         
         try:
-            fixed_result = fix_llm_json(result)
+            fixed_result = fix_llm_json(broken_json=result, llm_json_mode=llm)
             compliance_result = json.dumps(fixed_result, indent=2)
             return json.loads(compliance_result)
         except json.JSONDecodeError:
