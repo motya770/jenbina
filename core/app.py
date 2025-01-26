@@ -3,7 +3,7 @@ from datetime import datetime
  # Import your other components
 from action_decision_chain import create_action_decision_chain
 from basic_needs import BasicNeeds, create_basic_needs_chain
-from asimov_check_chain import create_asimov_check_system 
+from asimov_check_chain import create_asimov_check_system
 from state_analysis_chain import create_state_analysis_system
 from world_state import WorldState, create_world_description_system
 from chat_handler import handle_chat_interaction
@@ -38,80 +38,87 @@ st.title("Jenbin:")
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    # Display all stages and responses
     st.subheader("System Stages and Responses")
+    
+    # Initialize states if not already done
+    if 'simulation_completed' not in st.session_state:
+        st.session_state.simulation_completed = False
+        st.session_state.needs_response = None
+        st.session_state.world_description = None
+        st.session_state.action_decision = None
+        st.session_state.state_response = None
+
     if st.button("Start simulation"):
-            # Display all stages
-            st.write("### Processing Stages:")
-            # Display person's current state
-            st.write("### Current Jenbin State:")
-            st.write(f"- Hunger Level: {person}")
+        # Display all stages
+        st.write("### Processing Stages:")
+        st.write("### Current Jenbin State:")
+        st.write(f"- Hunger Level: {person}")
+        
+        # Basic needs analysis
+        st.write("**1. Basic Needs Analysis:**")
+        st.session_state.needs_response = create_basic_needs_chain(llm_json_mode=llm_json_mode, person=person)
+        st.write(st.session_state.needs_response)
+
+        # World state and description
+        st.write("**2. World State:**")
+        world = WorldState()
+        st.write(world)
+
+        st.write("**2.1 World Description:**")
+        st.session_state.world_description = create_world_description_system(llm=llm_json_mode, person=person, world=world)
+        st.write(st.session_state.world_description)
+
+        # Action decision
+        st.write("**3. Action Decision:**")
+        st.session_state.action_decision = create_action_decision_chain(llm=llm_json_mode, person=person, world_description=st.session_state.world_description)
+        st.write(st.session_state.action_decision)
+        
+        # Asimov compliance check
+        st.write("**5. Asimov Compliance Check:**")
+        asimov_response = create_asimov_check_system(llm=llm_json_mode, action=st.session_state.action_decision)
+        st.write(asimov_response)
+
+        # State analysis
+        st.write("**4. State Analysis:**") 
+        st.session_state.state_response = create_state_analysis_system(llm=llm_json_mode, action_decision=st.session_state.action_decision, compliance_check=asimov_response)
+        st.write(st.session_state.state_response)
+
+        # Mark simulation as completed
+        st.session_state.simulation_completed = True
+
+    # Only show chat interface after simulation is completed
+    if st.session_state.simulation_completed:
+        st.write("**6. Interaction with User:**")
+        st.write("### Chat with Jenbin")
+        
+        user_input = st.chat_input("Talk to Jenbin...")
+        
+        if user_input:
+            print("User input:", user_input)
             
-            # Basic needs analysis
-            st.write("**1. Basic Needs Analysis:**")
-            needs_response = create_basic_needs_chain(llm_json_mode=llm_json_mode, person=person)
-            st.write(needs_response)
-
-            # World state
-            st.write("**2. World State:**")
-            world = WorldState()
-            st.write(world)
-
-            # World description
-            st.write("**2.1 World Description:**")
-            world_description = create_world_description_system(llm=llm_json_mode, person=person, world=world)
-            st.write(world_description)
-
-
-            # Action decision
-            st.write("**3. Action Decision:**")
-            action_decision = create_action_decision_chain(llm=llm_json_mode, person=person, world_description=world_description)
-            st.write(action_decision)
-
+            # Handle chat interaction using stored session state values
+            chat_result = handle_chat_interaction(
+                st=st,
+                llm=llm,
+                needs_response=st.session_state.needs_response,
+                world_description=st.session_state.world_description,
+                action_decision=st.session_state.action_decision,
+                state_response=st.session_state.state_response,
+                user_input=user_input
+            )
             
-            # Asimov compliance check
-            st.write("**5. Asimov Compliance Check:**")
-            asimov_response = create_asimov_check_system(llm=llm_json_mode, action=action_decision)
-            st.write(asimov_response)
+            print(chat_result)
 
-            # State analysis
-            st.write("**4. State Analysis:**") 
-            state_response = create_state_analysis_system(llm=llm_json_mode, action_decision=action_decision, compliance_check=asimov_response)
-            st.write(state_response)
-
-
-            # User interaction section
-            st.write("**6. Interaction with User:**")
-            st.write("### Chat with Jenbin")
-
-            user_input = st.chat_input("Talk to Jenbin...")
-            
-            if user_input:  # Only process chat when there's user input
-                print("User input:", user_input)
-                
-                # Handle chat interaction
-                chat_result = handle_chat_interaction(
-                    st=st,
-                    llm=llm,
-                    needs_response=needs_response,
-                    world_description=world_description,
-                    action_decision=action_decision,
-                    state_response=state_response,
-                    user_input=user_input
-                )
-                
-                print(chat_result)
-
-                # Add interactions to history
-                if "user_message" in chat_result:
-                    st.session_state.action_history.append({
-                        "role": "user",
-                        "content": chat_result["user_message"]
-                    })
+            # Add interactions to history
+            if "user_message" in chat_result:
                 st.session_state.action_history.append({
-                    "role": "assistant",
-                    "content": chat_result["assistant_response"]
+                    "role": "user",
+                    "content": chat_result["user_message"]
                 })
+            st.session_state.action_history.append({
+                "role": "assistant",
+                "content": chat_result["assistant_response"]
+            })
 
 # with col2:
 #     # Internal state visualization
