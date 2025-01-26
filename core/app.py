@@ -10,9 +10,14 @@ from world_state import WorldState, create_world_description_system
 # Initialize LLM
 import os
 
+os.environ['OLLAMA_HOST'] = 'http://129.153.140.217:11434'
+# os.environ['OLLAMA_HOST'] = 'http://localhost:11434'
+
 ### LLM
 from langchain_ollama import ChatOllama
 local_llm = 'llama3.2:3b-instruct-fp16'
+
+# os.environ['OLLAMA_HOST'] = 'https://api.sambanova.ai/v1'
 llm = ChatOllama(model=local_llm, temperature=0)
 llm_json_mode = ChatOllama(model=local_llm, temperature=0, format='json')
 
