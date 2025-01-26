@@ -32,7 +32,7 @@ if 'person' not in st.session_state:
     st.session_state.person = person
     st.session_state.action_history = []
 
-st.title("Jenbin:")
+st.title("Jenbina:")
 
 # Create columns for the interface layout
 col1, col2 = st.columns([2, 1])
@@ -51,7 +51,7 @@ with col1:
     if st.button("Start simulation"):
         # Display all stages
         st.write("### Processing Stages:")
-        st.write("### Current Jenbin State:")
+        st.write("### Current Jenbina State:")
         st.write(f"- Hunger Level: {person}")
         
         # Basic needs analysis
@@ -89,9 +89,9 @@ with col1:
     # Only show chat interface after simulation is completed
     if st.session_state.simulation_completed:
         st.write("**6. Interaction with User:**")
-        st.write("### Chat with Jenbin")
+        st.write("### Chat with Jenbina")
         
-        user_input = st.chat_input("Talk to Jenbin...")
+        user_input = st.chat_input("Talk to Jenbina...")
         
         if user_input:
             print("User input:", user_input)
