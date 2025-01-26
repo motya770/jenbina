@@ -6,15 +6,17 @@ from basic_needs import BasicNeeds, create_basic_needs_chain
 from asimov_check_chain import create_asimov_check_system 
 from state_analysis_chain import create_state_analysis_system
 from world_state import WorldState, create_world_description_system
+from chat_handler import handle_chat_interaction
 
 # Initialize LLM
 import os
 
-os.environ['OLLAMA_HOST'] = 'http://129.153.140.217:11434'
-# os.environ['OLLAMA_HOST'] = 'http://localhost:11434'
+# os.environ['OLLAMA_HOST'] = 'http://129.153.140.217:11434'
+os.environ['OLLAMA_HOST'] = 'http://localhost:11434'
 
 ### LLM
 from langchain_ollama import ChatOllama
+from langchain.schema import HumanMessage
 local_llm = 'llama3.2:3b-instruct-fp16'
 
 # os.environ['OLLAMA_HOST'] = 'https://api.sambanova.ai/v1'
@@ -76,10 +78,34 @@ with col1:
             st.write("**4. State Analysis:**") 
             state_response = create_state_analysis_system(llm=llm_json_mode, action_decision=action_decision, compliance_check=asimov_response)
             st.write(state_response)
+
+
+            # User interaction section
+            st.write("**6. Interaction with User:**")
+            st.write("### Chat with Jenbin")
             
+            # Handle chat interaction
+            chat_result = handle_chat_interaction(
+                st=st,
+                llm=llm,
+                needs_response=needs_response,
+                world_description=world_description,
+                action_decision=action_decision,
+                state_response=state_response
+            )
             
-            # Add system response to history
-            st.session_state.action_history.append({"role": "assistant", "content": action_decision})
+            print(chat_result)
+
+            # Add interactions to history
+            if "user_message" in chat_result:
+                st.session_state.action_history.append({
+                    "role": "user",
+                    "content": chat_result["user_message"]
+                })
+            st.session_state.action_history.append({
+                "role": "assistant",
+                "content": chat_result["assistant_response"]
+            })
 
 # with col2:
 #     # Internal state visualization
