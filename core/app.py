@@ -83,29 +83,35 @@ with col1:
             # User interaction section
             st.write("**6. Interaction with User:**")
             st.write("### Chat with Jenbin")
-            
-            # Handle chat interaction
-            chat_result = handle_chat_interaction(
-                st=st,
-                llm=llm,
-                needs_response=needs_response,
-                world_description=world_description,
-                action_decision=action_decision,
-                state_response=state_response
-            )
-            
-            print(chat_result)
 
-            # Add interactions to history
-            if "user_message" in chat_result:
+            user_input = st.chat_input("Talk to Jenbin...")
+            
+            if user_input:  # Only process chat when there's user input
+                print("User input:", user_input)
+                
+                # Handle chat interaction
+                chat_result = handle_chat_interaction(
+                    st=st,
+                    llm=llm,
+                    needs_response=needs_response,
+                    world_description=world_description,
+                    action_decision=action_decision,
+                    state_response=state_response,
+                    user_input=user_input
+                )
+                
+                print(chat_result)
+
+                # Add interactions to history
+                if "user_message" in chat_result:
+                    st.session_state.action_history.append({
+                        "role": "user",
+                        "content": chat_result["user_message"]
+                    })
                 st.session_state.action_history.append({
-                    "role": "user",
-                    "content": chat_result["user_message"]
+                    "role": "assistant",
+                    "content": chat_result["assistant_response"]
                 })
-            st.session_state.action_history.append({
-                "role": "assistant",
-                "content": chat_result["assistant_response"]
-            })
 
 # with col2:
 #     # Internal state visualization
