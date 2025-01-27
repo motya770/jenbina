@@ -11,8 +11,8 @@ from chat_handler import handle_chat_interaction
 # Initialize LLM
 import os
 
-# os.environ['OLLAMA_HOST'] = 'http://129.153.140.217:11434'
-os.environ['OLLAMA_HOST'] = 'http://localhost:11434'
+os.environ['OLLAMA_HOST'] = 'http://129.153.140.217:11434'
+# os.environ['OLLAMA_HOST'] = 'http://localhost:11434'
 
 ### LLM
 from langchain_ollama import ChatOllama
@@ -52,7 +52,7 @@ with col1:
         # Display all stages
         st.write("### Processing Stages:")
         st.write("### Current Jenbina State:")
-        st.write(f"- Hunger Level: {person}")
+        st.write(f"- State: {str(person)}")
         
         # Basic needs analysis
         st.write("**1. Basic Needs Analysis:**")
