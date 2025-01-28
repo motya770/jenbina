@@ -14,6 +14,12 @@ import os
 os.environ['OLLAMA_HOST'] = 'http://129.153.140.217:11434'
 # os.environ['OLLAMA_HOST'] = 'http://localhost:11434'
 
+os.environ['LANGSMITH_TRACING'] = 'true'
+os.environ['LANGSMITH_ENDPOINT'] = "https://api.smith.langchain.com"
+os.environ['LANGSMITH_API_KEY'] = "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"
+os.environ['LANGSMITH_PROJECT'] = "jenbina"
+
+
 ### LLM
 from langchain_ollama import ChatOllama
 from langchain.schema import HumanMessage
