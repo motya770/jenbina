@@ -3,14 +3,14 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.llms.base import BaseLLM
 from typing import Dict, Any
-from basic_needs import BasicNeeds  # Import instead of defining
+from person import Person  # Import Person instead of BasicNeeds
 from fix_llm_json import fix_llm_json
 
 
-def create_action_decision_chain(llm: BaseLLM, person: BasicNeeds, world_description) -> LLMChain:
+def create_action_decision_chain(llm: BaseLLM, person: Person, world_description) -> LLMChain:
     # Create prompt for action decision
     action_prompt = PromptTemplate(
-        input_variables=["descriptions", "actions", "hunger_level", "energy_level", "comfort_level"],
+        input_variables=["descriptions", "actions", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction"],
         template="""Given the current situation and the person's needs, decide on the most appropriate action to take.
 
     Current Description:
@@ -20,9 +20,10 @@ def create_action_decision_chain(llm: BaseLLM, person: BasicNeeds, world_descrip
     {actions}
 
     Person's Current Needs:
-    - Hunger Level: {hunger_level}
-    - Energy Level: {energy_level} 
-    - Comfort Level: {comfort_level}
+    - Hunger satisfaction: {hunger_satisfaction:.1f}%
+    - Sleep satisfaction: {sleep_satisfaction:.1f}%
+    - Safety satisfaction: {safety_satisfaction:.1f}%
+    - Overall satisfaction: {overall_satisfaction:.1f}%
 
     Select one action from the available actions that best addresses the person's most pressing needs.
     Explain your reasoning for choosing this action.
@@ -39,12 +40,12 @@ def create_action_decision_chain(llm: BaseLLM, person: BasicNeeds, world_descrip
         verbose=True
     )
 
-    def process_action_decision(person: BasicNeeds, world_description: str, llm: BaseLLM) -> Dict[str, Any]:
+    def process_action_decision(person: Person, world_description: str, llm: BaseLLM) -> Dict[str, Any]:
         """
         Process and decide the next action based on person's needs and world description.
         
         Args:
-            person: BasicNeeds object containing person's current needs
+            person: Person object containing person's current needs
             world_description: JSON string containing world description and available actions
             llm: Language model instance
         
@@ -55,13 +56,21 @@ def create_action_decision_chain(llm: BaseLLM, person: BasicNeeds, world_descrip
         # Parse the world description JSON to get lists
         description_data = json.loads(world_description)
         
+        # Get individual need satisfaction levels from the Person's BasicNeeds
+        basic_needs = person.needs[0]  # Person has a list of BasicNeeds objects
+        hunger_satisfaction = basic_needs.needs.get('hunger', 50.0).satisfaction
+        sleep_satisfaction = basic_needs.needs.get('sleep', 50.0).satisfaction
+        safety_satisfaction = basic_needs.needs.get('safety', 50.0).satisfaction
+        overall_satisfaction = basic_needs.get_overall_satisfaction()
+        
         # Get decision from the chain
         action_decision = action_decision_chain.run(
             descriptions=description_data["list_of_descriptions"],
             actions=description_data["list_of_actions"],
-            hunger_level=person.hunger,
-            energy_level=100,
-            comfort_level=100
+            hunger_satisfaction=hunger_satisfaction,
+            sleep_satisfaction=sleep_satisfaction,
+            safety_satisfaction=safety_satisfaction,
+            overall_satisfaction=overall_satisfaction
         )
         
         # Fix and parse the JSON response
