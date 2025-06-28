@@ -99,12 +99,25 @@ with col1:
         st.write("**6. Interaction with User:**")
         st.write("### Chat with Jenbina")
         
+        # Display current person state
+        st.write(f"**Current State:** {person}")
+        
         user_input = st.chat_input("Talk to Jenbina...")
         
         if user_input:
             print("User input:", user_input)
             
-            # Handle chat interaction using stored session state values
+            # Store the user message in person's communication history
+            person.receive_message("User", user_input, "text")
+            
+            # Get conversation history for context
+            conversation_history = person.get_conversation_history("User", count=5)
+            recent_context = "\n".join([
+                f"{msg.sender}: {msg.content}" 
+                for msg in conversation_history[-3:]  # Last 3 messages for context
+            ])
+            
+            # Handle chat interaction using stored session state values and person's state
             chat_result = handle_chat_interaction(
                 st=st,
                 llm=llm,
@@ -112,10 +125,16 @@ with col1:
                 world_description=st.session_state.world_description,
                 action_decision=st.session_state.action_decision,
                 state_response=st.session_state.state_response,
-                user_input=user_input
+                user_input=user_input,
+                person_state=person.get_current_state(),
+                conversation_context=recent_context
             )
             
             print(chat_result)
+
+            # Store the person's response in communication history
+            if "assistant_response" in chat_result:
+                person.send_message("User", chat_result["assistant_response"], "text")
 
             # Add interactions to history
             if "user_message" in chat_result:
@@ -127,6 +146,31 @@ with col1:
                 "role": "assistant",
                 "content": chat_result["assistant_response"]
             })
+        
+        # Display communication statistics
+        with st.expander("Communication Statistics", expanded=False):
+            comm_stats = person.get_communication_stats()
+            st.write(f"**Total Conversations:** {comm_stats['total_conversations']}")
+            st.write(f"**Total Messages:** {comm_stats['total_messages']}")
+            
+            if comm_stats['most_active_conversations']:
+                st.write("**Most Active Conversations:**")
+                for conv in comm_stats['most_active_conversations']:
+                    st.write(f"- {conv['outsider']}: {conv['message_count']} messages")
+        
+        # Display recent conversation history
+        with st.expander("Recent Conversation History", expanded=False):
+            user_summary = person.get_conversation_summary("User")
+            if user_summary['message_count'] > 0:
+                st.write(f"**Messages with User:** {user_summary['message_count']}")
+                st.write(f"**Last Interaction:** {user_summary['last_interaction'].strftime('%Y-%m-%d %H:%M')}")
+                
+                st.write("**Recent Messages:**")
+                for msg in user_summary['recent_messages']:
+                    sender_icon = "👤" if msg['sender'] == "User" else "🤖"
+                    st.write(f"{sender_icon} **{msg['sender']}** ({msg['timestamp'].strftime('%H:%M')}): {msg['content']}")
+            else:
+                st.write("No conversation history yet.")
 
 # with col2:
 #     # Internal state visualization
