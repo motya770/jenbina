@@ -11,8 +11,8 @@ from chat_handler import handle_chat_interaction
 # Initialize LLM
 import os
 
-os.environ['OLLAMA_HOST'] = 'http://129.153.140.217:11434'
-# os.environ['OLLAMA_HOST'] = 'http://localhost:11434'
+# os.environ['OLLAMA_HOST'] = 'http://129.153.140.217:11434'
+os.environ['OLLAMA_HOST'] = 'http://localhost:11434'
 
 os.environ['LANGSMITH_TRACING'] = 'true'
 os.environ['LANGSMITH_ENDPOINT'] = "https://api.smith.langchain.com"
