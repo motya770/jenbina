@@ -64,7 +64,7 @@ with col1:
         
         # Basic needs analysis
         st.write("**1. Basic Needs Analysis:**")
-        st.session_state.needs_response = create_basic_needs_chain(llm_json_mode=llm_json_mode, person=person)
+        st.session_state.needs_response = create_basic_needs_chain(llm_json_mode=llm_json_mode, person=person.needs[0])
         st.write(st.session_state.needs_response)
 
         # World state and description
