@@ -1,4 +1,4 @@
-from actor import Actor
+from old.actor import Actor
 from openai import OpenAI
 from threading import Thread
 import instructor
