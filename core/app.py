@@ -7,6 +7,7 @@ from asimov_check_chain import create_asimov_check_system
 from state_analysis_chain import create_state_analysis_system
 from world_state import WorldState, create_world_description_system
 from chat_handler import handle_chat_interaction
+from person import Person
 
 # Initialize LLM
 import os
@@ -30,8 +31,9 @@ llm = ChatOllama(model=local_llm, temperature=0)
 llm_json_mode = ChatOllama(model=local_llm, temperature=0, format='json')
 
 # Example usage
-person = BasicNeeds()
-person.update_needs()  
+person = Person()
+person.update_all_needs()
+print(person)
 
 # Initialize session state for person's state if not already done
 if 'person' not in st.session_state:
