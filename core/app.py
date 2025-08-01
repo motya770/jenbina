@@ -10,6 +10,7 @@ from chat_handler import handle_chat_interaction
 from person import Person
 from meta_cognition import MetaCognitiveSystem
 from enhanced_action_decision_chain import create_meta_cognitive_action_chain
+from conversation_memory import ChromaMemoryManager
 
 # Initialize LLM
 import os
@@ -40,9 +41,16 @@ print(person)
 # Initialize meta-cognitive system
 meta_cognitive_system = MetaCognitiveSystem(llm_json_mode)
 
+# Initialize memory manager
+memory_manager = ChromaMemoryManager()
+
 # Initialize session state for meta-cognition
 if 'meta_cognitive_system' not in st.session_state:
     st.session_state.meta_cognitive_system = meta_cognitive_system
+
+# Initialize session state for memory manager
+if 'memory_manager' not in st.session_state:
+    st.session_state.memory_manager = memory_manager
 
 # Initialize session state for person's state if not already done
 if 'person' not in st.session_state:
@@ -157,7 +165,8 @@ with col1:
                 state_response=st.session_state.state_response,
                 user_input=user_input,
                 person_state=person.get_current_state(),
-                conversation_context=recent_context
+                conversation_context=recent_context,
+                memory_manager=st.session_state.memory_manager
             )
             
             print(chat_result)
@@ -201,6 +210,23 @@ with col1:
                     st.write(f"{sender_icon} **{msg['sender']}** ({msg['timestamp'].strftime('%H:%M')}): {msg['content']}")
             else:
                 st.write("No conversation history yet.")
+        
+        # Display memory system statistics
+        with st.expander("Memory System Statistics", expanded=False):
+            memory_stats = st.session_state.memory_manager.get_memory_stats()
+            st.write(f"**Total Conversations in Memory:** {memory_stats.get('total_conversations', 0)}")
+            st.write(f"**Unique People:** {memory_stats.get('unique_people', 0)}")
+            st.write(f"**Memory Size:** {memory_stats.get('memory_size_mb', 0)} MB")
+            
+            if memory_stats.get('people'):
+                st.write("**People in Memory:**")
+                for person_name in memory_stats['people']:
+                    st.write(f"- {person_name}")
+            
+            if memory_stats.get('message_types'):
+                st.write("**Message Types:**")
+                for msg_type, count in memory_stats['message_types'].items():
+                    st.write(f"- {msg_type}: {count}")
 
 # with col2:
 #     # Internal state visualization
