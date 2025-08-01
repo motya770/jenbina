@@ -8,6 +8,8 @@ from state_analysis_chain import create_state_analysis_system
 from world_state import WorldState, create_world_description_system
 from chat_handler import handle_chat_interaction
 from person import Person
+from meta_cognition import MetaCognitiveSystem
+from enhanced_action_decision_chain import create_meta_cognitive_action_chain
 
 # Initialize LLM
 import os
@@ -34,6 +36,13 @@ llm_json_mode = ChatOllama(model=local_llm, temperature=0, format='json')
 person = Person()
 person.update_all_needs()
 print(person)
+
+# Initialize meta-cognitive system
+meta_cognitive_system = MetaCognitiveSystem(llm_json_mode)
+
+# Initialize session state for meta-cognition
+if 'meta_cognitive_system' not in st.session_state:
+    st.session_state.meta_cognitive_system = meta_cognitive_system
 
 # Initialize session state for person's state if not already done
 if 'person' not in st.session_state:
@@ -76,11 +85,32 @@ with col1:
         st.session_state.world_description = create_world_description_system(llm=llm_json_mode, person=person, world=world)
         st.write(st.session_state.world_description)
 
-        # Action decision
-        st.write("**3. Action Decision:**")
-        st.session_state.action_decision = create_action_decision_chain(llm=llm_json_mode, person=person, world_description=st.session_state.world_description)
+        # Enhanced action decision with meta-cognition
+        st.write("**3. Action Decision (with Meta-Cognition):**")
+        st.session_state.action_decision = create_meta_cognitive_action_chain(
+            llm=llm_json_mode, 
+            person=person, 
+            world_description=st.session_state.world_description,
+            meta_cognitive_system=st.session_state.meta_cognitive_system
+        )
         st.write(st.session_state.action_decision)
         
+        # Display meta-cognitive insights
+        with st.expander("Meta-Cognitive Insights", expanded=False):
+            meta_stats = st.session_state.meta_cognitive_system.get_meta_cognitive_stats()
+            st.write(f"**Total Cognitive Processes:** {meta_stats['total_processes']}")
+            st.write(f"**Total Insights:** {meta_stats['total_insights']}")
+            
+            st.write("**Cognitive Biases Detected:**")
+            for bias, level in meta_stats['cognitive_biases'].items():
+                if level > 0:
+                    st.write(f"- {bias}: {level:.2f}")
+            
+            if meta_stats['recent_insights']:
+                st.write("**Recent Insights:**")
+                for insight in meta_stats['recent_insights']:
+                    st.write(f"- **{insight['type']}**: {insight['description']}")
+
         # Asimov compliance check
         st.write("**5. Asimov Compliance Check:**")
         asimov_response = create_asimov_check_system(llm=llm_json_mode, action=st.session_state.action_decision)
