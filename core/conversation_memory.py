@@ -1,0 +1,406 @@
+from dataclasses import dataclass, field
+from typing import Dict, List, Any, Optional
+from datetime import datetime
+import json
+import hashlib
+import os
+import chromadb
+from chromadb.config import Settings
+from langchain.embeddings import OllamaEmbeddings
+from langchain.schema import Document
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+@dataclass
+class ConversationMemory:
+    """Represents a conversation memory entry"""
+    person_name: str
+    message_content: str
+    message_type: str  # "user_message", "jenbina_response", "context"
+    timestamp: datetime
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    embedding_id: Optional[str] = None
+
+class ChromaMemoryManager:
+    def __init__(self, embeddings_model: str = "llama3.2:3b-instruct-fp16"):
+        """
+        Initialize Chroma-based memory manager
+        
+        Args:
+            embeddings_model: Ollama model to use for embeddings
+        """
+        self.embeddings = OllamaEmbeddings(model=embeddings_model)
+        self.vector_store_path = "./jenbina_memory"
+        self.client = None
+        self.collection = None
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]
+        )
+        self._initialize_vector_store()
+    
+    def _initialize_vector_store(self):
+        """Initialize or load the Chroma vector store"""
+        try:
+            # Initialize ChromaDB client
+            self.client = chromadb.PersistentClient(
+                path=self.vector_store_path,
+                settings=Settings(
+                    anonymized_telemetry=False,
+                    allow_reset=True
+                )
+            )
+            
+            # Get or create collection
+            try:
+                self.collection = self.client.get_collection("jenbina_conversations")
+                print(f"Loaded existing collection from {self.vector_store_path}")
+            except:
+                self.collection = self.client.create_collection("jenbina_conversations")
+                print(f"Created new collection at {self.vector_store_path}")
+                
+        except Exception as e:
+            print(f"Error initializing vector store: {e}")
+            # Fallback to in-memory client
+            self.client = chromadb.Client()
+            self.collection = self.client.create_collection("jenbina_conversations")
+    
+    def _generate_embedding_id(self, person_name: str, content: str, timestamp: datetime) -> str:
+        """Generate a unique ID for the embedding"""
+        unique_string = f"{person_name}_{content}_{timestamp.isoformat()}"
+        return hashlib.md5(unique_string.encode()).hexdigest()
+    
+    def store_conversation(self, person_name: str, message_content: str, 
+                          message_type: str, metadata: Dict[str, Any] = None) -> str:
+        """
+        Store a conversation message in Chroma
+        
+        Args:
+            person_name: Name of the person
+            message_content: Content of the message
+            message_type: Type of message (user_message, jenbina_response, etc.)
+            metadata: Additional metadata
+            
+        Returns:
+            embedding_id: Unique ID of the stored embedding
+        """
+        try:
+            timestamp = datetime.now()
+            embedding_id = self._generate_embedding_id(person_name, message_content, timestamp)
+            
+            # Generate embedding
+            embedding = self.embeddings.embed_query(message_content)
+            
+            # Prepare metadata
+            doc_metadata = {
+                "person_name": person_name,
+                "message_type": message_type,
+                "timestamp": timestamp.isoformat(),
+                "embedding_id": embedding_id,
+                **(metadata or {})
+            }
+            
+            # Add to Chroma collection
+            self.collection.add(
+                embeddings=[embedding],
+                documents=[message_content],
+                metadatas=[doc_metadata],
+                ids=[embedding_id]
+            )
+            
+            print(f"Stored conversation for {person_name}: {message_content[:50]}...")
+            return embedding_id
+            
+        except Exception as e:
+            print(f"Error storing conversation: {e}")
+            return None
+    
+    def retrieve_relevant_context(self, person_name: str, current_message: str, 
+                                top_k: int = 5) -> List[Dict[str, Any]]:
+        """
+        Retrieve relevant conversation context for a person
+        
+        Args:
+            person_name: Name of the person
+            current_message: Current message to find context for
+            top_k: Number of relevant documents to retrieve
+            
+        Returns:
+            List of relevant context documents
+        """
+        try:
+            # Generate embedding for current message
+            query_embedding = self.embeddings.embed_query(current_message)
+            
+            # Search for relevant documents
+            results = self.collection.query(
+                query_embeddings=[query_embedding],
+                n_results=top_k * 2,  # Get more to filter
+                where={"person_name": person_name}
+            )
+            
+            # Filter and format results
+            relevant_context = []
+            for i, (doc, metadata, distance) in enumerate(zip(
+                results['documents'][0], 
+                results['metadatas'][0], 
+                results['distances'][0]
+            )):
+                # Convert distance to similarity score (Chroma uses L2 distance)
+                similarity_score = 1.0 / (1.0 + distance)
+                
+                if similarity_score > 0.6:  # Adjust threshold as needed
+                    relevant_context.append({
+                        "content": doc,
+                        "metadata": metadata,
+                        "relevance_score": similarity_score
+                    })
+            
+            print(f"Retrieved {len(relevant_context)} relevant contexts for {person_name}")
+            return relevant_context[:top_k]
+            
+        except Exception as e:
+            print(f"Error retrieving context: {e}")
+            return []
+    
+    def get_person_conversation_history(self, person_name: str, 
+                                      limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Get recent conversation history for a specific person
+        
+        Args:
+            person_name: Name of the person
+            limit: Maximum number of messages to retrieve
+            
+        Returns:
+            List of conversation messages
+        """
+        try:
+            # Get all documents for this person
+            results = self.collection.get(
+                where={"person_name": person_name},
+                limit=limit
+            )
+            
+            # Format and sort by timestamp
+            person_history = []
+            for i, (doc, metadata) in enumerate(zip(results['documents'], results['metadatas'])):
+                person_history.append({
+                    "content": doc,
+                    "metadata": metadata
+                })
+            
+            # Sort by timestamp (most recent first)
+            person_history.sort(
+                key=lambda x: x["metadata"]["timestamp"], 
+                reverse=True
+            )
+            
+            return person_history[:limit]
+            
+        except Exception as e:
+            print(f"Error getting conversation history: {e}")
+            return []
+    
+    def get_person_summary(self, person_name: str) -> Dict[str, Any]:
+        """
+        Get a summary of interactions with a specific person
+        
+        Args:
+            person_name: Name of the person
+            
+        Returns:
+            Summary dictionary
+        """
+        try:
+            history = self.get_person_conversation_history(person_name, limit=50)
+            
+            if not history:
+                return {
+                    "person_name": person_name,
+                    "total_interactions": 0,
+                    "first_interaction": None,
+                    "last_interaction": None,
+                    "common_topics": [],
+                    "interaction_patterns": {}
+                }
+            
+            # Analyze interaction patterns
+            message_types = [h["metadata"]["message_type"] for h in history]
+            timestamps = [h["metadata"]["timestamp"] for h in history]
+            
+            # Extract common topics (simple keyword extraction)
+            all_content = " ".join([h["content"] for h in history])
+            common_words = self._extract_common_words(all_content)
+            
+            return {
+                "person_name": person_name,
+                "total_interactions": len(history),
+                "first_interaction": min(timestamps) if timestamps else None,
+                "last_interaction": max(timestamps) if timestamps else None,
+                "common_topics": common_words[:10],
+                "interaction_patterns": {
+                    "user_messages": message_types.count("user_message"),
+                    "jenbina_responses": message_types.count("jenbina_response"),
+                    "context_entries": message_types.count("context")
+                }
+            }
+            
+        except Exception as e:
+            print(f"Error getting person summary: {e}")
+            return {"person_name": person_name, "error": str(e)}
+    
+    def _extract_common_words(self, text: str) -> List[str]:
+        """Extract common words from text"""
+        import re
+        from collections import Counter
+        
+        # Remove punctuation and convert to lowercase
+        words = re.findall(r'\b\w+\b', text.lower())
+        
+        # Remove common stop words
+        stop_words = {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 
+            'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 
+            'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 
+            'may', 'might', 'must', 'can', 'i', 'you', 'he', 'she', 'it', 'we', 
+            'they', 'me', 'him', 'her', 'us', 'them', 'this', 'that', 'these', 
+            'those', 'my', 'your', 'his', 'her', 'its', 'our', 'their'
+        }
+        
+        words = [word for word in words if word not in stop_words and len(word) > 3]
+        
+        # Count and return most common words
+        word_counts = Counter(words)
+        return [word for word, count in word_counts.most_common(20)]
+    
+    def search_similar_conversations(self, query: str, person_name: str = None, 
+                                   top_k: int = 5) -> List[Dict[str, Any]]:
+        """
+        Search for similar conversations
+        
+        Args:
+            query: Search query
+            person_name: Optional person name to filter by
+            top_k: Number of results to return
+            
+        Returns:
+            List of similar conversations
+        """
+        try:
+            # Generate embedding for query
+            query_embedding = self.embeddings.embed_query(query)
+            
+            # Search
+            if person_name:
+                results = self.collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=top_k,
+                    where={"person_name": person_name}
+                )
+            else:
+                results = self.collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=top_k
+                )
+            
+            # Format results
+            formatted_results = []
+            for i, (doc, metadata, distance) in enumerate(zip(
+                results['documents'][0], 
+                results['metadatas'][0], 
+                results['distances'][0]
+            )):
+                similarity_score = 1.0 / (1.0 + distance)
+                formatted_results.append({
+                    "content": doc,
+                    "metadata": metadata,
+                    "relevance_score": similarity_score
+                })
+            
+            return formatted_results
+            
+        except Exception as e:
+            print(f"Error searching conversations: {e}")
+            return []
+    
+    def get_memory_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about the memory system
+        
+        Returns:
+            Dictionary with memory statistics
+        """
+        try:
+            # Get collection count
+            count = self.collection.count()
+            
+            if count == 0:
+                return {
+                    "total_conversations": 0,
+                    "unique_people": 0,
+                    "total_messages": 0,
+                    "memory_size_mb": 0
+                }
+            
+            # Get all documents to analyze
+            all_results = self.collection.get(limit=count)
+            
+            # Count unique people
+            unique_people = set()
+            message_types = {}
+            
+            for metadata in all_results['metadatas']:
+                if metadata:
+                    person_name = metadata.get("person_name", "unknown")
+                    unique_people.add(person_name)
+                    
+                    message_type = metadata.get("message_type", "unknown")
+                    message_types[message_type] = message_types.get(message_type, 0) + 1
+            
+            # Calculate memory size
+            memory_size_mb = 0
+            if os.path.exists(self.vector_store_path):
+                for root, dirs, files in os.walk(self.vector_store_path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        memory_size_mb += os.path.getsize(file_path) / (1024 * 1024)
+            
+            return {
+                "total_conversations": count,
+                "unique_people": len(unique_people),
+                "total_messages": count,
+                "message_types": message_types,
+                "people": list(unique_people),
+                "memory_size_mb": round(memory_size_mb, 2)
+            }
+            
+        except Exception as e:
+            print(f"Error getting memory stats: {e}")
+            return {"error": str(e)}
+    
+    def clear_memory(self, person_name: str = None):
+        """
+        Clear memory for a specific person or all memory
+        
+        Args:
+            person_name: If provided, clear only this person's memory
+        """
+        try:
+            if person_name:
+                # Get all documents for this person
+                results = self.collection.get(
+                    where={"person_name": person_name}
+                )
+                
+                # Delete by IDs
+                if results['ids']:
+                    self.collection.delete(ids=results['ids'])
+                    print(f"Cleared memory for {person_name}")
+            else:
+                # Clear all memory
+                self.collection.delete(where={})
+                print("Cleared all memory")
+                
+        except Exception as e:
+            print(f"Error clearing memory: {e}") 
