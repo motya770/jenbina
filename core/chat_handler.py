@@ -33,6 +33,7 @@ def handle_chat_interaction(
         # Get relevant context from Chroma
         relevant_context = ""
         if memory_manager:
+            print(f"Retrieving relevant context for message: {user_input[:50]}...")
             relevant_context_docs = memory_manager.retrieve_relevant_context(
                 person_name="User",
                 current_message=user_input,
@@ -40,10 +41,16 @@ def handle_chat_interaction(
             )
             
             if relevant_context_docs:
+                print(f"Found {len(relevant_context_docs)} relevant context documents")
                 relevant_context = "\n".join([
                     f"Previous context: {doc['content']}"
                     for doc in relevant_context_docs
                 ])
+                print(f"Context being used: {relevant_context[:200]}...")
+            else:
+                print("No relevant context found")
+        else:
+            print("No memory manager available")
         
         # Build context-aware prompt
         context_parts = []
@@ -53,6 +60,15 @@ def handle_chat_interaction(
         
         if relevant_context:
             context_parts.append(f"Relevant Conversation History:\n{relevant_context}")
+            # Show context being used in Streamlit
+            st.info(f"📚 Using {len(relevant_context_docs)} relevant context documents from memory")
+            
+            # Show the actual context being used (for debugging)
+            with st.expander("🔍 Context Being Used", expanded=False):
+                for i, doc in enumerate(relevant_context_docs):
+                    st.write(f"**Context {i+1}** (Relevance: {doc['relevance_score']:.2f}):")
+                    st.write(f"*{doc['metadata']['message_type']}* - {doc['content']}")
+                    st.write("---")
         
         if conversation_context:
             context_parts.append(f"Recent Conversation Context:\n{conversation_context}")
