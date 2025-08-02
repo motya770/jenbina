@@ -1,13 +1,13 @@
 import json
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+# Remove LLMChain import since we'll use invoke directly
 from langchain.llms.base import BaseLLM
 from typing import Dict, Any
 from person import Person  # Import Person instead of BasicNeeds
 from fix_llm_json import fix_llm_json
 
 
-def create_action_decision_chain(llm: BaseLLM, person: Person, world_description) -> LLMChain:
+def create_action_decision_chain(llm: BaseLLM, person: Person, world_description) -> Dict[str, Any]:
     # Create prompt for action decision
     action_prompt = PromptTemplate(
         input_variables=["descriptions", "actions", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction"],
@@ -34,11 +34,7 @@ def create_action_decision_chain(llm: BaseLLM, person: Person, world_description
     """
     )
 
-    action_decision_chain = LLMChain(
-        llm=llm,
-        prompt=action_prompt,
-        verbose=True
-    )
+    # Remove LLMChain creation since we'll use invoke directly
 
     def process_action_decision(person: Person, world_description: str, llm: BaseLLM) -> Dict[str, Any]:
         """
@@ -63,15 +59,20 @@ def create_action_decision_chain(llm: BaseLLM, person: Person, world_description
         safety_satisfaction = basic_needs.needs.get('safety', 50.0).satisfaction
         overall_satisfaction = basic_needs.get_overall_satisfaction()
         
-        # Get decision from the chain
-        action_decision = action_decision_chain.run(
-            descriptions=description_data["list_of_descriptions"],
-            actions=description_data["list_of_actions"],
-            hunger_satisfaction=hunger_satisfaction,
-            sleep_satisfaction=sleep_satisfaction,
-            safety_satisfaction=safety_satisfaction,
-            overall_satisfaction=overall_satisfaction
+        # Get decision using invoke directly
+        response = llm.invoke(
+            action_prompt.format(
+                descriptions=description_data["list_of_descriptions"],
+                actions=description_data["list_of_actions"],
+                hunger_satisfaction=hunger_satisfaction,
+                sleep_satisfaction=sleep_satisfaction,
+                safety_satisfaction=safety_satisfaction,
+                overall_satisfaction=overall_satisfaction
+            )
         )
+        
+        # Extract content from the response
+        action_decision = response.content if hasattr(response, 'content') else str(response)
         
         # Fix and parse the JSON response
         fixed_action_decision = fix_llm_json(broken_json=action_decision, llm_json_mode=llm)
@@ -79,4 +80,4 @@ def create_action_decision_chain(llm: BaseLLM, person: Person, world_description
         
         return json.loads(fixed_action_decision)
     
-    return process_action_decision(person=person, world_description=world_description, llm=action_decision_chain)
+    return process_action_decision(person=person, world_description=world_description, llm=llm)
