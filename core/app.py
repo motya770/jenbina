@@ -94,72 +94,22 @@ with col1:
         st.session_state.action_decision = None
         st.session_state.state_response = None
 
-    if st.button("Start simulation"):
-        # Display all stages
-        st.write("### Processing Stages:")
-        st.write("### Current Jenbina State:")
-        st.write(f"- Name: {person.name}")
-        st.write(f"- Overall Satisfaction: {person.needs[0].get_overall_satisfaction():.1f}%")
-        st.write(f"- Hunger: {person.needs[0].needs.get('hunger', 50.0).satisfaction:.1f}%")
-        st.write(f"- Sleep: {person.needs[0].needs.get('sleep', 50.0).satisfaction:.1f}%")
-        st.write(f"- Safety: {person.needs[0].needs.get('safety', 50.0).satisfaction:.1f}%")
-        
-        # Basic needs analysis
-        st.write("**1. Basic Needs Analysis:**")
-        st.session_state.needs_response = create_basic_needs_chain(llm_json_mode=llm_json_mode, person=person.needs[0])
-        st.write(st.session_state.needs_response)
-
-        # World state and description
-        st.write("**2. World State:**")
-        world = WorldState()
-        st.write(f"Location: {world.location}")
-        st.write(f"Time of Day: {world.time_of_day}")
-        st.write(f"Weather: {world.weather}")
-        if world.last_descriptions:
-            st.write(f"Previous Descriptions: {len(world.last_descriptions)} items")
-
-        st.write("**2.1 World Description:**")
-        st.session_state.world_description = create_world_description_system(llm=llm_json_mode, person=person, world=world)
-        st.write(st.session_state.world_description)
-
-        # Enhanced action decision with meta-cognition
-        st.write("**3. Action Decision (with Meta-Cognition):**")
-        st.session_state.action_decision = create_meta_cognitive_action_chain(
-            llm=llm_json_mode, 
-            person=person, 
-            world_description=st.session_state.world_description,
-            meta_cognitive_system=st.session_state.meta_cognitive_system
-        )
-        st.write(st.session_state.action_decision)
-        
-        # Display meta-cognitive insights
-        with st.expander("Meta-Cognitive Insights", expanded=False):
-            meta_stats = st.session_state.meta_cognitive_system.get_meta_cognitive_stats()
-            st.write(f"**Total Cognitive Processes:** {meta_stats['total_processes']}")
-            st.write(f"**Total Insights:** {meta_stats['total_insights']}")
-            
-            st.write("**Cognitive Biases Detected:**")
-            for bias, level in meta_stats['cognitive_biases'].items():
-                if level > 0:
-                    st.write(f"- {bias}: {level:.2f}")
-            
-            if meta_stats['recent_insights']:
-                st.write("**Recent Insights:**")
-                for insight in meta_stats['recent_insights']:
-                    st.write(f"- **{insight['type']}**: {insight['description']}")
-
-        # Asimov compliance check
-        st.write("**5. Asimov Compliance Check:**")
-        asimov_response = create_asimov_check_system(llm=llm_json_mode, action=st.session_state.action_decision)
-        st.write(asimov_response)
-
-        # State analysis
-        st.write("**4. State Analysis:**") 
-        st.session_state.state_response = create_state_analysis_system(llm=llm_json_mode, action_decision=st.session_state.action_decision, compliance_check=asimov_response)
-        st.write(st.session_state.state_response)
-
-        # Mark simulation as completed
-        st.session_state.simulation_completed = True
+    # Skip simulation and go directly to chat
+    st.session_state.simulation_completed = True
+    st.session_state.needs_response = "Basic needs are being managed automatically"
+    st.session_state.world_description = "Living in a small house in a Moldovan village"
+    st.session_state.action_decision = "Continue with daily activities"
+    st.session_state.state_response = "State is being monitored automatically"
+    
+    st.success("🚀 **Direct Chat Mode Activated!** - Skip simulation and chat directly with Jenbina")
+    
+    # Quick status display
+    st.write("**Jenbina's Current Status:**")
+    st.write(f"- Name: {person.name}")
+    st.write(f"- Overall Satisfaction: {person.needs[0].get_overall_satisfaction():.1f}%")
+    st.write(f"- Hunger: {person.needs[0].needs.get('hunger', 50.0).satisfaction:.1f}%")
+    st.write(f"- Sleep: {person.needs[0].needs.get('sleep', 50.0).satisfaction:.1f}%")
+    st.write(f"- Safety: {person.needs[0].needs.get('safety', 50.0).satisfaction:.1f}%")
 
     # Only show chat interface after simulation is completed
     if st.session_state.simulation_completed:
