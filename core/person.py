@@ -127,7 +127,7 @@ class Person:
         """Get a summary of the person's current state"""
         state = {"name": self.name, "needs": []}
         for need in self.needs:
-            state["needs"].append(str(need))
+            state["needs"].append(need)  # Return actual BasicNeeds object, not string
         
         # Add communication state
         comm_stats = self.get_communication_stats()

@@ -59,6 +59,27 @@ if 'person' not in st.session_state:
 
 st.title("Jenbina:")
 
+# Debug mode toggle
+debug_mode = st.sidebar.checkbox("🔧 Debug Mode", value=True, help="Show detailed debugging information")
+
+# Debug controls
+if debug_mode:
+    st.sidebar.subheader("🔧 Debug Controls")
+    
+    # Memory operations
+    if st.sidebar.button("🗑️ Clear All Memory"):
+        st.session_state.memory_manager.clear_memory()
+        st.sidebar.success("Memory cleared!")
+    
+    if st.sidebar.button("📊 Refresh Memory Stats"):
+        st.sidebar.rerun()
+    
+    # Show current memory path
+    st.sidebar.write(f"**Memory Path:** `{st.session_state.memory_manager.vector_store_path}`")
+    
+    # Show embedding model
+    st.sidebar.write(f"**Embedding Model:** `{st.session_state.memory_manager.embeddings.model}`")
+
 # Create columns for the interface layout
 col1, col2 = st.columns([2, 1])
 
@@ -77,7 +98,11 @@ with col1:
         # Display all stages
         st.write("### Processing Stages:")
         st.write("### Current Jenbina State:")
-        st.write(f"- State: {str(person)}")
+        st.write(f"- Name: {person.name}")
+        st.write(f"- Overall Satisfaction: {person.needs[0].get_overall_satisfaction():.1f}%")
+        st.write(f"- Hunger: {person.needs[0].needs.get('hunger', 50.0).satisfaction:.1f}%")
+        st.write(f"- Sleep: {person.needs[0].needs.get('sleep', 50.0).satisfaction:.1f}%")
+        st.write(f"- Safety: {person.needs[0].needs.get('safety', 50.0).satisfaction:.1f}%")
         
         # Basic needs analysis
         st.write("**1. Basic Needs Analysis:**")
@@ -87,7 +112,11 @@ with col1:
         # World state and description
         st.write("**2. World State:**")
         world = WorldState()
-        st.write(world)
+        st.write(f"Location: {world.location}")
+        st.write(f"Time of Day: {world.time_of_day}")
+        st.write(f"Weather: {world.weather}")
+        if world.last_descriptions:
+            st.write(f"Previous Descriptions: {len(world.last_descriptions)} items")
 
         st.write("**2.1 World Description:**")
         st.session_state.world_description = create_world_description_system(llm=llm_json_mode, person=person, world=world)
@@ -138,7 +167,12 @@ with col1:
         st.write("### Chat with Jenbina")
         
         # Display current person state
-        st.write(f"**Current State:** {person}")
+        st.write("**Current State:**")
+        st.write(f"- Name: {person.name}")
+        st.write(f"- Overall Satisfaction: {person.needs[0].get_overall_satisfaction():.1f}%")
+        st.write(f"- Hunger: {person.needs[0].needs.get('hunger', 50.0).satisfaction:.1f}%")
+        st.write(f"- Sleep: {person.needs[0].needs.get('sleep', 50.0).satisfaction:.1f}%")
+        st.write(f"- Safety: {person.needs[0].needs.get('safety', 50.0).satisfaction:.1f}%")
         
         user_input = st.chat_input("Talk to Jenbina...")
         
@@ -166,7 +200,8 @@ with col1:
                 user_input=user_input,
                 person_state=person.get_current_state(),
                 conversation_context=recent_context,
-                memory_manager=st.session_state.memory_manager
+                memory_manager=st.session_state.memory_manager,
+                debug_mode=debug_mode
             )
             
             print(chat_result)
@@ -227,6 +262,36 @@ with col1:
                 st.write("**Message Types:**")
                 for msg_type, count in memory_stats['message_types'].items():
                     st.write(f"- {msg_type}: {count}")
+        
+        # Debug section for memory system
+        if debug_mode:
+            with st.expander("🐛 Memory Debug Info", expanded=False):
+                st.write("**Memory Manager Status:**")
+                st.write(f"- Memory Manager Initialized: {st.session_state.memory_manager is not None}")
+                st.write(f"- Chroma Client: {st.session_state.memory_manager.client is not None if st.session_state.memory_manager else False}")
+                st.write(f"- Collection: {st.session_state.memory_manager.collection is not None if st.session_state.memory_manager else False}")
+                
+                # Test memory operations
+                if st.button("🧪 Test Memory Operations"):
+                    try:
+                        # Test storing
+                        test_id = st.session_state.memory_manager.store_conversation(
+                            "TestUser", "This is a test message", "test_message"
+                        )
+                        st.success(f"✅ Test message stored with ID: {test_id}")
+                        
+                        # Test retrieval
+                        test_context = st.session_state.memory_manager.retrieve_relevant_context(
+                            "TestUser", "test message", top_k=1
+                        )
+                        st.success(f"✅ Test retrieval found {len(test_context)} documents")
+                        
+                        # Clean up test
+                        st.session_state.memory_manager.clear_memory("TestUser")
+                        st.success("✅ Test data cleaned up")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Memory test failed: {str(e)}")
 
 # with col2:
 #     # Internal state visualization

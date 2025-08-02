@@ -3,7 +3,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 import json
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+# Remove LLMChain import since we use invoke directly
 from langchain.llms.base import BaseLLM
 
 @dataclass
@@ -86,16 +86,18 @@ Respond in JSON format:
 }}"""
         )
         
-        reflection_chain = LLMChain(llm=self.llm, prompt=reflection_prompt)
-        
+        # Use invoke directly instead of LLMChain
         try:
-            result = reflection_chain.run(
-                process_type=process.process_type,
-                input_data=json.dumps(process.input_data),
-                output_data=json.dumps(process.output_data),
-                reasoning_chain="\n".join(process.reasoning_chain),
-                confidence=process.confidence
+            response = self.llm.invoke(
+                reflection_prompt.format(
+                    process_type=process.process_type,
+                    input_data=json.dumps(process.input_data),
+                    output_data=json.dumps(process.output_data),
+                    reasoning_chain="\n".join(process.reasoning_chain),
+                    confidence=process.confidence
+                )
             )
+            result = response.content if hasattr(response, 'content') else str(response)
             
             reflection_data = json.loads(result)
             
@@ -149,8 +151,6 @@ Respond in JSON format:
 }}"""
         )
         
-        pattern_chain = LLMChain(llm=self.llm, prompt=pattern_prompt)
-        
         # Format cognitive history for analysis
         history_text = "\n\n".join([
             f"Process {i+1}: {p.process_type} (confidence: {p.confidence})"
@@ -158,7 +158,9 @@ Respond in JSON format:
         ])
         
         try:
-            result = pattern_chain.run(cognitive_history=history_text)
+            # Use invoke directly instead of LLMChain
+            response = self.llm.invoke(pattern_prompt.format(cognitive_history=history_text))
+            result = response.content if hasattr(response, 'content') else str(response)
             return json.loads(result)
         except Exception as e:
             return {"error": f"Pattern analysis failed: {e}"}
@@ -188,8 +190,6 @@ Respond in JSON format:
 }}"""
         )
         
-        strategy_chain = LLMChain(llm=self.llm, prompt=strategy_prompt)
-        
         # Format insights for display
         insights_text = "\n".join([
             f"- {insight.insight_type}: {insight.description}"
@@ -197,11 +197,15 @@ Respond in JSON format:
         ])
         
         try:
-            result = strategy_chain.run(
-                current_situation=json.dumps(current_situation),
-                cognitive_biases=json.dumps(self.cognitive_biases),
-                insights=insights_text
+            # Use invoke directly instead of LLMChain
+            response = self.llm.invoke(
+                strategy_prompt.format(
+                    current_situation=json.dumps(current_situation),
+                    cognitive_biases=json.dumps(self.cognitive_biases),
+                    insights=insights_text
+                )
             )
+            result = response.content if hasattr(response, 'content') else str(response)
             return json.loads(result)
         except Exception as e:
             return {"error": f"Strategy suggestion failed: {e}"}

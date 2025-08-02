@@ -1,6 +1,6 @@
 import json
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+# Remove LLMChain import since we'll use invoke directly
 from langchain.llms.base import BaseLLM
 from typing import Dict, Any, Callable
 from fix_llm_json import fix_llm_json
@@ -35,18 +35,16 @@ Respond in JSON format with:
         input_variables=["action"]
     )
 
-    asimov_check_chain = LLMChain(
-        llm=llm,
-        prompt=asimov_prompt,
-        verbose=True
-    )
+    # Remove LLMChain creation since we'll use invoke directly
 
     def check_asimov_compliance(action: str) -> Dict[str, Any]:
         """
         Check if an action complies with Asimov's Laws
         Returns dict with compliance status and explanation
         """
-        result = asimov_check_chain.run(action=action)
+        # Use invoke directly instead of LLMChain.run
+        response = llm.invoke(asimov_prompt.format(action=action))
+        result = response.content if hasattr(response, 'content') else str(response)
         
         try:
             fixed_result = fix_llm_json(broken_json=result, llm_json_mode=llm)

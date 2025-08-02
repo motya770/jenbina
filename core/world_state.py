@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
 from langchain.llms.base import BaseLLM
 from typing import List, Callable
 from basic_needs import BasicNeeds
@@ -67,11 +66,7 @@ def create_world_description_system(llm: BaseLLM, person: Person, world: WorldSt
     """
     )
 
-    world_description_chain = LLMChain(
-        llm=llm,
-        prompt=world_prompt,
-        verbose=True
-    )
+    # Remove the LLMChain creation since we'll use invoke directly
 
     def get_world_description(person: Person, world: WorldState) -> str:
         """
@@ -91,16 +86,22 @@ def create_world_description_system(llm: BaseLLM, person: Person, world: WorldSt
         safety_satisfaction = basic_needs.needs.get('safety', 50.0).satisfaction
         overall_satisfaction = basic_needs.get_overall_satisfaction()
         
-        description = world_description_chain.run(
-            location=world.location,
-            time_of_day=world.time_of_day,
-            weather=world.weather,
-            last_descriptions="\n".join(world.last_descriptions),
-            hunger_satisfaction=hunger_satisfaction,
-            sleep_satisfaction=sleep_satisfaction,
-            safety_satisfaction=safety_satisfaction,
-            overall_satisfaction=overall_satisfaction
+        # Use invoke directly instead of LLMChain.run
+        response = llm.invoke(
+            world_prompt.format(
+                location=world.location,
+                time_of_day=world.time_of_day,
+                weather=world.weather,
+                last_descriptions="\n".join(world.last_descriptions),
+                hunger_satisfaction=hunger_satisfaction,
+                sleep_satisfaction=sleep_satisfaction,
+                safety_satisfaction=safety_satisfaction,
+                overall_satisfaction=overall_satisfaction
+            )
         )
+        
+        # Extract content from the response
+        description = response.content if hasattr(response, 'content') else str(response)
         world.add_description(description)
         return description
 

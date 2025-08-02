@@ -1,5 +1,49 @@
+import json
 from langchain.schema import HumanMessage
 from conversation_memory import ChromaMemoryManager
+
+def basic_needs_to_json(basic_needs):
+    """Convert BasicNeeds object to JSON-serializable format"""
+    if not basic_needs:
+        return None
+    
+    needs_json = {
+        "overall_satisfaction": basic_needs.get_overall_satisfaction(),
+        "needs": {}
+    }
+    
+    # Convert each need to a simple dict
+    for need_name, need_obj in basic_needs.needs.items():
+        needs_json["needs"][need_name] = {
+            "name": need_obj.name,
+            "satisfaction": need_obj.satisfaction,
+            "decay_rate": need_obj.decay_rate
+        }
+    
+    return json.dumps(needs_json)
+
+def create_metadata_from_person_state(person_state, world_description=None, action_decision=None):
+    """Create metadata dictionary from person state and other context"""
+    metadata = {}
+    
+    if person_state:
+        # Store BasicNeeds as JSON
+        if "needs" in person_state and person_state["needs"]:
+            needs = person_state["needs"][0] if isinstance(person_state["needs"], list) else person_state["needs"]
+            metadata["basic_needs_json"] = basic_needs_to_json(needs)
+        
+        # Add other person state info
+        metadata["person_name"] = person_state.get("name", "Unknown")
+        metadata["conversations"] = person_state.get("conversations", 0)
+        metadata["messages"] = person_state.get("messages", 0)
+    
+    if world_description:
+        metadata["world_description"] = str(world_description)[:500]  # Truncate if too long
+    
+    if action_decision:
+        metadata["action_taken"] = str(action_decision)[:500]  # Truncate if too long
+    
+    return metadata
 
 def handle_chat_interaction(
     st,
@@ -11,7 +55,8 @@ def handle_chat_interaction(
     user_input=None,
     person_state=None,
     conversation_context=None,
-    memory_manager=None
+    memory_manager=None,
+    debug_mode=False
 ):
     """Handle chat interactions with Jenbina using Chroma memory."""
     if user_input:
@@ -20,15 +65,20 @@ def handle_chat_interaction(
         
         # Store user message in Chroma
         if memory_manager:
-            memory_manager.store_conversation(
+            print(f"🔵 Storing user message in memory: {user_input[:50]}...")
+            
+            # Create metadata with JSON-serialized BasicNeeds
+            metadata = create_metadata_from_person_state(person_state, world_description)
+            
+            embedding_id = memory_manager.store_conversation(
                 person_name="User",
                 message_content=user_input,
                 message_type="user_message",
-                metadata={
-                    "needs_state": person_state.get("needs", []) if person_state else [],
-                    "world_state": world_description
-                }
+                metadata=metadata
             )
+            print(f"✅ Stored with embedding ID: {embedding_id}")
+        else:
+            print("❌ No memory manager available for storing user message")
         
         # Get relevant context from Chroma
         relevant_context = ""
@@ -64,11 +114,21 @@ def handle_chat_interaction(
             st.info(f"📚 Using {len(relevant_context_docs)} relevant context documents from memory")
             
             # Show the actual context being used (for debugging)
-            with st.expander("🔍 Context Being Used", expanded=False):
-                for i, doc in enumerate(relevant_context_docs):
-                    st.write(f"**Context {i+1}** (Relevance: {doc['relevance_score']:.2f}):")
-                    st.write(f"*{doc['metadata']['message_type']}* - {doc['content']}")
-                    st.write("---")
+            if debug_mode:
+                with st.expander("🔍 Context Being Used", expanded=False):
+                    for i, doc in enumerate(relevant_context_docs):
+                        st.write(f"**Context {i+1}** (Relevance: {doc['relevance_score']:.2f}):")
+                        st.write(f"*{doc['metadata']['message_type']}* - {doc['content']}")
+                        
+                        # Show BasicNeeds if available
+                        if "basic_needs" in doc['metadata'] and doc['metadata']['basic_needs']:
+                            needs = doc['metadata']['basic_needs']
+                            st.write(f"**Needs at time:** Overall: {needs.get('overall_satisfaction', 0):.1f}%")
+                            if 'needs' in needs:
+                                for need_name, need_data in needs['needs'].items():
+                                    st.write(f"  - {need_name}: {need_data.get('satisfaction', 0):.1f}%")
+                        
+                        st.write("---")
         
         if conversation_context:
             context_parts.append(f"Recent Conversation Context:\n{conversation_context}")
@@ -96,16 +156,20 @@ Keep the response natural and in-character. Consider your current needs and how 
         
         # Store Jenbina's response in Chroma
         if memory_manager:
-            memory_manager.store_conversation(
+            print(f"🔵 Storing Jenbina response in memory: {response.content[:50]}...")
+            
+            # Create metadata with JSON-serialized BasicNeeds
+            metadata = create_metadata_from_person_state(person_state, world_description, action_decision)
+            
+            embedding_id = memory_manager.store_conversation(
                 person_name="User",
                 message_content=response.content,
                 message_type="jenbina_response",
-                metadata={
-                    "needs_state": person_state.get("needs", []) if person_state else [],
-                    "world_state": world_description,
-                    "action_taken": action_decision
-                }
+                metadata=metadata
             )
+            print(f"✅ Stored Jenbina response with embedding ID: {embedding_id}")
+        else:
+            print("❌ No memory manager available for storing Jenbina response")
         
         return {
             "user_message": user_input,
