@@ -91,14 +91,14 @@ def handle_chat_interaction(
             )
             
             if relevant_context_docs:
-                print(f"Found {len(relevant_context_docs)} relevant context documents")
+                print(f"Found {len(relevant_context_docs)} recent context documents")
                 relevant_context = "\n".join([
-                    f"Previous context: {doc['content']}"
+                    f"Recent message: {doc['content']}"
                     for doc in relevant_context_docs
                 ])
                 print(f"Context being used: {relevant_context[:200]}...")
             else:
-                print("No relevant context found")
+                print("No recent context found")
         else:
             print("No memory manager available")
         
@@ -109,9 +109,9 @@ def handle_chat_interaction(
             context_parts.append(f"Current State: {person_state}")
         
         if relevant_context:
-            context_parts.append(f"Relevant Conversation History:\n{relevant_context}")
+            context_parts.append(f"Recent Conversation History:\n{relevant_context}")
             # Show context being used in Streamlit
-            st.info(f"📚 Using {len(relevant_context_docs)} relevant context documents from memory")
+            st.info(f"📚 Using {len(relevant_context_docs)} recent context documents from memory")
             
             # Show the actual context being used (for debugging)
             if debug_mode:

@@ -140,50 +140,58 @@ class ChromaMemoryManager:
     def retrieve_relevant_context(self, person_name: str, current_message: str, 
                                 top_k: int = 5) -> List[Dict[str, Any]]:
         """
-        Retrieve relevant conversation context for a person
+        Retrieve recent conversation context for a person (all recent messages)
         
         Args:
             person_name: Name of the person
-            current_message: Current message to find context for
-            top_k: Number of relevant documents to retrieve
+            current_message: Current message (not used for retrieval, just for compatibility)
+            top_k: Number of recent documents to retrieve
             
         Returns:
-            List of relevant context documents with parsed BasicNeeds
+            List of recent context documents with parsed BasicNeeds
         """
         try:
-            # Generate embedding for current message
-            query_embedding = self.embeddings.embed_query(current_message)
-            
-            # Search for relevant documents
-            results = self.collection.query(
-                query_embeddings=[query_embedding],
-                n_results=top_k * 2,  # Get more to filter
+            # Get recent documents for this person (no semantic search, just chronological)
+            # First, let's see how many documents exist for this person
+            all_results = self.collection.get(
                 where={"person_name": person_name}
             )
+            print(f"🔍 Debug: Total documents for {person_name}: {len(all_results['documents'])}")
             
-            # Filter and format results
-            relevant_context = []
-            for i, (doc, metadata, distance) in enumerate(zip(
-                results['documents'][0], 
-                results['metadatas'][0], 
-                results['distances'][0]
-            )):
-                # Convert distance to similarity score (Chroma uses L2 distance)
-                similarity_score = 1.0 / (1.0 + distance)
-                
-                if similarity_score > 0.6:  # Adjust threshold as needed
+            # Now get the recent ones with a higher limit
+            results = self.collection.get(
+                where={"person_name": person_name},
+                limit=top_k * 5  # Increase limit to make sure we get enough
+            )
+            
+            print(f"🔍 Debug: Found {len(results['documents'])} total documents for {person_name}")
+            
+            # Format and sort results by timestamp
+            recent_context = []
+            for i, (doc, metadata) in enumerate(zip(results['documents'], results['metadatas'])):
+                if metadata:
+                    print(f"🔍 Debug: Document {i}: {doc[:50]}... | Timestamp: {metadata.get('timestamp', 'N/A')}")
+                    
                     # Parse BasicNeeds JSON if present
-                    if metadata and "basic_needs_json" in metadata:
+                    if "basic_needs_json" in metadata:
                         metadata["basic_needs"] = parse_basic_needs_from_json(metadata["basic_needs_json"])
                     
-                    relevant_context.append({
+                    recent_context.append({
                         "content": doc,
                         "metadata": metadata,
-                        "relevance_score": similarity_score
+                        "relevance_score": 1.0  # All recent messages are equally relevant
                     })
             
-            print(f"Retrieved {len(relevant_context)} relevant contexts for {person_name}")
-            return relevant_context[:top_k]
+            print(f"🔍 Debug: Processed {len(recent_context)} documents")
+            
+            # Sort by timestamp (most recent first) and take top_k
+            recent_context.sort(
+                key=lambda x: x["metadata"]["timestamp"], 
+                reverse=True
+            )
+            
+            print(f"Retrieved {len(recent_context[:top_k])} recent contexts for {person_name}")
+            return recent_context[:top_k]
             
         except Exception as e:
             print(f"Error retrieving context: {e}")
