@@ -6,9 +6,21 @@ import hashlib
 import os
 import chromadb
 from chromadb.config import Settings
-from langchain.embeddings import OllamaEmbeddings
+from langchain_ollama import OllamaEmbeddings
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+def parse_basic_needs_from_json(needs_json_str):
+    """Parse BasicNeeds from JSON string stored in metadata"""
+    if not needs_json_str:
+        return None
+    
+    try:
+        needs_data = json.loads(needs_json_str)
+        return needs_data
+    except (json.JSONDecodeError, TypeError):
+        print(f"Error parsing BasicNeeds JSON: {needs_json_str}")
+        return None
 
 @dataclass
 class ConversationMemory:
@@ -91,14 +103,22 @@ class ChromaMemoryManager:
             # Generate embedding
             embedding = self.embeddings.embed_query(message_content)
             
-            # Prepare metadata
+            # Prepare metadata - ensure all values are serializable
             doc_metadata = {
                 "person_name": person_name,
                 "message_type": message_type,
                 "timestamp": timestamp.isoformat(),
                 "embedding_id": embedding_id,
-                **(metadata or {})
             }
+            
+            # Add metadata with type checking
+            if metadata:
+                for key, value in metadata.items():
+                    if isinstance(value, (str, int, float, bool)) or value is None:
+                        doc_metadata[key] = value
+                    else:
+                        # Convert complex objects to strings
+                        doc_metadata[key] = str(value)[:500]  # Truncate if too long
             
             # Add to Chroma collection
             self.collection.add(
@@ -113,6 +133,8 @@ class ChromaMemoryManager:
             
         except Exception as e:
             print(f"Error storing conversation: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def retrieve_relevant_context(self, person_name: str, current_message: str, 
@@ -126,7 +148,7 @@ class ChromaMemoryManager:
             top_k: Number of relevant documents to retrieve
             
         Returns:
-            List of relevant context documents
+            List of relevant context documents with parsed BasicNeeds
         """
         try:
             # Generate embedding for current message
@@ -150,6 +172,10 @@ class ChromaMemoryManager:
                 similarity_score = 1.0 / (1.0 + distance)
                 
                 if similarity_score > 0.6:  # Adjust threshold as needed
+                    # Parse BasicNeeds JSON if present
+                    if metadata and "basic_needs_json" in metadata:
+                        metadata["basic_needs"] = parse_basic_needs_from_json(metadata["basic_needs_json"])
+                    
                     relevant_context.append({
                         "content": doc,
                         "metadata": metadata,
@@ -173,7 +199,7 @@ class ChromaMemoryManager:
             limit: Maximum number of messages to retrieve
             
         Returns:
-            List of conversation messages
+            List of conversation messages with parsed BasicNeeds
         """
         try:
             # Get all documents for this person
@@ -185,6 +211,10 @@ class ChromaMemoryManager:
             # Format and sort by timestamp
             person_history = []
             for i, (doc, metadata) in enumerate(zip(results['documents'], results['metadatas'])):
+                # Parse BasicNeeds JSON if present
+                if metadata and "basic_needs_json" in metadata:
+                    metadata["basic_needs"] = parse_basic_needs_from_json(metadata["basic_needs_json"])
+                
                 person_history.append({
                     "content": doc,
                     "metadata": metadata

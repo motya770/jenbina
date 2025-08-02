@@ -1,4 +1,3 @@
-from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from dataclasses import dataclass
 from typing import Dict
@@ -110,24 +109,23 @@ Consider:
 - Prioritize the most critical needs first"""
     )
 
-    # Create the chain for decision making
-    needs_chain = LLMChain(
-        llm=llm_json_mode,
-        prompt=needs_prompt,
-        verbose=True
-    )
-
     # Prepare the needs status string
     needs_status = ", ".join([f"{name}: {need.satisfaction:.1f}%" for name, need in person.needs.items()])
     
-    response = needs_chain.run(
-        needs_status=needs_status,
-        overall_satisfaction=person.get_overall_satisfaction(),
-        critical_needs=person.get_critical_needs(),
-        low_needs=person.get_low_needs()
+    # Use the newer invoke method instead of run
+    response = llm_json_mode.invoke(
+        needs_prompt.format(
+            needs_status=needs_status,
+            overall_satisfaction=person.get_overall_satisfaction(),
+            critical_needs=person.get_critical_needs(),
+            low_needs=person.get_low_needs()
+        )
     )
     
+    # Extract content from the response
+    response_content = response.content if hasattr(response, 'content') else str(response)
+    
     print(f"Current state: {person}")
-    print(f"AI Decision: {response}")
-    return response
+    print(f"AI Decision: {response_content}")
+    return response_content
     

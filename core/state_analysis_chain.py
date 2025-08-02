@@ -1,6 +1,6 @@
 import json
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+# Remove LLMChain import since we'll use invoke directly
 from langchain.llms.base import BaseLLM
 from typing import Dict, Any, Callable, Optional
 
@@ -26,11 +26,7 @@ def create_state_analysis_system(llm: BaseLLM, action_decision: str, compliance_
         """
     )
 
-    state_analysis_chain = LLMChain(
-        llm=llm,
-        prompt=state_analysis_prompt,
-        verbose=True
-    )
+    # Remove LLMChain creation since we'll use invoke directly
 
     def analyze_state_changes(action_decision: str, compliance_check: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
@@ -48,7 +44,9 @@ def create_state_analysis_system(llm: BaseLLM, action_decision: str, compliance_
             return None
 
         try:
-            state_changes = state_analysis_chain.run(action=action_decision)
+            # Use invoke directly instead of LLMChain.run
+            response = llm.invoke(state_analysis_prompt.format(action=action_decision))
+            state_changes = response.content if hasattr(response, 'content') else str(response)
             state_result = json.loads(state_changes)
             print(f"\nState Changes After Action: {state_result}")
             return state_result
