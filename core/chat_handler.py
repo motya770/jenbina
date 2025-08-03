@@ -55,7 +55,7 @@ def handle_chat_interaction(
     user_input=None,
     person_state=None,
     conversation_context=None,
-    memory_manager=None,
+    memory_manager: ChromaMemoryManager = None,
     debug_mode=False
 ):
     """Handle chat interactions with Jenbina using Chroma memory."""
@@ -162,7 +162,7 @@ Keep the response natural and in-character. Consider your current needs and how 
             metadata = create_metadata_from_person_state(person_state, world_description, action_decision)
             
             embedding_id = memory_manager.store_conversation(
-                person_name="User",
+                person_name="Jenbina",
                 message_content=response.content,
                 message_type="jenbina_response",
                 metadata=metadata
