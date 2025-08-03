@@ -103,6 +103,9 @@ class ChromaMemoryManager:
             # Generate embedding
             embedding = self.embeddings.embed_query(message_content)
             
+            # DEBUG: Print the exact parameters being used
+            print(f"🔍 STORE DEBUG: person_name='{person_name}', message_type='{message_type}', content='{message_content[:30]}...'")
+            
             # Prepare metadata - ensure all values are serializable
             doc_metadata = {
                 "person_name": person_name,
@@ -119,6 +122,9 @@ class ChromaMemoryManager:
                     else:
                         # Convert complex objects to strings
                         doc_metadata[key] = str(value)[:500]  # Truncate if too long
+            
+            # DEBUG: Print the final metadata being stored
+            print(f"🔍 STORE DEBUG: Final doc_metadata['person_name']='{doc_metadata['person_name']}'")
             
             # Add to Chroma collection
             self.collection.add(
