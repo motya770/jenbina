@@ -3,7 +3,7 @@
     "configurations": [
         {
             "name": "Python: Streamlit",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "module": "streamlit",
             "args": [
