@@ -11,6 +11,7 @@ from person import Person
 from meta_cognition import MetaCognitiveSystem
 from enhanced_action_decision_chain import create_meta_cognitive_action_chain
 from conversation_memory import ChromaMemoryManager
+from environment_simulator import EnvironmentSimulator
 
 # Initialize LLM
 import os
@@ -44,6 +45,9 @@ meta_cognitive_system = MetaCognitiveSystem(llm_json_mode)
 # Initialize memory manager
 memory_manager = ChromaMemoryManager()
 
+# Initialize environment simulator
+environment_simulator = EnvironmentSimulator("Palo Alto, CA")
+
 # Initialize session state for meta-cognition
 if 'meta_cognitive_system' not in st.session_state:
     st.session_state.meta_cognitive_system = meta_cognitive_system
@@ -52,12 +56,89 @@ if 'meta_cognitive_system' not in st.session_state:
 if 'memory_manager' not in st.session_state:
     st.session_state.memory_manager = memory_manager
 
+# Initialize session state for environment simulator
+if 'environment_simulator' not in st.session_state:
+    st.session_state.environment_simulator = environment_simulator
+
 # Initialize session state for person's state if not already done
 if 'person' not in st.session_state:
     st.session_state.person = person
     st.session_state.action_history = []
 
 st.title("Jenbina:")
+
+# Get current environment state
+current_environment = st.session_state.environment_simulator.get_environment_state()
+
+# Display current environment
+with st.sidebar:
+    st.subheader("🌍 Current Environment")
+    st.write(f"**Location:** {current_environment.location}")
+    st.write(f"**Time:** {current_environment.time.current_time.strftime('%H:%M')}")
+    st.write(f"**Day:** {current_environment.time.day_of_week}")
+    st.write(f"**Weather:** {current_environment.weather.description}")
+    st.write(f"**Temperature:** {current_environment.weather.temperature}°C")
+    st.write(f"**Season:** {current_environment.time.season}")
+    
+    if current_environment.events:
+        st.write("**Events:**")
+        for event in current_environment.events:
+            st.write(f"• {event}")
+    
+    # Location exploration
+    st.subheader("🗺️ Explore Locations")
+    
+    # Get activity suggestion
+    activity_suggestion = st.session_state.environment_simulator.location_system.get_daily_activity_suggestion()
+    st.write(f"**Suggested Activity:** {activity_suggestion['activity']}")
+    st.write(f"*{activity_suggestion['reason']}*")
+    
+    # Dynamic events and venues
+    st.subheader("🎉 Dynamic Events & Venues")
+    
+    # Get today's highlights
+    highlights = st.session_state.environment_simulator.get_today_highlights()
+    for highlight in highlights:
+        st.write(f"• {highlight}")
+    
+    # Get dynamic recommendations
+    recommendations = st.session_state.environment_simulator.get_dynamic_recommendations()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**🎵 Events This Week:**")
+        if recommendations.get('events'):
+            for event in recommendations['events'][:3]:
+                st.write(f"• {event.name}")
+                st.write(f"  {event.start_time.strftime('%m/%d %H:%M')} - {event.price}")
+        else:
+            st.write("• No events found")
+    
+    with col2:
+        st.write("**🍺 Popular Venues:**")
+        if recommendations.get('venues'):
+            for venue in recommendations['venues'][:3]:
+                st.write(f"• {venue.name}")
+                st.write(f"  {venue.rating}⭐ ({venue.price_level})")
+        else:
+            st.write("• No venues found")
+    
+    # Location recommendations
+    st.subheader("📍 Location Recommendations")
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        st.write("**Popular Places:**")
+        popular_locations = st.session_state.environment_simulator.location_system.get_popular_locations(0.7)
+        for location in popular_locations[:3]:
+            st.write(f"• {location.name} ({location.type})")
+    
+    with col4:
+        st.write("**Currently Open:**")
+        open_locations = st.session_state.environment_simulator.location_system.get_open_locations()
+        for location in open_locations[:3]:
+            st.write(f"• {location.name} ({location.type})")
 
 # Debug mode toggle
 debug_mode = st.sidebar.checkbox("🔧 Debug Mode", value=True, help="Show detailed debugging information")
@@ -72,6 +153,9 @@ if debug_mode:
         st.sidebar.success("Memory cleared!")
     
     if st.sidebar.button("📊 Refresh Memory Stats"):
+        st.sidebar.rerun()
+    
+    if st.sidebar.button("🔄 Refresh Environment"):
         st.sidebar.rerun()
     
     # Show current memory path
@@ -97,7 +181,10 @@ with col1:
     # Skip simulation and go directly to chat
     st.session_state.simulation_completed = True
     st.session_state.needs_response = "Basic needs are being managed automatically"
-    st.session_state.world_description = "Living in a small house in a Moldovan village"
+    
+    # Get dynamic world description from environment simulator
+    world_description = st.session_state.environment_simulator.get_environment_description()
+    st.session_state.world_description = world_description
     st.session_state.action_decision = "Continue with daily activities"
     st.session_state.state_response = "State is being monitored automatically"
     
