@@ -137,6 +137,36 @@ class ChromaMemoryManager:
             traceback.print_exc()
             return None
     
+    def debug_collection_contents(self, person_name: str = None):
+        """Debug method to inspect what's actually in the collection"""
+        try:
+            print(f"🔍 DEBUG: Inspecting collection contents...")
+            
+            # Get all documents without any filter first
+            all_results = self.collection.get()
+            print(f"🔍 DEBUG: Total documents in collection: {len(all_results['documents'])}")
+            
+            # Show all documents
+            for i, (doc, metadata) in enumerate(zip(all_results['documents'], all_results['metadatas'])):
+                person = metadata.get('person_name', 'Unknown') if metadata else 'Unknown'
+                msg_type = metadata.get('message_type', 'Unknown') if metadata else 'Unknown'
+                timestamp = metadata.get('timestamp', 'Unknown') if metadata else 'Unknown'
+                print(f"🔍 DEBUG: Doc {i}: Person={person}, Type={msg_type}, Time={timestamp}, Content={doc[:50]}...")
+            
+            # If person_name specified, show filtered results
+            if person_name:
+                filtered_results = self.collection.get(where={"person_name": person_name})
+                print(f"🔍 DEBUG: Documents for {person_name}: {len(filtered_results['documents'])}")
+                for i, (doc, metadata) in enumerate(zip(filtered_results['documents'], filtered_results['metadatas'])):
+                    msg_type = metadata.get('message_type', 'Unknown') if metadata else 'Unknown'
+                    timestamp = metadata.get('timestamp', 'Unknown') if metadata else 'Unknown'
+                    print(f"🔍 DEBUG: Filtered Doc {i}: Type={msg_type}, Time={timestamp}, Content={doc[:50]}...")
+                    
+        except Exception as e:
+            print(f"Error debugging collection: {e}")
+            import traceback
+            traceback.print_exc()
+
     def retrieve_relevant_context(self, person_name: str, current_message: str, 
                                 top_k: int = 5) -> List[Dict[str, Any]]:
         """
@@ -151,6 +181,9 @@ class ChromaMemoryManager:
             List of recent context documents with parsed BasicNeeds
         """
         try:
+            # Debug: First let's see what's in the collection
+            self.debug_collection_contents(person_name)
+            
             # Get recent documents for this person (no semantic search, just chronological)
             # First, let's see how many documents exist for this person
             all_results = self.collection.get(
@@ -195,6 +228,8 @@ class ChromaMemoryManager:
             
         except Exception as e:
             print(f"Error retrieving context: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def get_person_conversation_history(self, person_name: str, 
