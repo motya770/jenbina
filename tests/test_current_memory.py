@@ -2,9 +2,10 @@
 
 import sys
 import os
-sys.path.append('../core')
+# Add the parent directory to the path to allow importing core module
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from conversation_memory import ChromaMemoryManager
+from core.memory.conversation_memory import ChromaMemoryManager
 
 def test_current_memory():
     print("🔍 Testing Current Memory State...")
