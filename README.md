@@ -31,7 +31,13 @@ On the other hand, LLMs have a powerful logical apparatus that allows them to re
 
 In this paper, I propose a solution to these problems (1, 2, 3) by creating a special version of Tamagotchi. Tamagotchi is an electronic toy popular in the early 1990s where users had to take care of a virtual being (e.g., feeding it at specific times). I suggest creating a self-sustaining version of such a toy that integrates the logical apparatus of an LLM. It could be compared to the HAL robot from the movie "Interstellar" or even a real person.
 
-To determine the needs of the virtual being, we will use Maslow's Hierarchy of Needs (Fig. 1). Initially, we will focus on two physiological needs: food and health. To create memory, I propose a graph database where information about people, places, and events is stored chronologically (Fig. 2).
+To determine the needs of the virtual being, we will use Maslow's Hierarchy of Needs (Fig. 1). Initially, we will focus on two physiological needs: food and health. To create memory, I propose a hybrid memory system combining:
+
+1. **Vector Database (ChromaDB)**: For semantic/contextual memory and similarity search
+2. **Graph Database (Neo4j)**: For relationship tracking between people, places, and events
+3. **Time-Series Database (SQLite)**: For chronological tracking of events and needs changes
+
+This hybrid approach mirrors how human memory works - different types of information are stored and retrieved using different mechanisms.
 
 Access to the external environment will be provided through an external LLM that will simulate the external environment and sensor data.
 
