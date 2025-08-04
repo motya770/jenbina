@@ -7,6 +7,8 @@ https://discord.gg/e6sRPpyc
 
 Jenbina: open source non-profit AGI simulation (patented). 
 
+How to install: https://github.com/motya770/jenbina/blob/main/INSTALL.md
+
 Title: 
 
 Artificial Intelligence System with the Ability to Act According to Personal Interests and Needs based on combination on LLMs, Graph Databases and Memory 
