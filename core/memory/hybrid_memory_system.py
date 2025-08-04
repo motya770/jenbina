@@ -11,6 +11,14 @@ from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import logging
 
+# ChromaDB availability check
+try:
+    import chromadb
+    CHROMA_AVAILABLE = True
+except ImportError:
+    CHROMA_AVAILABLE = False
+    print("Warning: ChromaDB not installed. Install with: pip install chromadb")
+
 # Neo4j imports
 try:
     from neo4j import GraphDatabase
@@ -102,10 +110,18 @@ class HybridMemorySystem:
         self._initialize_time_series_db()
     
     def _initialize_vector_store(self):
-        """Initialize ChromaDB for semantic memory"""
+        """Initialize ChromaDB for semantic memory storage"""
+        if not CHROMA_AVAILABLE:
+            self.logger.warning("ChromaDB not available. Vector storage features will be disabled.")
+            self.chroma_client = None
+            self.chroma_collection = None
+            return
+        
         try:
+            # Create directory if it doesn't exist
             os.makedirs(self.vector_store_path, exist_ok=True)
             
+            # Initialize ChromaDB client
             self.chroma_client = chromadb.PersistentClient(
                 path=self.vector_store_path,
                 settings=Settings(
@@ -118,8 +134,44 @@ class HybridMemorySystem:
                 self.chroma_collection = self.chroma_client.get_collection("jenbina_memories")
                 self.logger.info(f"Loaded existing ChromaDB collection from {self.vector_store_path}")
             except Exception as e:
-                self.chroma_collection = self.chroma_client.create_collection("jenbina_memories")
-                self.logger.info(f"Created new ChromaDB collection at {self.vector_store_path}")
+                # If there's a schema mismatch or other error, try to reset and recreate
+                if "no such column" in str(e) or "schema" in str(e).lower():
+                    self.logger.warning(f"ChromaDB schema mismatch detected: {e}")
+                    self.logger.info("Resetting ChromaDB database due to schema mismatch...")
+                    try:
+                        # Try to delete the collection if it exists
+                        self.chroma_client.delete_collection("jenbina_memories")
+                    except:
+                        pass  # Collection might not exist
+                    
+                    # Try to reset the entire database
+                    try:
+                        import shutil
+                        # Remove the entire ChromaDB directory and recreate
+                        if os.path.exists(self.vector_store_path):
+                            shutil.rmtree(self.vector_store_path)
+                        os.makedirs(self.vector_store_path, exist_ok=True)
+                        
+                        # Recreate the client
+                        self.chroma_client = chromadb.PersistentClient(
+                            path=self.vector_store_path,
+                            settings=Settings(
+                                anonymized_telemetry=False,
+                                allow_reset=True
+                            )
+                        )
+                    except Exception as reset_error:
+                        self.logger.error(f"Failed to reset ChromaDB: {reset_error}")
+                        # Fallback to in-memory client
+                        self.chroma_client = chromadb.Client()
+                    
+                    # Create fresh collection
+                    self.chroma_collection = self.chroma_client.create_collection("jenbina_memories")
+                    self.logger.info(f"Created new ChromaDB collection after schema reset at {self.vector_store_path}")
+                else:
+                    # For other errors, just create a new collection
+                    self.chroma_collection = self.chroma_client.create_collection("jenbina_memories")
+                    self.logger.info(f"Created new ChromaDB collection at {self.vector_store_path}")
                 
         except Exception as e:
             self.logger.error(f"Error initializing ChromaDB: {e}")

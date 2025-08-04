@@ -15,7 +15,7 @@ import json
 # Add the core directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
 
-from hybrid_memory_system import HybridMemorySystem, MemoryEvent
+from core.memory.hybrid_memory_system import HybridMemorySystem, MemoryEvent
 
 
 class TestMemoryEvent(unittest.TestCase):

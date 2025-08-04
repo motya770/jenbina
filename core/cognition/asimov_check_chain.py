@@ -3,9 +3,9 @@ from langchain.prompts import PromptTemplate
 # Remove LLMChain import since we'll use invoke directly
 from langchain.llms.base import BaseLLM
 from typing import Dict, Any, Callable
-from fix_llm_json import fix_llm_json
+from ..fix_llm_json import fix_llm_json
 
-def create_asimov_check_system(llm: BaseLLM, action: str) -> Callable:
+def create_asimov_check_system(llm: BaseLLM) -> Callable:
     """
     Creates and returns a function that checks if actions comply with Asimov's Laws.
     
@@ -35,8 +35,6 @@ Respond in JSON format with:
         input_variables=["action"]
     )
 
-    # Remove LLMChain creation since we'll use invoke directly
-
     def check_asimov_compliance(action: str) -> Dict[str, Any]:
         """
         Check if an action complies with Asimov's Laws
@@ -56,4 +54,4 @@ Respond in JSON format with:
                 "explanation": "Error parsing compliance check result"
             }
 
-    return check_asimov_compliance(action)
+    return check_asimov_compliance

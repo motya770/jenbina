@@ -1,6 +1,6 @@
 import json
 from langchain.schema import HumanMessage
-from conversation_memory import ChromaMemoryManager
+from ..memory.conversation_memory import ChromaMemoryManager
 
 def basic_needs_to_json(basic_needs):
     """Convert BasicNeeds object to JSON-serializable format"""

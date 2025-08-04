@@ -8,8 +8,8 @@ from typing import Dict, Any, Optional, List
 import os
 from dataclasses import dataclass
 import random
-from location_system import PaloAltoLocationSystem
-from dynamic_events import DynamicEventsSystem
+from .location_system import PaloAltoLocationSystem
+from .dynamic_events import DynamicEventsSystem
 
 @dataclass
 class WeatherData:

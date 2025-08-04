@@ -1,5 +1,5 @@
 from langchain.prompts import PromptTemplate
-from maslow_needs import MaslowNeedsSystem, NeedLevel
+from .maslow_needs import MaslowNeedsSystem, NeedLevel
 from typing import Dict, List, Any
 import json
 

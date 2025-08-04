@@ -1,17 +1,17 @@
 import streamlit as st
 from datetime import datetime
  # Import your other components
-from action_decision_chain import create_action_decision_chain
-from maslow_needs import BasicNeeds, create_basic_needs_chain
-from asimov_check_chain import create_asimov_check_system
-from state_analysis_chain import create_state_analysis_system
-from world_state import WorldState, create_world_description_system
-from chat_handler import handle_chat_interaction
-from person import Person
-from meta_cognition import MetaCognitiveSystem
-from enhanced_action_decision_chain import create_meta_cognitive_action_chain
-from conversation_memory import ChromaMemoryManager
-from environment_simulator import EnvironmentSimulator
+from .cognition.action_decision_chain import create_action_decision_chain
+from .needs.maslow_needs import BasicNeeds, create_basic_needs_chain
+from .cognition.asimov_check_chain import create_asimov_check_system
+from .cognition.state_analysis_chain import create_state_analysis_system
+from .environment.world_state import WorldState, create_world_description_system
+from .interaction.chat_handler import handle_chat_interaction
+from .person.person import Person
+from .cognition.meta_cognition import MetaCognitiveSystem
+from .cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
+from .memory.conversation_memory import ChromaMemoryManager
+from .environment.environment_simulator import EnvironmentSimulator
 
 # Initialize LLM
 import os
@@ -193,10 +193,10 @@ with col1:
     # Quick status display
     st.write("**Jenbina's Current Status:**")
     st.write(f"- Name: {person.name}")
-    st.write(f"- Overall Satisfaction: {person.needs[0].get_overall_satisfaction():.1f}%")
-    st.write(f"- Hunger: {person.needs[0].needs.get('hunger', 50.0).satisfaction:.1f}%")
-    st.write(f"- Sleep: {person.needs[0].needs.get('sleep', 50.0).satisfaction:.1f}%")
-    st.write(f"- Safety: {person.needs[0].needs.get('safety', 50.0).satisfaction:.1f}%")
+    st.write(f"- Overall Satisfaction: {person.maslow_needs.get_overall_satisfaction():.1f}%")
+    st.write(f"- Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
+    st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
+    st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
 
     # Only show chat interface after simulation is completed
     if st.session_state.simulation_completed:
@@ -206,10 +206,10 @@ with col1:
         # Display current person state
         st.write("**Current State:**")
         st.write(f"- Name: {person.name}")
-        st.write(f"- Overall Satisfaction: {person.needs[0].get_overall_satisfaction():.1f}%")
-        st.write(f"- Hunger: {person.needs[0].needs.get('hunger', 50.0).satisfaction:.1f}%")
-        st.write(f"- Sleep: {person.needs[0].needs.get('sleep', 50.0).satisfaction:.1f}%")
-        st.write(f"- Safety: {person.needs[0].needs.get('safety', 50.0).satisfaction:.1f}%")
+        st.write(f"- Overall Satisfaction: {person.maslow_needs.get_overall_satisfaction():.1f}%")
+        st.write(f"- Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
+        st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
+        st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
         
         user_input = st.chat_input("Talk to Jenbina...")
         

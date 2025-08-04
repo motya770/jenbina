@@ -3,11 +3,11 @@ from langchain.prompts import PromptTemplate
 # Remove LLMChain import since we'll use invoke directly
 from langchain.llms.base import BaseLLM
 from typing import Dict, Any
-from person import Person  # Import Person instead of BasicNeeds
-from fix_llm_json import fix_llm_json
+from ..person.person import Person  # Import Person instead of BasicNeeds
+from ..fix_llm_json import fix_llm_json
 
 
-def create_action_decision_chain(llm: BaseLLM, person: Person, world_description) -> Dict[str, Any]:
+def create_action_decision_chain(llm: BaseLLM) -> callable:
     # Create prompt for action decision
     action_prompt = PromptTemplate(
         input_variables=["descriptions", "actions", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction"],
@@ -34,8 +34,6 @@ def create_action_decision_chain(llm: BaseLLM, person: Person, world_description
     """
     )
 
-    # Remove LLMChain creation since we'll use invoke directly
-
     def process_action_decision(person: Person, world_description: str, llm: BaseLLM) -> Dict[str, Any]:
         """
         Process and decide the next action based on person's needs and world description.
@@ -52,12 +50,12 @@ def create_action_decision_chain(llm: BaseLLM, person: Person, world_description
         # Parse the world description JSON to get lists
         description_data = json.loads(world_description)
         
-        # Get individual need satisfaction levels from the Person's BasicNeeds
-        basic_needs = person.needs[0]  # Person has a list of BasicNeeds objects
-        hunger_satisfaction = basic_needs.needs.get('hunger', 50.0).satisfaction
-        sleep_satisfaction = basic_needs.needs.get('sleep', 50.0).satisfaction
-        safety_satisfaction = basic_needs.needs.get('safety', 50.0).satisfaction
-        overall_satisfaction = basic_needs.get_overall_satisfaction()
+        # Get individual need satisfaction levels from the Person's MaslowNeedsSystem
+        maslow_needs = person.maslow_needs
+        hunger_satisfaction = maslow_needs.get_need_satisfaction('hunger')
+        sleep_satisfaction = maslow_needs.get_need_satisfaction('sleep')
+        safety_satisfaction = maslow_needs.get_need_satisfaction('security')
+        overall_satisfaction = maslow_needs.get_overall_satisfaction()
         
         # Get decision using invoke directly
         response = llm.invoke(
@@ -80,4 +78,4 @@ def create_action_decision_chain(llm: BaseLLM, person: Person, world_description
         
         return json.loads(fixed_action_decision)
     
-    return process_action_decision(person=person, world_description=world_description, llm=llm)
+    return process_action_decision

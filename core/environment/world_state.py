@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from langchain.prompts import PromptTemplate
 from langchain.llms.base import BaseLLM
 from typing import List, Callable
-from maslow_needs import BasicNeeds
-from person import Person
+from ..needs.maslow_needs import BasicNeeds
+from ..person.person import Person
 
 @dataclass
 class WorldState:
@@ -22,7 +22,7 @@ class WorldState:
         if len(self.last_descriptions) > 5:
             self.last_descriptions.pop(0)
 
-def create_world_description_system(llm: BaseLLM, person: Person, world: WorldState) -> Callable:
+def create_world_description_system(llm: BaseLLM) -> Callable:
     """
     Creates and returns a function that generates world descriptions.
     
@@ -66,8 +66,6 @@ def create_world_description_system(llm: BaseLLM, person: Person, world: WorldSt
     """
     )
 
-    # Remove the LLMChain creation since we'll use invoke directly
-
     def get_world_description(person: Person, world: WorldState) -> str:
         """
         Generate a coherent world description based on current state and person's needs.
@@ -79,12 +77,12 @@ def create_world_description_system(llm: BaseLLM, person: Person, world: WorldSt
         Returns:
             String containing the world description
         """
-        # Get individual need satisfaction levels from the Person's BasicNeeds
-        basic_needs = person.needs[0]  # Person has a list of BasicNeeds objects
-        hunger_satisfaction = basic_needs.needs.get('hunger', 50.0).satisfaction
-        sleep_satisfaction = basic_needs.needs.get('sleep', 50.0).satisfaction
-        safety_satisfaction = basic_needs.needs.get('safety', 50.0).satisfaction
-        overall_satisfaction = basic_needs.get_overall_satisfaction()
+        # Get individual need satisfaction levels from the Person's MaslowNeedsSystem
+        maslow_needs = person.maslow_needs
+        hunger_satisfaction = maslow_needs.get_need_satisfaction('hunger')
+        sleep_satisfaction = maslow_needs.get_need_satisfaction('sleep')
+        safety_satisfaction = maslow_needs.get_need_satisfaction('security')
+        overall_satisfaction = maslow_needs.get_overall_satisfaction()
         
         # Use invoke directly instead of LLMChain.run
         response = llm.invoke(
@@ -100,9 +98,6 @@ def create_world_description_system(llm: BaseLLM, person: Person, world: WorldSt
             )
         )
         
-        # Extract content from the response
-        description = response.content if hasattr(response, 'content') else str(response)
-        world.add_description(description)
-        return description
+        return response.content
 
-    return get_world_description(person=person, world=world)
+    return get_world_description

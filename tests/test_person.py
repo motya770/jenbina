@@ -13,7 +13,7 @@ import json
 # Add the core directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
 
-from person import Person, Message, Conversation
+from core.person.person import Person, Message, Conversation
 
 
 class TestMessage(unittest.TestCase):

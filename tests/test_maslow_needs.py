@@ -13,7 +13,7 @@ import json
 # Add the core directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
 
-from maslow_needs import (
+from core.needs.maslow_needs import (
     MaslowNeedsSystem, MaslowNeed, NeedLevel, NeedCategory,
     BasicNeeds, Need, create_basic_needs_chain
 )

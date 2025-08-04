@@ -1,5 +1,5 @@
-from action_decision_chain import create_action_decision_chain
-from meta_cognition import MetaCognitiveSystem
+from .action_decision_chain import create_action_decision_chain
+from .meta_cognition import MetaCognitiveSystem
 from typing import Dict, Any
 import json
 
