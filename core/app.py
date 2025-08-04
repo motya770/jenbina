@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import datetime
  # Import your other components
 from action_decision_chain import create_action_decision_chain
-from basic_needs import BasicNeeds, create_basic_needs_chain
+from maslow_needs import BasicNeeds, create_basic_needs_chain
 from asimov_check_chain import create_asimov_check_system
 from state_analysis_chain import create_state_analysis_system
 from world_state import WorldState, create_world_description_system
