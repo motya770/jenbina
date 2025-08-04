@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from langchain.prompts import PromptTemplate
 from langchain.llms.base import BaseLLM
 from typing import List, Callable
-from basic_needs import BasicNeeds
+from maslow_needs import BasicNeeds
 from person import Person
 
 @dataclass

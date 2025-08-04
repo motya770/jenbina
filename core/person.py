@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
-from basic_needs import BasicNeeds
+from maslow_needs import MaslowNeedsSystem
 from datetime import datetime
 
 
@@ -46,17 +46,16 @@ class Conversation:
 @dataclass
 class Person:
     name: str = "Jenbina"
-    needs: List[BasicNeeds] = None
+    maslow_needs: MaslowNeedsSystem = None
     conversations: Dict[str, Conversation] = field(default_factory=dict)
     
     def __post_init__(self):
-        if self.needs is None:
-            self.needs = [BasicNeeds()]
+        if self.maslow_needs is None:
+            self.maslow_needs = MaslowNeedsSystem()
     
     def update_all_needs(self):
         """Update all needs for this person"""
-        for need in self.needs:
-            need.update_needs()
+        self.maslow_needs.update_all_needs()
     
     def add_conversation(self, outsider_name: str) -> Conversation:
         """Start a new conversation with an outsider"""
@@ -125,9 +124,10 @@ class Person:
     
     def get_current_state(self):
         """Get a summary of the person's current state"""
-        state = {"name": self.name, "needs": []}
-        for need in self.needs:
-            state["needs"].append(need)  # Return actual BasicNeeds object, not string
+        state = {"name": self.name}
+        
+        # Add Maslow needs state
+        state["maslow_needs"] = self.maslow_needs.get_needs_summary()
         
         # Add communication state
         comm_stats = self.get_communication_stats()
@@ -136,6 +136,6 @@ class Person:
         return state
     
     def __str__(self):
-        needs_str = ", ".join([str(need) for need in self.needs])
         comm_stats = self.get_communication_stats()
-        return f"Person(name={self.name}, needs=[{needs_str}], conversations={comm_stats['total_conversations']}, messages={comm_stats['total_messages']})"
+        maslow_summary = self.maslow_needs.get_needs_summary()
+        return f"Person(name={self.name}, maslow_stage={maslow_summary['stage_name']}, conversations={comm_stats['total_conversations']}, messages={comm_stats['total_messages']})"

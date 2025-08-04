@@ -1,4 +1,4 @@
-from basic_needs import BasicNeeds
+from maslow_needs import BasicNeeds
 from world_state import WorldState, create_world_description_system
 from action_decision_chain import process_action_decision
 from asimov_check_chain import create_asimov_check_system
