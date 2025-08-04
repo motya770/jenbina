@@ -10,6 +10,7 @@ Before starting, ensure you have the following installed:
 - **Git** (for cloning the repository)
 - **At least 16GB of RAM** (for running the LLM)
 - **8GB of free disk space** (for the model and dependencies)
+- **Neo4j Database** (optional, for advanced relationship tracking)
 
 ## Step 1: Install Ollama
 
@@ -76,6 +77,34 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Step 4.5: Install Neo4j (Optional)
+
+For advanced relationship tracking and graph-based memory, you can install Neo4j:
+
+### Using Docker (Recommended)
+```bash
+docker run \
+    --name neo4j \
+    -p 7474:7474 -p 7687:7687 \
+    -e NEO4J_AUTH=neo4j/password \
+    -e NEO4J_PLUGINS='["apoc"]' \
+    -v neo4j_data:/data \
+    -v neo4j_logs:/logs \
+    neo4j:5.17.0
+```
+
+### Using Neo4j Desktop
+1. Download Neo4j Desktop from [https://neo4j.com/download/](https://neo4j.com/download/)
+2. Install and create a new project
+3. Create a new database with password "password"
+4. Start the database
+
+### Verify Neo4j Installation
+- **Browser**: http://localhost:7474 (username: neo4j, password: password)
+- **Bolt**: bolt://localhost:7687
+
+**Note**: The application will work without Neo4j, but graph-based relationship tracking will be disabled.
+
 ## Step 5: Configure Environment Variables (Optional)
 
 For advanced features and debugging, you can set these environment variables:
@@ -114,7 +143,13 @@ streamlit run app.py
    ```
    You should see `llama3.2:3b-instruct-fp16` in the list.
 
-2. **Test the Application**: 
+2. **Test the Hybrid Memory System** (Optional):
+   ```bash
+   python test_hybrid_memory.py
+   ```
+   This will test the memory system with sample data.
+
+3. **Test the Application**: 
    - Open your browser and go to http://localhost:8501
    - You should see the Jenbina interface with a chat window
    - Try sending a message to verify the LLM is responding
