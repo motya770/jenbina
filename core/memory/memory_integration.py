@@ -5,8 +5,8 @@ Shows how to integrate the hybrid memory system with existing Jenbina components
 
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-from hybrid_memory_system import HybridMemorySystem, MemoryEvent
-from person import Person
+from .hybrid_memory_system import HybridMemorySystem, MemoryEvent
+from ..person.person import Person
 
 class MemoryIntegration:
     """

@@ -1,6 +1,4 @@
 import json
-
-import json
 import re
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -43,21 +41,25 @@ def fix_llm_json(broken_json: str, llm_json_mode: BaseLLM) -> Dict[str, Any]:
             prompt=fix_json_prompt
         )
         
-        fixed_json = fix_json_chain.invoke({"broken_json": broken_json})
-        
         try:
+            fixed_json = fix_json_chain.invoke({"broken_json": broken_json})
+            
             # Try to parse the fixed JSON
             return json.loads(fixed_json['text'])
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError, Exception):
             # If still invalid, try with strict structure
             strict_fix_prompt = PromptTemplate(
                 input_variables=["broken_json"],
                 template="Convert this content to valid JSON with this structure: {\"key1\": \"value1\", \"key2\": \"value2\"}\n\nContent: {broken_json}"
             )
             
-            fixed_json = LLMChain(
-                llm=llm_json_mode,
-                prompt=strict_fix_prompt
-            ).invoke({"broken_json": broken_json})
-            
-            return json.loads(fixed_json['text'])
+            try:
+                fixed_json = LLMChain(
+                    llm=llm_json_mode,
+                    prompt=strict_fix_prompt
+                ).invoke({"broken_json": broken_json})
+                
+                return json.loads(fixed_json['text'])
+            except (json.JSONDecodeError, KeyError, Exception):
+                # If all else fails, return a basic structure
+                return {"error": "Failed to parse JSON", "original": broken_json}

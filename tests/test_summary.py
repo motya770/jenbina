@@ -10,8 +10,8 @@ import os
 import time
 from datetime import datetime
 
-# Add the core directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
+# Add the parent directory to the path to allow importing core module
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 def run_comprehensive_tests():
     """Run all tests and provide comprehensive reporting"""
