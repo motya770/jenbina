@@ -2,7 +2,7 @@
 
 import sys
 import os
-sys.path.append('core')
+sys.path.append('../core')
 
 from conversation_memory import ChromaMemoryManager
 
