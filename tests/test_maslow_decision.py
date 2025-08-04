@@ -6,11 +6,12 @@ Demonstrates decision making, action execution, and goal setting
 
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), 'core'))
+# Add the parent directory to the path to allow importing core module
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from datetime import datetime, timedelta
-from maslow_needs import MaslowNeedsSystem
-from maslow_decision_chain import (
+from core.needs.maslow_needs import MaslowNeedsSystem
+from core.needs.maslow_decision_chain import (
     create_maslow_decision_chain,
     create_maslow_action_executor,
     create_maslow_goal_setter,
