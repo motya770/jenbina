@@ -65,7 +65,6 @@ class MemoryIntegration:
             needs_state=needs_state,
             metadata={
                 "message_type": message_type,
-                "person_name": person_name,
                 "sender_name": sender_name,
                 "receiver_name": receiver_name,
                 **(metadata or {})
