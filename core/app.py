@@ -224,10 +224,10 @@ with col1:
             person.receive_message("User", user_input, "text")
             
             # Get conversation history for context
-            conversation_history = person.get_conversation_history("User", count=5)
+            conversation_history = person.get_conversation_history("User", count=1000)
             recent_context = "\n".join([
                 f"{msg.sender}: {msg.content}" 
-                for msg in conversation_history[-3:]  # Last 3 messages for context
+                for msg in conversation_history  # All messages for context
             ])
             
             # Handle chat interaction using stored session state values and person's state
