@@ -83,7 +83,8 @@ class ChromaMemoryManager:
         return hashlib.md5(unique_string.encode()).hexdigest()
     
     def store_conversation(self, person_name: str, message_content: str, 
-                          message_type: str, metadata: Dict[str, Any] = None) -> str:
+                          message_type: str, sender_name: str = None, 
+                          receiver_name: str = None, metadata: Dict[str, Any] = None) -> str:
         """
         Store a conversation message in Chroma
         
@@ -91,6 +92,8 @@ class ChromaMemoryManager:
             person_name: Name of the person
             message_content: Content of the message
             message_type: Type of message (user_message, jenbina_response, etc.)
+            sender_name: Name of the sender (defaults to person_name if None)
+            receiver_name: Name of the receiver (defaults to "Jenbina" if None)
             metadata: Additional metadata
             
         Returns:
@@ -103,12 +106,24 @@ class ChromaMemoryManager:
             # Generate embedding
             embedding = self.embeddings.embed_query(message_content)
             
+            # Set default sender and receiver names
+            if sender_name is None:
+                sender_name = person_name
+            if receiver_name is None:
+                receiver_name = "Jenbina"
+            
+            # Validate that sender_name is not None
+            if not sender_name:
+                raise ValueError("Sender name is required")
+            
             # DEBUG: Print the exact parameters being used
-            print(f"🔍 STORE DEBUG: person_name='{person_name}', message_type='{message_type}', content='{message_content[:30]}...'")
+            print(f"🔍 STORE DEBUG: person_name='{person_name}', sender='{sender_name}', receiver='{receiver_name}', message_type='{message_type}', content='{message_content[:30]}...'")
             
             # Prepare metadata - ensure all values are serializable
             doc_metadata = {
                 "person_name": person_name,
+                "sender_name": sender_name,
+                "receiver_name": receiver_name,
                 "message_type": message_type,
                 "timestamp": timestamp.isoformat(),
                 "embedding_id": embedding_id,
@@ -155,18 +170,22 @@ class ChromaMemoryManager:
             # Show all documents
             for i, (doc, metadata) in enumerate(zip(all_results['documents'], all_results['metadatas'])):
                 person = metadata.get('person_name', 'Unknown') if metadata else 'Unknown'
+                sender = metadata.get('sender_name', 'Unknown') if metadata else 'Unknown'
+                receiver = metadata.get('receiver_name', 'Unknown') if metadata else 'Unknown'
                 msg_type = metadata.get('message_type', 'Unknown') if metadata else 'Unknown'
                 timestamp = metadata.get('timestamp', 'Unknown') if metadata else 'Unknown'
-                print(f"🔍 DEBUG: Doc {i}: Person={person}, Type={msg_type}, Time={timestamp}, Content={doc[:50]}...")
+                print(f"🔍 DEBUG: Doc {i}: Person={person}, Sender={sender}->Receiver={receiver}, Type={msg_type}, Time={timestamp}, Content={doc[:50]}...")
             
             # If person_name specified, show filtered results
             if person_name:
                 filtered_results = self.collection.get(where={"person_name": person_name})
                 print(f"🔍 DEBUG: Documents for {person_name}: {len(filtered_results['documents'])}")
                 for i, (doc, metadata) in enumerate(zip(filtered_results['documents'], filtered_results['metadatas'])):
+                    sender = metadata.get('sender_name', 'Unknown') if metadata else 'Unknown'
+                    receiver = metadata.get('receiver_name', 'Unknown') if metadata else 'Unknown'
                     msg_type = metadata.get('message_type', 'Unknown') if metadata else 'Unknown'
                     timestamp = metadata.get('timestamp', 'Unknown') if metadata else 'Unknown'
-                    print(f"🔍 DEBUG: Filtered Doc {i}: Type={msg_type}, Time={timestamp}, Content={doc[:50]}...")
+                    print(f"🔍 DEBUG: Filtered Doc {i}: Sender={sender}->Receiver={receiver}, Type={msg_type}, Time={timestamp}, Content={doc[:50]}...")
                     
         except Exception as e:
             print(f"Error debugging collection: {e}")
@@ -279,6 +298,80 @@ class ChromaMemoryManager:
             
         except Exception as e:
             print(f"Error getting conversation history: {e}")
+            return []
+    
+    def get_conversation_between(self, sender_name: str, receiver_name: str, 
+                               limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Get conversation history between specific sender and receiver
+        
+        Args:
+            sender_name: Name of the sender
+            receiver_name: Name of the receiver
+            limit: Maximum number of messages to retrieve
+            
+        Returns:
+            List of conversation messages between the specified parties
+        """
+        try:
+            # Get documents where sender and receiver match
+            # ChromaDB requires using $and operator for multiple conditions
+            results = self.collection.get(
+                where={
+                    "$and": [
+                        {"sender_name": sender_name},
+                        {"receiver_name": receiver_name}
+                    ]
+                },
+                limit=limit
+            )
+            
+            # Also get reverse direction (receiver to sender)
+            reverse_results = self.collection.get(
+                where={
+                    "$and": [
+                        {"sender_name": receiver_name},
+                        {"receiver_name": sender_name}
+                    ]
+                },
+                limit=limit
+            )
+            
+            # Combine and format results
+            all_messages = []
+            
+            # Process forward direction
+            for i, (doc, metadata) in enumerate(zip(results['documents'], results['metadatas'])):
+                if metadata and "basic_needs_json" in metadata:
+                    metadata["basic_needs"] = parse_basic_needs_from_json(metadata["basic_needs_json"])
+                
+                all_messages.append({
+                    "content": doc,
+                    "metadata": metadata,
+                    "direction": "forward"
+                })
+            
+            # Process reverse direction
+            for i, (doc, metadata) in enumerate(zip(reverse_results['documents'], reverse_results['metadatas'])):
+                if metadata and "basic_needs_json" in metadata:
+                    metadata["basic_needs"] = parse_basic_needs_from_json(metadata["basic_needs_json"])
+                
+                all_messages.append({
+                    "content": doc,
+                    "metadata": metadata,
+                    "direction": "reverse"
+                })
+            
+            # Sort by timestamp (most recent first) and take limit
+            all_messages.sort(
+                key=lambda x: x["metadata"]["timestamp"], 
+                reverse=True
+            )
+            
+            return all_messages[:limit]
+            
+        except Exception as e:
+            print(f"Error getting conversation between {sender_name} and {receiver_name}: {e}")
             return []
     
     def get_person_summary(self, person_name: str) -> Dict[str, Any]:

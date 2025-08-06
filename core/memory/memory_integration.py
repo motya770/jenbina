@@ -20,7 +20,9 @@ class MemoryIntegration:
                                  person_name: str, 
                                  message_content: str,
                                  message_type: str,
-                                 person_state: Person,
+                                 sender_name: str = None,
+                                 receiver_name: str = None,
+                                 person_state: Person = None,
                                  metadata: Dict[str, Any] = None) -> str:
         """
         Store a conversation memory with full context
@@ -29,6 +31,8 @@ class MemoryIntegration:
             person_name: Name of the person being conversed with
             message_content: Content of the conversation
             message_type: Type of message (user_message, jenbina_response, etc.)
+            sender_name: Name of the sender (defaults to person_name if None)
+            receiver_name: Name of the receiver (defaults to "Jenbina" if None)
             person_state: Current state of Jenbina (Person object)
             metadata: Additional metadata
             
@@ -36,10 +40,17 @@ class MemoryIntegration:
             event_id: Unique identifier for the stored memory
         """
         
+        # Set default sender and receiver names
+        if sender_name is None:
+            sender_name = person_name
+        if receiver_name is None:
+            receiver_name = "Jenbina"
+        
         # Extract current needs state
         needs_state = {}
-        for need_name, need_obj in person_state.maslow_needs.needs.items():
-            needs_state[need_name] = need_obj.satisfaction
+        if person_state:
+            for need_name, need_obj in person_state.maslow_needs.needs.items():
+                needs_state[need_name] = need_obj.satisfaction
         
         # Create memory event
         event = MemoryEvent(
@@ -55,6 +66,8 @@ class MemoryIntegration:
             metadata={
                 "message_type": message_type,
                 "person_name": person_name,
+                "sender_name": sender_name,
+                "receiver_name": receiver_name,
                 **(metadata or {})
             }
         )
