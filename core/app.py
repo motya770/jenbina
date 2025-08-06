@@ -1,21 +1,25 @@
 import streamlit as st
 from datetime import datetime
- # Import your other components
-from .cognition.action_decision_chain import create_action_decision_chain
-from .needs.maslow_needs import BasicNeeds, create_basic_needs_chain
-from .cognition.asimov_check_chain import create_asimov_check_system
-from .cognition.state_analysis_chain import create_state_analysis_system
-from .environment.world_state import WorldState, create_world_description_system
-from .interaction.chat_handler import handle_chat_interaction
-from .person.person import Person
-from .cognition.meta_cognition import MetaCognitiveSystem
-from .cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
-from .memory.conversation_memory import ChromaMemoryManager
-from .environment.environment_simulator import EnvironmentSimulator
-
-# Initialize LLM
+import sys
 import os
 
+# Add the parent directory to the Python path so we can import core modules
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import your other components with absolute imports
+from core.cognition.action_decision_chain import create_action_decision_chain
+from core.needs.maslow_needs import BasicNeeds, create_basic_needs_chain
+from core.cognition.asimov_check_chain import create_asimov_check_system
+from core.cognition.state_analysis_chain import create_state_analysis_system
+from core.environment.world_state import WorldState, create_world_description_system
+from core.interaction.chat_handler import handle_chat_interaction
+from core.person.person import Person
+from core.cognition.meta_cognition import MetaCognitiveSystem
+from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
+from core.memory.conversation_memory import ChromaMemoryManager
+from core.environment.environment_simulator import EnvironmentSimulator
+
+# Initialize LLM
 # os.environ['OLLAMA_HOST'] = 'http://129.153.140.217:11434'
 os.environ['OLLAMA_HOST'] = 'http://localhost:11434'
 
@@ -328,22 +332,4 @@ with col1:
                         st.success("✅ Test data cleaned up")
                         
                     except Exception as e:
-                        st.error(f"❌ Memory test failed: {str(e)}")
-
-# with col2:
-#     # Internal state visualization
-#     st.subheader("Jenbina's Internal State")
-#     st.write("Current Emotional State:", st.session_state.person.emotional_state)
-#     st.write("Decision Making Process:")
-    
-#     # Display the reasoning chain
-#     if st.session_state.action_history:
-#         with st.expander("Latest Decision Chain", expanded=True):
-#             chain = state_analysis_chain(st.session_state.person)
-#             st.write(chain)
-            
-#     # Display Asimov compliance status
-#     compliance_status = check_asimov_compliance(st.session_state.person)
-#     st.metric("Asimov Compliance", value=f"{compliance_status}%")
-
-
+                        st.error(f"❌ Memory test failed: {str(e)}") 
