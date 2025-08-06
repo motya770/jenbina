@@ -121,7 +121,6 @@ class ChromaMemoryManager:
             
             # Prepare metadata - ensure all values are serializable
             doc_metadata = {
-                "person_name": person_name,
                 "sender_name": sender_name,
                 "receiver_name": receiver_name,
                 "message_type": message_type,
@@ -139,7 +138,7 @@ class ChromaMemoryManager:
                         doc_metadata[key] = str(value)[:500]  # Truncate if too long
             
             # DEBUG: Print the final metadata being stored
-            print(f"🔍 STORE DEBUG: Final doc_metadata['person_name']='{doc_metadata['person_name']}'")
+            print(f"🔍 STORE DEBUG: Final doc_metadata['sender_name']='{doc_metadata['sender_name']}'")
             
             # Add to Chroma collection
             self.collection.add(
@@ -169,17 +168,24 @@ class ChromaMemoryManager:
             
             # Show all documents
             for i, (doc, metadata) in enumerate(zip(all_results['documents'], all_results['metadatas'])):
-                person = metadata.get('person_name', 'Unknown') if metadata else 'Unknown'
                 sender = metadata.get('sender_name', 'Unknown') if metadata else 'Unknown'
                 receiver = metadata.get('receiver_name', 'Unknown') if metadata else 'Unknown'
                 msg_type = metadata.get('message_type', 'Unknown') if metadata else 'Unknown'
                 timestamp = metadata.get('timestamp', 'Unknown') if metadata else 'Unknown'
-                print(f"🔍 DEBUG: Doc {i}: Person={person}, Sender={sender}->Receiver={receiver}, Type={msg_type}, Time={timestamp}, Content={doc[:50]}...")
+                print(f"🔍 DEBUG: Doc {i}: Sender={sender}->Receiver={receiver}, Type={msg_type}, Time={timestamp}, Content={doc[:50]}...")
             
             # If person_name specified, show filtered results
             if person_name:
-                filtered_results = self.collection.get(where={"person_name": person_name})
-                print(f"🔍 DEBUG: Documents for {person_name}: {len(filtered_results['documents'])}")
+                # Filter by sender_name or receiver_name containing the person_name
+                filtered_results = self.collection.get(
+                    where={
+                        "$or": [
+                            {"sender_name": person_name},
+                            {"receiver_name": person_name}
+                        ]
+                    }
+                )
+                print(f"🔍 DEBUG: Documents involving {person_name}: {len(filtered_results['documents'])}")
                 for i, (doc, metadata) in enumerate(zip(filtered_results['documents'], filtered_results['metadatas'])):
                     sender = metadata.get('sender_name', 'Unknown') if metadata else 'Unknown'
                     receiver = metadata.get('receiver_name', 'Unknown') if metadata else 'Unknown'
@@ -212,13 +218,23 @@ class ChromaMemoryManager:
             # Get recent documents for this person (no semantic search, just chronological)
             # First, let's see how many documents exist for this person
             all_results = self.collection.get(
-                where={"person_name": person_name}
+                where={
+                    "$or": [
+                        {"sender_name": person_name},
+                        {"receiver_name": person_name}
+                    ]
+                }
             )
-            print(f"🔍 Debug: Total documents for {person_name}: {len(all_results['documents'])}")
+            print(f"🔍 Debug: Total documents involving {person_name}: {len(all_results['documents'])}")
             
             # Now get the recent ones with a higher limit
             results = self.collection.get(
-                where={"person_name": person_name},
+                where={
+                    "$or": [
+                        {"sender_name": person_name},
+                        {"receiver_name": person_name}
+                    ]
+                },
                 limit=top_k * 5  # Increase limit to make sure we get enough
             )
             
@@ -270,9 +286,14 @@ class ChromaMemoryManager:
             List of conversation messages with parsed BasicNeeds
         """
         try:
-            # Get all documents for this person
+            # Get all documents for this person (as sender or receiver)
             results = self.collection.get(
-                where={"person_name": person_name},
+                where={
+                    "$or": [
+                        {"sender_name": person_name},
+                        {"receiver_name": person_name}
+                    ]
+                },
                 limit=limit
             )
             
@@ -518,14 +539,16 @@ class ChromaMemoryManager:
             # Get all documents to analyze
             all_results = self.collection.get(limit=count)
             
-            # Count unique people
+            # Count unique people (from both sender and receiver)
             unique_people = set()
             message_types = {}
             
             for metadata in all_results['metadatas']:
                 if metadata:
-                    person_name = metadata.get("person_name", "unknown")
-                    unique_people.add(person_name)
+                    sender_name = metadata.get("sender_name", "unknown")
+                    receiver_name = metadata.get("receiver_name", "unknown")
+                    unique_people.add(sender_name)
+                    unique_people.add(receiver_name)
                     
                     message_type = metadata.get("message_type", "unknown")
                     message_types[message_type] = message_types.get(message_type, 0) + 1
@@ -560,9 +583,14 @@ class ChromaMemoryManager:
         """
         try:
             if person_name:
-                # Get all documents for this person
+                # Get all documents involving this person (as sender or receiver)
                 results = self.collection.get(
-                    where={"person_name": person_name}
+                    where={
+                        "$or": [
+                            {"sender_name": person_name},
+                            {"receiver_name": person_name}
+                        ]
+                    }
                 )
                 
                 # Delete by IDs
