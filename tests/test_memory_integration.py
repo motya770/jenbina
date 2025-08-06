@@ -70,6 +70,8 @@ class TestMemoryIntegration(unittest.TestCase):
             person_name="Alice",
             message_content="Hello, how are you today?",
             message_type="greeting",
+            sender_name="Alice",
+            receiver_name="Jenbina",
             person_state=self.person,
             metadata={"topic": "greeting", "sentiment": "positive"}
         )
@@ -96,6 +98,8 @@ class TestMemoryIntegration(unittest.TestCase):
             person_name="Bob",
             message_content="I'm feeling a bit hungry and lonely",
             message_type="emotional_expression",
+            sender_name="Bob",
+            receiver_name="Jenbina",
             person_state=self.person
         )
         

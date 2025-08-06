@@ -20,21 +20,23 @@ def test_memory():
     # Test storing a few messages
     print("\n=== TESTING MESSAGE STORAGE ===")
     
-    # Store some test messages
+    # Store some test messages with sender/receiver information
     test_messages = [
-        ("User", "Hi, I am matthew", "user_message"),
-        ("User", "Hello Matthew! Nice to meet you. I'm Jenbina.", "jenbina_response"),
-        ("User", "What is my name", "user_message"),
-        ("User", "Ah, Matthew! Nice to meet you. I'm Jenbina.", "jenbina_response"),
-        ("User", "Lets talk about C++", "user_message"),
+        ("User", "Hi, I am matthew", "user_message", "User", "Jenbina"),
+        ("User", "Hello Matthew! Nice to meet you. I'm Jenbina.", "jenbina_response", "Jenbina", "User"),
+        ("User", "What is my name", "user_message", "User", "Jenbina"),
+        ("User", "Ah, Matthew! Nice to meet you. I'm Jenbina.", "jenbina_response", "Jenbina", "User"),
+        ("User", "Lets talk about C++", "user_message", "User", "Jenbina"),
     ]
     
-    for person, message, msg_type in test_messages:
-        print(f"Storing: {person} - {msg_type} - {message[:50]}...")
+    for person, message, msg_type, sender, receiver in test_messages:
+        print(f"Storing: {person} - {msg_type} - {sender}->{receiver} - {message[:50]}...")
         embedding_id = memory_manager.store_conversation(
             person_name=person,
             message_content=message,
-            message_type=msg_type
+            message_type=msg_type,
+            sender_name=sender,
+            receiver_name=receiver
         )
         print(f"  -> Stored with ID: {embedding_id}")
     
@@ -53,6 +55,26 @@ def test_memory():
     print(f"Retrieved {len(context)} context documents")
     for i, doc in enumerate(context):
         print(f"  {i+1}. {doc['content'][:50]}... (Type: {doc['metadata']['message_type']})")
+    
+    # Test the new conversation between functionality
+    print("\n=== TESTING CONVERSATION BETWEEN ===")
+    conversation = memory_manager.get_conversation_between("User", "Jenbina", limit=10)
+    print(f"Retrieved {len(conversation)} messages between User and Jenbina")
+    for i, msg in enumerate(conversation):
+        sender = msg['metadata'].get('sender_name', 'Unknown')
+        receiver = msg['metadata'].get('receiver_name', 'Unknown')
+        direction = msg.get('direction', 'unknown')
+        print(f"  {i+1}. {sender}->{receiver} ({direction}): {msg['content'][:50]}...")
+    
+    # Test reverse direction
+    print("\n=== TESTING REVERSE CONVERSATION ===")
+    reverse_conversation = memory_manager.get_conversation_between("Jenbina", "User", limit=10)
+    print(f"Retrieved {len(reverse_conversation)} messages between Jenbina and User")
+    for i, msg in enumerate(reverse_conversation):
+        sender = msg['metadata'].get('sender_name', 'Unknown')
+        receiver = msg['metadata'].get('receiver_name', 'Unknown')
+        direction = msg.get('direction', 'unknown')
+        print(f"  {i+1}. {sender}->{receiver} ({direction}): {msg['content'][:50]}...")
 
 if __name__ == "__main__":
     test_memory() 
