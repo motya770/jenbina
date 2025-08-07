@@ -1,0 +1,98 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of tests to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - memory
+        - chains
+        - integration
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+        
+    - name: Create test directory structure
+      run: |
+        mkdir -p tests/jenbina_memory
+        
+    - name: Run all tests
+      if: github.event.inputs.test_type == 'all' || github.event_name == 'push'
+      run: |
+        cd tests
+        echo "🧪 Running all test suites..."
+        python -m pytest test_*.py -v --tb=short --cov=../core --cov-report=term-missing
+        echo "✅ All tests completed!"
+        
+    - name: Run memory tests only
+      if: github.event.inputs.test_type == 'memory'
+      run: |
+        cd tests
+        echo "🧠 Running memory tests..."
+        python test_memory.py
+        python test_memory_integration.py
+        python test_hybrid_memory.py
+        python test_sender_receiver_memory.py
+        echo "✅ Memory tests completed!"
+        
+    - name: Run chain tests only
+      if: github.event.inputs.test_type == 'chains'
+      run: |
+        cd tests
+        echo "🔗 Running chain tests..."
+        python test_chains.py
+        python test_chain_integration.py
+        python run_chain_tests.py
+        echo "✅ Chain tests completed!"
+        
+    - name: Run integration tests only
+      if: github.event.inputs.test_type == 'integration'
+      run: |
+        cd tests
+        echo "🔗 Running integration tests..."
+        python test_memory_integration.py
+        python test_chain_integration.py
+        python test_maslow_needs.py
+        echo "✅ Integration tests completed!"
+        
+    - name: Generate test summary
+      run: |
+        echo "📊 Test Summary:"
+        echo "Repository: ${{ github.repository }}"
+        echo "Branch: ${{ github.ref_name }}"
+        echo "Commit: ${{ github.sha }}"
+        echo "Triggered by: ${{ github.event_name }}"
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          echo "Test type: ${{ github.event.inputs.test_type }}"
+        fi
