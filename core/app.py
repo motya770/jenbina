@@ -192,6 +192,23 @@ with col1:
         st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
         st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
         
+        # JSON representation of person object
+        st.write("**Person Object (JSON):**")
+        person_dict = {
+            "name": person.name,
+            "maslow_needs": {
+                "overall_satisfaction": person.maslow_needs.get_overall_satisfaction(),
+                "individual_needs": {
+                    need_name: person.maslow_needs.get_need_satisfaction(need_name)
+                    for need_name in ["hunger", "sleep", "security", "love", "esteem", "self_actualization"]
+                    if person.maslow_needs.get_need_satisfaction(need_name) > 0
+                },
+                "critical_needs": person.maslow_needs.get_critical_needs(),
+                "low_needs": person.maslow_needs.get_low_needs()
+            }
+        }
+        st.json(person_dict)
+        
         # Basic needs analysis
         st.write("**1. Basic Needs Analysis:**")
         needs_response = create_basic_needs_chain(llm_json_mode, person.maslow_needs)
