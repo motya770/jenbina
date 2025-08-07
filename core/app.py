@@ -11,7 +11,7 @@ from core.cognition.action_decision_chain import create_action_decision_chain
 from core.needs.maslow_needs import BasicNeeds, create_basic_needs_chain
 from core.cognition.asimov_check_chain import create_asimov_check_system
 from core.cognition.state_analysis_chain import create_state_analysis_system
-from core.environment.world_state import WorldState, create_world_description_system
+from core.environment.world_state import WorldState, create_world_description_system, create_comprehensive_world_state, get_world_state_summary
 from core.interaction.chat_handler import handle_chat_interaction
 from core.person.person import Person
 from core.cognition.meta_cognition import MetaCognitiveSystem
@@ -217,12 +217,24 @@ with col1:
 
         # World state and description
         st.write("**2. World State:**")
-        world = WorldState()
-        st.write(f"Location: {world.location}")
-        st.write(f"Time of Day: {world.time_of_day}")
-        st.write(f"Weather: {world.weather}")
+        world = create_comprehensive_world_state(person_location="Jenbina's House")
+        world_summary = get_world_state_summary(world)
+        
+        st.write(f"Location: {world_summary['location']['name']}")
+        st.write(f"Time of Day: {world_summary['time']['time_of_day']}")
+        st.write(f"Weather: {world_summary['weather']['description']}")
+        st.write(f"Temperature: {world_summary['weather']['temperature']:.1f}°C")
+        st.write(f"Humidity: {world_summary['weather']['humidity']:.1f}%")
+        st.write(f"Nearby Locations: {world_summary['environment']['nearby_locations_count']}")
+        st.write(f"Open Locations: {world_summary['environment']['open_locations_count']}")
+        st.write(f"Current Events: {world_summary['environment']['current_events_count']}")
+        
         if world.last_descriptions:
             st.write(f"Previous Descriptions: {len(world.last_descriptions)} items")
+
+        # Display world state as JSON
+        st.write("**World State (JSON):**")
+        st.json(world_summary)
 
         st.write("**2.1 World Description:**")
         world_chain = create_world_description_system(llm_json_mode)
@@ -236,7 +248,8 @@ with col1:
             llm=llm_json_mode, 
             person=person, 
             world_description=st.session_state.world_description,
-            meta_cognitive_system=st.session_state.meta_cognitive_system
+            meta_cognitive_system=st.session_state.meta_cognitive_system,
+            world_state=world
         )
         st.session_state.action_decision = action_response
         st.write(st.session_state.action_decision)

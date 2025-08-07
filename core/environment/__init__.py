@@ -17,7 +17,9 @@ from .environment_simulator import (
 
 from .world_state import (
     WorldState,
-    create_world_description_system
+    create_world_description_system,
+    create_comprehensive_world_state,
+    get_world_state_summary
 )
 
 from .location_system import (
@@ -42,6 +44,8 @@ __all__ = [
     # World state
     'WorldState',
     'create_world_description_system',
+    'create_comprehensive_world_state',
+    'get_world_state_summary',
     
     # Location system
     'PaloAltoLocationSystem',
