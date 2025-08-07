@@ -242,7 +242,8 @@ with col1:
 
         # Asimov compliance check
         st.write("**5. Asimov Compliance Check:**")
-        asimov_response = create_asimov_check_system(llm_json_mode, action=st.session_state.action_decision)
+        asimov_chain = create_asimov_check_system(llm_json_mode)
+        asimov_response = asimov_chain(st.session_state.action_decision)
         st.write(asimov_response)
 
         # State analysis
