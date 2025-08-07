@@ -182,154 +182,221 @@ with col1:
         st.session_state.action_decision = None
         st.session_state.state_response = None
 
-    # Skip simulation and go directly to chat
-    st.session_state.simulation_completed = True
-    st.session_state.needs_response = "Basic needs are being managed automatically"
-    
-    # Get dynamic world description from environment simulator
-    world_description = st.session_state.environment_simulator.get_environment_description()
-    st.session_state.world_description = world_description
-    st.session_state.action_decision = "Continue with daily activities"
-    st.session_state.state_response = "State is being monitored automatically"
-    
-    st.success("🚀 **Direct Chat Mode Activated!** - Skip simulation and chat directly with Jenbina")
-    
-    # Quick status display
-    st.write("**Jenbina's Current Status:**")
-    st.write(f"- Name: {person.name}")
-    st.write(f"- Overall Satisfaction: {person.maslow_needs.get_overall_satisfaction():.1f}%")
-    st.write(f"- Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
-    st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
-    st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
-
-    # Only show chat interface after simulation is completed
-    if st.session_state.simulation_completed:
-        st.write("**6. Interaction with User:**")
-        st.write("### Chat with Jenbina")
-        
-        # Display current person state
-        st.write("**Current State:**")
+    if st.button("Start simulation"):
+        # Display all stages
+        st.write("### Processing Stages:")
+        st.write("### Current Jenbina State:")
         st.write(f"- Name: {person.name}")
         st.write(f"- Overall Satisfaction: {person.maslow_needs.get_overall_satisfaction():.1f}%")
         st.write(f"- Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
         st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
         st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
         
-        user_input = st.chat_input("Talk to Jenbina...")
+        # Basic needs analysis
+        st.write("**1. Basic Needs Analysis:**")
+        needs_response = create_basic_needs_chain(llm_json_mode, person.maslow_needs)
+        st.session_state.needs_response = needs_response
+        st.write(st.session_state.needs_response)
+
+        # World state and description
+        st.write("**2. World State:**")
+        world = WorldState()
+        st.write(f"Location: {world.location}")
+        st.write(f"Time of Day: {world.time_of_day}")
+        st.write(f"Weather: {world.weather}")
+        if world.last_descriptions:
+            st.write(f"Previous Descriptions: {len(world.last_descriptions)} items")
+
+        st.write("**2.1 World Description:**")
+        world_chain = create_world_description_system(llm_json_mode)
+        world_response = world_chain(person, world)
+        st.session_state.world_description = world_response
+        st.write(st.session_state.world_description)
+
+        # Enhanced action decision with meta-cognition
+        st.write("**3. Action Decision (with Meta-Cognition):**")
+        action_response = create_meta_cognitive_action_chain(
+            llm=llm_json_mode, 
+            person=person, 
+            world_description=st.session_state.world_description,
+            meta_cognitive_system=st.session_state.meta_cognitive_system
+        )
+        st.session_state.action_decision = action_response
+        st.write(st.session_state.action_decision)
         
-        if user_input:
-            print("User input:", user_input)
+        # Display meta-cognitive insights
+        with st.expander("Meta-Cognitive Insights", expanded=False):
+            meta_stats = st.session_state.meta_cognitive_system.get_meta_cognitive_stats()
+            st.write(f"**Total Cognitive Processes:** {meta_stats['total_processes']}")
+            st.write(f"**Total Insights:** {meta_stats['total_insights']}")
             
-            # Store the user message in person's communication history
-            person.receive_message("User", user_input, "text")
+            st.write("**Cognitive Biases Detected:**")
+            for bias, level in meta_stats['cognitive_biases'].items():
+                if level > 0:
+                    st.write(f"- {bias}: {level:.2f}")
             
-            # Get conversation history for context
-            conversation_history = person.get_conversation_history("User", count=1000)
-            recent_context = "\n".join([
-                f"{msg.sender}: {msg.content}" 
-                for msg in conversation_history  # All messages for context
-            ])
-            
-            # Handle chat interaction using stored session state values and person's state
-            chat_result = handle_chat_interaction(
-                st=st,
-                llm=llm,
-                needs_response=st.session_state.needs_response,
-                world_description=st.session_state.world_description,
-                action_decision=st.session_state.action_decision,
-                state_response=st.session_state.state_response,
-                user_input=user_input,
-                person_state=person.get_current_state(),
-                conversation_context=recent_context,
-                memory_manager=st.session_state.memory_manager,
-                debug_mode=debug_mode
-            )
-            
-            print(chat_result)
+            if meta_stats['recent_insights']:
+                st.write("**Recent Insights:**")
+                for insight in meta_stats['recent_insights']:
+                    st.write(f"- **{insight['type']}**: {insight['description']}")
 
-            # Store the person's response in communication history
-            if "assistant_response" in chat_result:
-                person.send_message("User", chat_result["assistant_response"], "text")
+        # Asimov compliance check
+        st.write("**5. Asimov Compliance Check:**")
+        asimov_response = create_asimov_check_system(llm_json_mode, action=st.session_state.action_decision)
+        st.write(asimov_response)
 
-            # Add interactions to history
-            if "user_message" in chat_result:
-                st.session_state.action_history.append({
-                    "role": "user",
-                    "content": chat_result["user_message"]
-                })
+        # State analysis
+        st.write("**4. State Analysis:**") 
+        state_response = create_state_analysis_system(llm_json_mode, action_decision=st.session_state.action_decision, compliance_check=asimov_response)
+        st.session_state.state_response = state_response
+        st.write(st.session_state.state_response)
+
+        # Mark simulation as completed
+        st.session_state.simulation_completed = True
+
+    # Chat interface - always available (simulation is optional)
+    st.write("**6. Interaction with User:**")
+    st.write("### Chat with Jenbina")
+    
+    # Display current person state
+    st.write("**Current State:**")
+    st.write(f"- Name: {person.name}")
+    st.write(f"- Overall Satisfaction: {person.maslow_needs.get_overall_satisfaction():.1f}%")
+    st.write(f"- Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
+    st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
+    st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
+    
+    user_input = st.chat_input("Talk to Jenbina...")
+    
+    if user_input:
+        print("User input:", user_input)
+        
+        # Store the user message in person's communication history
+        person.receive_message("User", user_input, "text")
+        
+        # Get conversation history for context
+        conversation_history = person.get_conversation_history("User", count=1000)
+        recent_context = "\n".join([
+            f"{msg.sender}: {msg.content}" 
+            for msg in conversation_history  # All messages for context
+        ])
+        
+        # Handle chat interaction using stored session state values and person's state
+        chat_result = handle_chat_interaction(
+            st=st,
+            llm=llm,
+            needs_response=st.session_state.needs_response,
+            world_description=st.session_state.world_description,
+            action_decision=st.session_state.action_decision,
+            state_response=st.session_state.state_response,
+            user_input=user_input,
+            person_state=person.get_current_state(),
+            conversation_context=recent_context,
+            memory_manager=st.session_state.memory_manager,
+            debug_mode=debug_mode
+        )
+        
+        print(chat_result)
+
+        # Store the person's response in communication history
+        if "assistant_response" in chat_result:
+            person.send_message("User", chat_result["assistant_response"], "text")
+
+        # Add interactions to history
+        if "user_message" in chat_result:
             st.session_state.action_history.append({
-                "role": "assistant",
-                "content": chat_result["assistant_response"]
+                "role": "user",
+                "content": chat_result["user_message"]
             })
+        st.session_state.action_history.append({
+            "role": "assistant",
+            "content": chat_result["assistant_response"]
+        })
+    
+    # Display communication statistics
+    with st.expander("Communication Statistics", expanded=False):
+        comm_stats = person.get_communication_stats()
+        st.write(f"**Total Conversations:** {comm_stats['total_conversations']}")
+        st.write(f"**Total Messages:** {comm_stats['total_messages']}")
         
-        # Display communication statistics
-        with st.expander("Communication Statistics", expanded=False):
-            comm_stats = person.get_communication_stats()
-            st.write(f"**Total Conversations:** {comm_stats['total_conversations']}")
-            st.write(f"**Total Messages:** {comm_stats['total_messages']}")
+        if comm_stats['most_active_conversations']:
+            st.write("**Most Active Conversations:**")
+            for conv in comm_stats['most_active_conversations']:
+                st.write(f"- {conv['outsider']}: {conv['message_count']} messages")
+    
+    # Display recent conversation history
+    with st.expander("Recent Conversation History", expanded=False):
+        user_summary = person.get_conversation_summary("User")
+        if user_summary['message_count'] > 0:
+            st.write(f"**Messages with User:** {user_summary['message_count']}")
+            st.write(f"**Last Interaction:** {user_summary['last_interaction'].strftime('%Y-%m-%d %H:%M')}")
             
-            if comm_stats['most_active_conversations']:
-                st.write("**Most Active Conversations:**")
-                for conv in comm_stats['most_active_conversations']:
-                    st.write(f"- {conv['outsider']}: {conv['message_count']} messages")
+            st.write("**Recent Messages:**")
+            for msg in user_summary['recent_messages']:
+                sender_icon = "👤" if msg['sender'] == "User" else "🤖"
+                st.write(f"{sender_icon} **{msg['sender']}** ({msg['timestamp'].strftime('%H:%M')}): {msg['content']}")
+        else:
+            st.write("No conversation history yet.")
+    
+    # Display memory system statistics
+    with st.expander("Memory System Statistics", expanded=False):
+        memory_stats = st.session_state.memory_manager.get_memory_stats()
+        st.write(f"**Total Conversations in Memory:** {memory_stats.get('total_conversations', 0)}")
+        st.write(f"**Unique People:** {memory_stats.get('unique_people', 0)}")
+        st.write(f"**Memory Size:** {memory_stats.get('memory_size_mb', 0)} MB")
         
-        # Display recent conversation history
-        with st.expander("Recent Conversation History", expanded=False):
-            user_summary = person.get_conversation_summary("User")
-            if user_summary['message_count'] > 0:
-                st.write(f"**Messages with User:** {user_summary['message_count']}")
-                st.write(f"**Last Interaction:** {user_summary['last_interaction'].strftime('%Y-%m-%d %H:%M')}")
-                
-                st.write("**Recent Messages:**")
-                for msg in user_summary['recent_messages']:
-                    sender_icon = "👤" if msg['sender'] == "User" else "🤖"
-                    st.write(f"{sender_icon} **{msg['sender']}** ({msg['timestamp'].strftime('%H:%M')}): {msg['content']}")
-            else:
-                st.write("No conversation history yet.")
+        if memory_stats.get('people'):
+            st.write("**People in Memory:**")
+            for person_name in memory_stats['people']:
+                st.write(f"- {person_name}")
         
-        # Display memory system statistics
-        with st.expander("Memory System Statistics", expanded=False):
-            memory_stats = st.session_state.memory_manager.get_memory_stats()
-            st.write(f"**Total Conversations in Memory:** {memory_stats.get('total_conversations', 0)}")
-            st.write(f"**Unique People:** {memory_stats.get('unique_people', 0)}")
-            st.write(f"**Memory Size:** {memory_stats.get('memory_size_mb', 0)} MB")
+        if memory_stats.get('message_types'):
+            st.write("**Message Types:**")
+            for msg_type, count in memory_stats['message_types'].items():
+                st.write(f"- {msg_type}: {count}")
+    
+    # Debug section for memory system
+    if debug_mode:
+        with st.expander("🐛 Memory Debug Info", expanded=False):
+            st.write("**Memory Manager Status:**")
+            st.write(f"- Memory Manager Initialized: {st.session_state.memory_manager is not None}")
+            st.write(f"- Chroma Client: {st.session_state.memory_manager.client is not None if st.session_state.memory_manager else False}")
+            st.write(f"- Collection: {st.session_state.memory_manager.collection is not None if st.session_state.memory_manager else False}")
             
-            if memory_stats.get('people'):
-                st.write("**People in Memory:**")
-                for person_name in memory_stats['people']:
-                    st.write(f"- {person_name}")
+            # Test memory operations
+            if st.button("🧪 Test Memory Operations"):
+                try:
+                    # Test storing
+                    test_id = st.session_state.memory_manager.store_conversation(
+                        "TestUser", "This is a test message", "test_message"
+                    )
+                    st.success(f"✅ Test message stored with ID: {test_id}")
+                    
+                    # Test retrieval
+                    test_context = st.session_state.memory_manager.retrieve_relevant_context(
+                        "TestUser", "test message", top_k=1
+                    )
+                    st.success(f"✅ Test retrieval found {len(test_context)} documents")
+                    
+                    # Clean up test
+                    st.session_state.memory_manager.clear_memory("TestUser")
+                    st.success("✅ Test data cleaned up")
+                    
+                except Exception as e:
+                    st.error(f"❌ Memory test failed: {str(e)}")
+
+# with col2:
+#     # Internal state visualization
+#     st.subheader("Jenbina's Internal State")
+#     st.write("Current Emotional State:", st.session_state.person.emotional_state)
+#     st.write("Decision Making Process:")
+    
+#     # Display the reasoning chain
+#     if st.session_state.action_history:
+#         with st.expander("Latest Decision Chain", expanded=True):
+#             chain = state_analysis_chain(st.session_state.person)
+#             st.write(chain)
             
-            if memory_stats.get('message_types'):
-                st.write("**Message Types:**")
-                for msg_type, count in memory_stats['message_types'].items():
-                    st.write(f"- {msg_type}: {count}")
-        
-        # Debug section for memory system
-        if debug_mode:
-            with st.expander("🐛 Memory Debug Info", expanded=False):
-                st.write("**Memory Manager Status:**")
-                st.write(f"- Memory Manager Initialized: {st.session_state.memory_manager is not None}")
-                st.write(f"- Chroma Client: {st.session_state.memory_manager.client is not None if st.session_state.memory_manager else False}")
-                st.write(f"- Collection: {st.session_state.memory_manager.collection is not None if st.session_state.memory_manager else False}")
-                
-                # Test memory operations
-                if st.button("🧪 Test Memory Operations"):
-                    try:
-                        # Test storing
-                        test_id = st.session_state.memory_manager.store_conversation(
-                            "TestUser", "This is a test message", "test_message"
-                        )
-                        st.success(f"✅ Test message stored with ID: {test_id}")
-                        
-                        # Test retrieval
-                        test_context = st.session_state.memory_manager.retrieve_relevant_context(
-                            "TestUser", "test message", top_k=1
-                        )
-                        st.success(f"✅ Test retrieval found {len(test_context)} documents")
-                        
-                        # Clean up test
-                        st.session_state.memory_manager.clear_memory("TestUser")
-                        st.success("✅ Test data cleaned up")
-                        
-                    except Exception as e:
-                        st.error(f"❌ Memory test failed: {str(e)}") 
+#     # Display Asimov compliance status
+#     compliance_status = check_asimov_compliance(st.session_state.person)
+#     st.metric("Asimov Compliance", value=f"{compliance_status}%") 
