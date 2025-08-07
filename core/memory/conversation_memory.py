@@ -53,6 +53,7 @@ class ChromaMemoryManager:
     
     def _initialize_vector_store(self):
         """Initialize or load the Chroma vector store"""
+        # Try persistent client first
         try:
             # Initialize ChromaDB client
             self.client = chromadb.PersistentClient(
@@ -67,15 +68,64 @@ class ChromaMemoryManager:
             try:
                 self.collection = self.client.get_collection("jenbina_conversations")
                 print(f"Loaded existing collection from {self.vector_store_path}")
-            except:
-                self.collection = self.client.create_collection("jenbina_conversations")
-                print(f"Created new collection at {self.vector_store_path}")
+                return  # Success, exit early
+            except Exception as collection_error:
+                error_msg = str(collection_error).lower()
+                if "already exists" in error_msg:
+                    # Collection exists but there was an issue getting it, try to get it again
+                    try:
+                        self.collection = self.client.get_collection("jenbina_conversations")
+                        print(f"Retrieved existing collection from {self.vector_store_path}")
+                        return  # Success, exit early
+                    except Exception as retry_error:
+                        print(f"Failed to retrieve existing collection: {retry_error}")
+                        # If we still can't get it, try to delete and recreate
+                        try:
+                            self.client.delete_collection("jenbina_conversations")
+                            self.collection = self.client.create_collection("jenbina_conversations")
+                            print(f"Recreated collection at {self.vector_store_path}")
+                            return  # Success, exit early
+                        except Exception as recreate_error:
+                            print(f"Failed to recreate collection: {recreate_error}")
+                            # Continue to fallback
+                elif "not found" in error_msg or "does not exist" in error_msg:
+                    # Collection doesn't exist, create it
+                    try:
+                        self.collection = self.client.create_collection("jenbina_conversations")
+                        print(f"Created new collection at {self.vector_store_path}")
+                        return  # Success, exit early
+                    except Exception as create_error:
+                        print(f"Failed to create collection: {create_error}")
+                        # Continue to fallback
+                else:
+                    print(f"Unknown collection error: {collection_error}")
+                    # Continue to fallback
                 
         except Exception as e:
-            print(f"Error initializing vector store: {e}")
-            # Fallback to in-memory client
+            print(f"Error initializing persistent vector store: {e}")
+            # Continue to fallback
+        
+        # Fallback to in-memory client
+        print("Falling back to in-memory ChromaDB client...")
+        try:
             self.client = chromadb.Client()
-            self.collection = self.client.create_collection("jenbina_conversations")
+            # Try to get existing collection first
+            try:
+                self.collection = self.client.get_collection("jenbina_conversations")
+                print("Using existing in-memory collection")
+            except:
+                self.collection = self.client.create_collection("jenbina_conversations")
+                print("Created new in-memory collection")
+        except Exception as fallback_error:
+            print(f"In-memory fallback failed: {fallback_error}")
+            # Last resort: create a new client and collection
+            try:
+                self.client = chromadb.Client()
+                self.collection = self.client.create_collection("jenbina_conversations")
+                print("Created new fallback collection")
+            except Exception as final_error:
+                print(f"Final fallback failed: {final_error}")
+                raise final_error
     
     def _generate_embedding_id(self, person_name: str, content: str, timestamp: datetime) -> str:
         """Generate a unique ID for the embedding"""
