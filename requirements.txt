@@ -5,5 +5,5 @@ streamlit==1.38.0
 langchain-nomic==0.1.4
 chromadb==1.0.15
 neo4j==5.28.2
-pytest==7.4.3
-pytest-cov==4.1.0
+pytest==8.4.1
+pytest-cov==6.2.1
