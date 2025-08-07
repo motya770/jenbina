@@ -7,7 +7,8 @@ def create_meta_cognitive_action_chain(llm, person, world_description, meta_cogn
     """Enhanced action decision with meta-cognitive monitoring"""
     
     # Get original decision
-    original_decision = create_action_decision_chain(llm, person, world_description)
+    action_chain = create_action_decision_chain(llm)
+    original_decision = action_chain(person, world_description, llm)
     
     # Extract reasoning chain (you'll need to modify your original chain to return this)
     reasoning_chain = [
@@ -21,7 +22,7 @@ def create_meta_cognitive_action_chain(llm, person, world_description, meta_cogn
     cognitive_process = meta_cognitive_system.monitor_cognitive_process(
         process_type="action_decision",
         input_data={
-            "needs": {name: need.satisfaction for name, need in person.needs[0].needs.items()},
+            "needs": {name: need.satisfaction for name, need in person.maslow_needs.needs.items()},
             "world_description": world_description
         },
         output_data=original_decision,
@@ -34,7 +35,7 @@ def create_meta_cognitive_action_chain(llm, person, world_description, meta_cogn
     
     # Get thinking strategies for improvement
     current_situation = {
-        "needs": {name: need.satisfaction for name, need in person.needs[0].needs.items()},
+        "needs": {name: need.satisfaction for name, need in person.maslow_needs.needs.items()},
         "decision_context": "action_selection"
     }
     

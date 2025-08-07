@@ -565,7 +565,7 @@ class BasicNeeds:
 
 def create_basic_needs_chain(llm_json_mode, person: BasicNeeds):
     """Legacy function for backward compatibility - now uses Maslow decision system"""
-    from maslow_decision_chain import create_maslow_decision_chain
+    from core.needs.maslow_decision_chain import create_maslow_decision_chain
     
     # Convert BasicNeeds to MaslowNeedsSystem for decision making
     if hasattr(person, 'maslow_system'):
