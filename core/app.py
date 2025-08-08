@@ -33,6 +33,8 @@ os.environ['LANGSMITH_PROJECT'] = "jenbina"
 from langchain_ollama import ChatOllama
 from langchain.schema import HumanMessage
 local_llm = 'llama3.2:3b-instruct-fp16'
+# local_llm = 'gpt-oss:20b'
+
 
 # os.environ['OLLAMA_HOST'] = 'https://api.sambanova.ai/v1'
 llm = ChatOllama(model=local_llm, temperature=0)
