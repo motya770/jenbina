@@ -1,6 +1,8 @@
 ollama==0.5.2
 langchain-ollama==0.3.6
 langchain==0.3.27
+langchain-openai==0.2.14
+openai==1.59.5
 streamlit==1.38.0
 langchain-nomic==0.1.4
 chromadb==1.0.15
