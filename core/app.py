@@ -29,16 +29,14 @@ os.environ['LANGSMITH_API_KEY'] = "lsv2_pt_0303f175c69d40579d9a3bbd239e0de5_2c83
 os.environ['LANGSMITH_PROJECT'] = "jenbina"
 
 
-### LLM
-from langchain_ollama import ChatOllama
+### LLM - Using ChatGPT as default
 from langchain.schema import HumanMessage
-local_llm = 'llama3.2:3b-instruct-fp16'
-# local_llm = 'gpt-oss:20b'
+from core.connect import get_llm, get_json_llm
 
-
-# os.environ['OLLAMA_HOST'] = 'https://api.sambanova.ai/v1'
-llm = ChatOllama(model=local_llm, temperature=0)
-llm_json_mode = ChatOllama(model=local_llm, temperature=0, format='json')
+# Use ChatGPT by default (change provider to "ollama" for local)
+# Options: "openai" (GPT-5-nano), "openai-advanced" (GPT-5.2), "ollama" (local)
+llm = get_llm(provider="openai", temperature=1)
+llm_json_mode = get_json_llm(provider="openai", temperature=1)
 
 # Example usage
 person = Person()

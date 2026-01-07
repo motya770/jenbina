@@ -4,15 +4,15 @@ from .cognition.action_decision_chain import process_action_decision
 from .cognition.asimov_check_chain import create_asimov_check_system
 from .cognition.state_analysis_chain import create_state_analysis_system
 from .person.person import Person
-from langchain_ollama import ChatOllama
+from .connect import get_llm, get_json_llm
 
 
 def run_simulation():
 
-    ### LLM
-    local_llm = 'llama3.2:3b-instruct-fp16'
-    llm = ChatOllama(model=local_llm, temperature=0)
-    llm_json_mode = ChatOllama(model=local_llm, temperature=0, format='json')
+    ### LLM - Using ChatGPT as default (switch to "ollama" for local)
+    # Options: "openai" (default), "openai-advanced", "ollama", "sambanova"
+    llm = get_llm(provider="openai", temperature=0)
+    llm_json_mode = get_json_llm(provider="openai", temperature=0)
 
     # Initialize person and world state
     person = Person()
