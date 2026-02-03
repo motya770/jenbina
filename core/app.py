@@ -14,8 +14,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # CONFIGURATION
 # ============================================================================
 
-# Environment configuration
-os.environ['OLLAMA_HOST'] = 'http://localhost:11434'
+# Environment configuration (Ollama disabled - using OpenAI)
+# os.environ['OLLAMA_HOST'] = 'http://localhost:11434'  # Disabled - not using Ollama
 os.environ['LANGSMITH_TRACING'] = 'true'
 os.environ['LANGSMITH_ENDPOINT'] = "https://api.smith.langchain.com"
 os.environ['LANGSMITH_API_KEY'] = "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"
