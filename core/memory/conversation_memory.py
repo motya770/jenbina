@@ -6,9 +6,16 @@ import hashlib
 import os
 import chromadb
 from chromadb.config import Settings
-from langchain_ollama import OllamaEmbeddings
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+# Try to import OpenAI embeddings, fallback to a simple hash-based approach
+try:
+    from langchain_openai import OpenAIEmbeddings
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    print("Warning: langchain_openai not installed, using simple embeddings")
 
 def parse_basic_needs_from_json(needs_json_str):
     """Parse BasicNeeds from JSON string stored in metadata"""
@@ -32,15 +39,51 @@ class ConversationMemory:
     metadata: Dict[str, Any] = field(default_factory=dict)
     embedding_id: Optional[str] = None
 
+class SimpleEmbeddings:
+    """Simple hash-based embeddings for when OpenAI is not available"""
+    
+    def __init__(self):
+        self.model = "simple-hash"
+        self.dimension = 384
+    
+    def embed_query(self, text: str) -> List[float]:
+        """Generate a simple hash-based embedding"""
+        import hashlib
+        # Create a deterministic embedding from hash
+        hash_bytes = hashlib.sha384(text.encode()).digest()
+        # Convert to floats between -1 and 1
+        embedding = [(b - 128) / 128.0 for b in hash_bytes]
+        return embedding
+    
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Embed multiple documents"""
+        return [self.embed_query(text) for text in texts]
+
+
 class ChromaMemoryManager:
-    def __init__(self, embeddings_model: str = "llama3.2:3b-instruct-fp16"):
+    def __init__(self, embeddings_provider: str = "openai"):
         """
         Initialize Chroma-based memory manager
         
         Args:
-            embeddings_model: Ollama model to use for embeddings
+            embeddings_provider: Which embeddings to use ("openai", "simple")
         """
-        self.embeddings = OllamaEmbeddings(model=embeddings_model)
+        # Initialize embeddings based on provider
+        if embeddings_provider == "openai" and OPENAI_AVAILABLE:
+            try:
+                self.embeddings = OpenAIEmbeddings(
+                    model="text-embedding-3-small",
+                    api_key=os.getenv('OPENAI_API_KEY')
+                )
+                print("Using OpenAI embeddings")
+            except Exception as e:
+                print(f"Failed to initialize OpenAI embeddings: {e}")
+                print("Falling back to simple embeddings")
+                self.embeddings = SimpleEmbeddings()
+        else:
+            print("Using simple hash-based embeddings (no API required)")
+            self.embeddings = SimpleEmbeddings()
+        
         self.vector_store_path = "./jenbina_memory"
         self.client = None
         self.collection = None
