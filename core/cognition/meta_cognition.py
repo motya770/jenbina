@@ -88,18 +88,48 @@ Respond in JSON format:
         
         # Use invoke directly instead of LLMChain
         try:
+            # Safely convert input_data and output_data to JSON strings
+            try:
+                input_data_str = json.dumps(process.input_data, default=str)
+            except (TypeError, ValueError):
+                input_data_str = str(process.input_data)
+            
+            try:
+                output_data_str = json.dumps(process.output_data, default=str)
+            except (TypeError, ValueError):
+                output_data_str = str(process.output_data)
+            
+            # Safely join reasoning chain (handle nested lists)
+            reasoning_chain_items = []
+            for item in process.reasoning_chain:
+                if isinstance(item, str):
+                    reasoning_chain_items.append(item)
+                else:
+                    reasoning_chain_items.append(str(item))
+            reasoning_chain_str = "\n".join(reasoning_chain_items)
+            
             response = self.llm.invoke(
                 reflection_prompt.format(
                     process_type=process.process_type,
-                    input_data=json.dumps(process.input_data),
-                    output_data=json.dumps(process.output_data),
-                    reasoning_chain="\n".join(process.reasoning_chain),
+                    input_data=input_data_str,
+                    output_data=output_data_str,
+                    reasoning_chain=reasoning_chain_str,
                     confidence=process.confidence
                 )
             )
             result = response.content if hasattr(response, 'content') else str(response)
             
-            reflection_data = json.loads(result)
+            # Try to parse JSON, handle potential issues
+            try:
+                reflection_data = json.loads(result)
+            except json.JSONDecodeError:
+                # Try to extract JSON from response if it contains extra text
+                import re
+                json_match = re.search(r'\{.*\}', result, re.DOTALL)
+                if json_match:
+                    reflection_data = json.loads(json_match.group())
+                else:
+                    raise ValueError("Could not parse JSON from response")
             
             insight = MetaCognitiveInsight(
                 insight_type=reflection_data["insight_type"],
@@ -112,9 +142,15 @@ Respond in JSON format:
             
             # Update bias tracking
             if "bias_detected" in reflection_data:
-                bias_type = reflection_data["bias_detected"]
-                if bias_type in self.cognitive_biases:
-                    self.cognitive_biases[bias_type] += 0.1
+                bias_detected = reflection_data["bias_detected"]
+                
+                # Handle both single string and list of biases
+                if isinstance(bias_detected, list):
+                    for bias_type in bias_detected:
+                        if isinstance(bias_type, str) and bias_type in self.cognitive_biases:
+                            self.cognitive_biases[bias_type] += 0.1
+                elif isinstance(bias_detected, str) and bias_detected in self.cognitive_biases:
+                    self.cognitive_biases[bias_detected] += 0.1
             
             return insight
             
