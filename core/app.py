@@ -295,8 +295,9 @@ with col1:
                     st.session_state.action_decision = action_response
                     st.write(st.session_state.action_decision)
                     
-                    # Display meta-cognitive insights
-                    with st.expander("Meta-Cognitive Insights", expanded=False):
+                    # Display meta-cognitive insights (using checkbox to avoid nested expander)
+                    show_meta = st.checkbox(f"🧠 Show Meta-Cognitive Insights", value=False, key=f"meta_insights_{iteration}")
+                    if show_meta:
                         meta_stats = st.session_state.meta_cognitive_system.get_meta_cognitive_stats()
                         st.write(f"**Total Cognitive Processes:** {meta_stats['total_processes']}")
                         st.write(f"**Total Insights:** {meta_stats['total_insights']}")
