@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from ..needs.maslow_needs import MaslowNeedsSystem
 from ..emotions.emotion_system import EmotionSystem
 from datetime import datetime
@@ -49,6 +49,7 @@ class Person:
     name: str = "Jenbina"
     maslow_needs: MaslowNeedsSystem = None
     emotion_system: EmotionSystem = None
+    learning_system: Any = None  # Initialized separately (needs LLM)
     conversations: Dict[str, Conversation] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -57,10 +58,31 @@ class Person:
         if self.emotion_system is None:
             self.emotion_system = EmotionSystem()
     
+    def init_learning_system(self, llm):
+        """Initialize the learning system with an LLM instance.
+        Called separately because LLM isn't available at Person creation time."""
+        from ..learning.learning_system import LearningSystem
+        self.learning_system = LearningSystem(llm)
+    
     def update_all_needs(self):
-        """Update all needs and decay emotions for this person"""
+        """Update all needs, decay emotions, and decay lessons"""
         self.maslow_needs.update_all_needs()
         self.emotion_system.update_all()
+        # Decay learned lessons over time (small amount per update cycle)
+        if self.learning_system is not None:
+            self.learning_system.decay_all_lessons(hours=0.5)
+    
+    def get_needs_snapshot(self) -> Dict[str, float]:
+        """Get current needs as a flat dict (for learning system)"""
+        return {
+            name: need.satisfaction 
+            for name, need in self.maslow_needs.needs.items()
+        }
+    
+    def get_emotions_snapshot(self) -> Dict[str, float]:
+        """Get current emotions as a flat dict (for learning system)"""
+        summary = self.emotion_system.get_emotional_state_summary()
+        return summary.get("emotions", {})
     
     def add_conversation(self, outsider_name: str) -> Conversation:
         """Start a new conversation with an outsider"""
@@ -140,6 +162,10 @@ class Person:
         # Add communication state
         comm_stats = self.get_communication_stats()
         state["communication"] = comm_stats
+
+        # Add learning state
+        if self.learning_system is not None:
+            state["learning"] = self.learning_system.get_learning_stats()
 
         return state
     

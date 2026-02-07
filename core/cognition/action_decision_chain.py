@@ -11,7 +11,7 @@ from ..environment.world_state import WorldState
 def create_action_decision_chain(llm: BaseLLM) -> callable:
     # Create prompt for action decision
     action_prompt = PromptTemplate(
-        input_variables=["descriptions", "actions", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "emotional_state", "world_state_info"],
+        input_variables=["descriptions", "actions", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "emotional_state", "world_state_info", "learned_lessons"],
         template="""Given the current situation, the person's needs, emotions, and the world state, decide on the most appropriate action to take.
 
     Current Description:
@@ -32,21 +32,26 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
     World State Information:
     {world_state_info}
 
+    Lessons Learned from Past Experiences:
+    {learned_lessons}
+
     Consider all of the following when making your decision:
     - Current weather and time conditions
     - Available nearby locations and events
     - Environmental mood factors
     - What locations are currently open
     - The person's emotional state (e.g., high fear → seek safety, high joy → social actions, high sadness → comforting activities)
+    - Lessons learned from past experiences (prioritize high-confidence lessons)
 
-    Select one action from the available actions that best addresses the person's most pressing needs and emotional state while considering the current world state.
-    Explain your reasoning for choosing this action, including how emotions and world state influenced your decision.
+    Select one action from the available actions that best addresses the person's most pressing needs and emotional state while considering the current world state and past lessons.
+    Explain your reasoning for choosing this action, including how emotions, world state, and past lessons influenced your decision.
 
     Respond in JSON format with:
     - chosen_action: the selected action
     - reasoning: brief explanation of why this action was chosen, including emotional and world state considerations
     - world_state_influence: how the world state specifically influenced this decision
     - emotional_influence: how the person's emotions influenced this decision
+    - lessons_applied: which lessons from past experience influenced this decision (if any)
     """
     )
 
@@ -105,6 +110,16 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
             {chr(10).join([f"- {factor}: {value:.2f}" for factor, value in world_state.mood_factors.items()])}
             """
         
+        # Get learned lessons from the learning system
+        learned_lessons = "No lessons learned yet."
+        if person.learning_system is not None:
+            needs_dict = {name: need.satisfaction for name, need in maslow_needs.needs.items()}
+            emotions_dict = emotion_summary.get("emotions", {})
+            learned_lessons = person.learning_system.format_lessons_for_prompt(
+                needs=needs_dict,
+                emotions=emotions_dict
+            )
+        
         # Get decision using invoke directly
         response = llm.invoke(
             action_prompt.format(
@@ -115,7 +130,8 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
                 safety_satisfaction=safety_satisfaction,
                 overall_satisfaction=overall_satisfaction,
                 emotional_state=emotional_state,
-                world_state_info=world_state_info
+                world_state_info=world_state_info,
+                learned_lessons=learned_lessons
             )
         )
         
