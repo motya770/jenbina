@@ -2,6 +2,7 @@
 import streamlit as st
 from datetime import datetime
 import time
+import json
 
 from core.needs.maslow_needs import create_basic_needs_chain
 from core.cognition.asimov_check_chain import create_asimov_check_system
@@ -91,9 +92,43 @@ def display_meta_cognitive_insights(meta_cognitive_system, iteration):
                 st.write(f"- **{insight['type']}**: {insight['description']}")
 
 
+def display_learning_stats(person, iteration):
+    """Display learning system stats"""
+    if person.learning_system is None:
+        return
+    
+    stats = person.learning_system.get_learning_stats()
+    show_learning = st.checkbox(
+        f"📚 Show Learning Stats",
+        value=False,
+        key=f"learning_stats_{iteration}"
+    )
+    if show_learning:
+        st.write(f"**Total Experiences:** {stats['total_experiences']}")
+        st.write(f"**Active Lessons:** {stats['active_lessons']} / {stats['total_lessons']}")
+        
+        if stats['lessons']:
+            st.write("**Learned Lessons:**")
+            for lesson in stats['lessons']:
+                confidence_bar = "█" * int(lesson['confidence'] * 10) + "░" * (10 - int(lesson['confidence'] * 10))
+                st.write(
+                    f"- [{lesson['category']}] {lesson['description']}\n"
+                    f"  Confidence: {confidence_bar} {lesson['confidence']:.0%} | "
+                    f"Confirmed: {lesson['times_confirmed']}x | "
+                    f"Action: {lesson['recommended_action']}"
+                )
+        else:
+            st.write("*No lessons learned yet. Jenbina needs more experiences.*")
+
+
 def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration):
     """Run a single simulation iteration and return results"""
     iteration_start_time = datetime.now()
+    
+    # ── SNAPSHOT BEFORE ─────────────────────────────────────────────────
+    needs_before = person.get_needs_snapshot()
+    emotions_before = person.get_emotions_snapshot()
+    satisfaction_before = person.maslow_needs.get_overall_satisfaction()
     
     # Display person state
     display_person_state(person)
@@ -118,6 +153,16 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     world_chain = create_world_description_system(llm_json_mode)
     world_response = world_chain(person, world)
     st.write(world_response)
+    
+    # Show learned lessons (if any) before making a decision
+    if person.learning_system is not None:
+        lessons_text = person.learning_system.format_lessons_for_prompt(
+            needs=needs_before,
+            emotions=emotions_before
+        )
+        if lessons_text != "No lessons learned yet.":
+            st.write("**2.5 Lessons Applied to Decision:**")
+            st.info(lessons_text)
     
     # Enhanced action decision with meta-cognition
     st.write("**3. Action Decision (with Meta-Cognition):**")
@@ -163,8 +208,49 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     else:
         st.write("No significant emotional changes.")
 
-    # Update person's needs (also decays emotions)
+    # Update person's needs (also decays emotions and lessons)
     person.update_all_needs()
+    
+    # ── SNAPSHOT AFTER ──────────────────────────────────────────────────
+    needs_after = person.get_needs_snapshot()
+    emotions_after = person.get_emotions_snapshot()
+    satisfaction_after = person.maslow_needs.get_overall_satisfaction()
+    
+    # ── RECORD EXPERIENCE ───────────────────────────────────────────────
+    if person.learning_system is not None:
+        chosen_action = action_response.get("chosen_action", "unknown") if isinstance(action_response, dict) else str(action_response)
+        reasoning = action_response.get("reasoning", "") if isinstance(action_response, dict) else ""
+        
+        world_ctx = {
+            "location": world_summary.get("location", {}).get("name", "unknown"),
+            "time_of_day": world_summary.get("time", {}).get("time_of_day", "unknown"),
+            "weather": world_summary.get("weather", {}).get("description", "unknown"),
+        }
+        
+        experience = person.learning_system.record_experience(
+            action_taken=chosen_action,
+            action_reasoning=reasoning,
+            needs_before=needs_before,
+            needs_after=needs_after,
+            emotions_before=emotions_before,
+            emotions_after=emotions_after,
+            world_context=world_ctx,
+            overall_satisfaction_before=satisfaction_before,
+            overall_satisfaction_after=satisfaction_after,
+        )
+        
+        # Show experience delta
+        st.write("**7. Learning - Experience Recorded:**")
+        sat_delta = satisfaction_after - satisfaction_before
+        delta_icon = "📈" if sat_delta >= 0 else "📉"
+        st.write(f"{delta_icon} Satisfaction: {satisfaction_before:.1f}% → {satisfaction_after:.1f}% ({sat_delta:+.1f}%)")
+        
+        # Show lesson count
+        stats = person.learning_system.get_learning_stats()
+        st.write(f"📚 Active lessons: {stats['active_lessons']} | Total experiences: {stats['total_experiences']}")
+    
+    # Show learning stats toggle
+    display_learning_stats(person, iteration)
     
     # Calculate duration
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
@@ -178,7 +264,8 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         "state_response": state_response,
         "person_dict": person_dict,
         "world_summary": world_summary,
-        "iteration_duration": iteration_duration
+        "iteration_duration": iteration_duration,
+        "satisfaction_delta": satisfaction_after - satisfaction_before,
     }
 
 
@@ -228,7 +315,7 @@ def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations
     return results
 
 
-def display_simulation_summary(simulation_history, iterations):
+def display_simulation_summary(simulation_history, iterations, person=None):
     """Display summary of simulation history"""
     st.success(f"🎉 Completed {iterations} simulation cycles!")
     
@@ -242,9 +329,16 @@ def display_simulation_summary(simulation_history, iterations):
                 action = record.get("action_decision", {})
                 if isinstance(action, dict):
                     chosen = action.get("chosen_action", "Unknown")
+                    lessons_applied = action.get("lessons_applied", "")
                 else:
                     chosen = str(action)[:100]
-                st.write(f"- Iteration {record['iteration']}: {chosen}")
+                    lessons_applied = ""
+                
+                delta = record.get("satisfaction_delta", 0)
+                delta_icon = "📈" if delta >= 0 else "📉"
+                st.write(f"- Iteration {record['iteration']}: {chosen} {delta_icon} ({delta:+.1f}%)")
+                if lessons_applied:
+                    st.write(f"  *Lessons applied: {lessons_applied}*")
             
             # Show needs evolution
             st.write("**Needs Evolution:**")
@@ -252,6 +346,19 @@ def display_simulation_summary(simulation_history, iterations):
                 needs = record.get("needs_state", {})
                 overall = needs.get("overall_satisfaction", 0)
                 st.write(f"- Iteration {record['iteration']}: Overall Satisfaction {overall:.1f}%")
+            
+            # Show learning summary
+            if person is not None and person.learning_system is not None:
+                stats = person.learning_system.get_learning_stats()
+                st.write("---")
+                st.write(f"**📚 Learning Summary:**")
+                st.write(f"- Total experiences recorded: {stats['total_experiences']}")
+                st.write(f"- Active lessons: {stats['active_lessons']}")
+                
+                if stats['lessons']:
+                    st.write("**Learned Lessons:**")
+                    for lesson in stats['lessons']:
+                        st.write(f"- **{lesson['description']}** (confidence: {lesson['confidence']:.0%}, confirmed {lesson['times_confirmed']}x)")
 
 
 def render_simulation_controls():
