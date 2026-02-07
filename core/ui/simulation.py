@@ -45,7 +45,8 @@ def display_person_state(person):
     for emo in dominant:
         st.write(f"- {emo['name'].capitalize()}: {emo['intensity']}")
     all_emotions = person.emotion_system.get_emotional_state_summary()["emotions"]
-    with st.expander("All Emotions", expanded=False):
+    show_all_emo = st.checkbox("Show All Emotions", value=False, key=f"all_emotions_{id(person)}_{hash(str(all_emotions))}")
+    if show_all_emo:
         for name, val in all_emotions.items():
             st.write(f"- {name}: {val}")
 
