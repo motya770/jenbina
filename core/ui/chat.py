@@ -1,6 +1,7 @@
 """Chat UI components for Jenbina app"""
 import streamlit as st
 from core.interaction.chat_handler import handle_chat_interaction
+from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 
 
 def display_person_state_compact(person):
@@ -11,6 +12,9 @@ def display_person_state_compact(person):
     st.write(f"- Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
     st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
     st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
+    dominant = person.emotion_system.get_dominant_emotions(3)
+    emotions_str = ", ".join(f"{d['name']}: {d['intensity']}" for d in dominant)
+    st.write(f"- Emotions: {emotions_str}")
 
 
 def handle_user_input(person, llm, memory_manager, debug_mode):
@@ -42,14 +46,27 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             person_state=person.get_current_state(),
             conversation_context=recent_context,
             memory_manager=memory_manager,
-            debug_mode=debug_mode
+            debug_mode=debug_mode,
+            emotional_state=person.emotion_system.get_emotional_state_summary()
         )
-        
+
         print(chat_result)
-        
-        # Store the person's response
-        if "assistant_response" in chat_result:
+
+        # Analyze emotion impact from the conversation
+        if chat_result and "assistant_response" in chat_result:
             person.send_message("User", chat_result["assistant_response"], "text")
+            try:
+                chat_situation = f"User said: \"{user_input}\". Jenbina responded: \"{chat_result['assistant_response']}\""
+                emotion_adjustments = analyze_emotion_impact(
+                    llm=llm,
+                    situation=chat_situation,
+                    emotion_system=person.emotion_system,
+                    maslow_needs=person.maslow_needs,
+                )
+                if emotion_adjustments:
+                    person.emotion_system.apply_adjustments(emotion_adjustments)
+            except Exception as e:
+                print(f"Emotion analysis after chat failed: {e}")
         
         # Add to action history
         if "user_message" in chat_result:

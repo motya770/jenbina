@@ -11,8 +11,8 @@ from ..environment.world_state import WorldState
 def create_action_decision_chain(llm: BaseLLM) -> callable:
     # Create prompt for action decision
     action_prompt = PromptTemplate(
-        input_variables=["descriptions", "actions", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "world_state_info"],
-        template="""Given the current situation, the person's needs, and the world state, decide on the most appropriate action to take.
+        input_variables=["descriptions", "actions", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "emotional_state", "world_state_info"],
+        template="""Given the current situation, the person's needs, emotions, and the world state, decide on the most appropriate action to take.
 
     Current Description:
     {descriptions}
@@ -26,22 +26,27 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
     - Safety satisfaction: {safety_satisfaction:.1f}%
     - Overall satisfaction: {overall_satisfaction:.1f}%
 
+    Person's Current Emotional State:
+    {emotional_state}
+
     World State Information:
     {world_state_info}
 
-    Consider the world state information when making your decision. This includes:
+    Consider all of the following when making your decision:
     - Current weather and time conditions
     - Available nearby locations and events
     - Environmental mood factors
     - What locations are currently open
+    - The person's emotional state (e.g., high fear → seek safety, high joy → social actions, high sadness → comforting activities)
 
-    Select one action from the available actions that best addresses the person's most pressing needs while considering the current world state.
-    Explain your reasoning for choosing this action, including how the world state influenced your decision.
+    Select one action from the available actions that best addresses the person's most pressing needs and emotional state while considering the current world state.
+    Explain your reasoning for choosing this action, including how emotions and world state influenced your decision.
 
     Respond in JSON format with:
     - chosen_action: the selected action
-    - reasoning: brief explanation of why this action was chosen, including world state considerations
+    - reasoning: brief explanation of why this action was chosen, including emotional and world state considerations
     - world_state_influence: how the world state specifically influenced this decision
+    - emotional_influence: how the person's emotions influenced this decision
     """
     )
 
@@ -68,6 +73,16 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
         sleep_satisfaction = maslow_needs.get_need_satisfaction('sleep')
         safety_satisfaction = maslow_needs.get_need_satisfaction('security')
         overall_satisfaction = maslow_needs.get_overall_satisfaction()
+
+        # Get emotional state
+        emotion_summary = person.emotion_system.get_emotional_state_summary()
+        dominant = emotion_summary["dominant_emotions"]
+        emotional_state = "Dominant emotions: " + ", ".join(
+            f"{d['name']} ({d['intensity']})" for d in dominant
+        )
+        emotional_state += "\nAll emotions: " + ", ".join(
+            f"{name}: {val}" for name, val in emotion_summary["emotions"].items()
+        )
         
         # Prepare world state information
         world_state_info = "No world state information available."
@@ -99,6 +114,7 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
                 sleep_satisfaction=sleep_satisfaction,
                 safety_satisfaction=safety_satisfaction,
                 overall_satisfaction=overall_satisfaction,
+                emotional_state=emotional_state,
                 world_state_info=world_state_info
             )
         )
