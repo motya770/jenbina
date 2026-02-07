@@ -8,6 +8,7 @@ from core.cognition.asimov_check_chain import create_asimov_check_system
 from core.cognition.state_analysis_chain import create_state_analysis_system
 from core.environment.world_state import create_world_description_system, create_comprehensive_world_state, get_world_state_summary
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
+from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 
 
 def get_person_dict(person):
@@ -23,7 +24,8 @@ def get_person_dict(person):
             },
             "critical_needs": person.maslow_needs.get_critical_needs(),
             "low_needs": person.maslow_needs.get_low_needs()
-        }
+        },
+        "emotions": person.emotion_system.get_emotional_state_summary()
     }
 
 
@@ -35,6 +37,16 @@ def display_person_state(person):
     st.write(f"- Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
     st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
     st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
+
+    # Display emotional state
+    dominant = person.emotion_system.get_dominant_emotions(3)
+    st.write("**Emotional State:**")
+    for emo in dominant:
+        st.write(f"- {emo['name'].capitalize()}: {emo['intensity']}")
+    all_emotions = person.emotion_system.get_emotional_state_summary()["emotions"]
+    with st.expander("All Emotions", expanded=False):
+        for name, val in all_emotions.items():
+            st.write(f"- {name}: {val}")
 
 
 def display_world_state(world_summary, world):
@@ -130,13 +142,28 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     # State analysis
     st.write("**4. State Analysis:**")
     state_response = create_state_analysis_system(
-        llm_json_mode, 
-        action_decision=action_response, 
+        llm_json_mode,
+        action_decision=action_response,
         compliance_check=asimov_response
     )
     st.write(state_response)
-    
-    # Update person's needs
+
+    # Emotion analysis based on action outcome
+    st.write("**6. Emotion Analysis:**")
+    action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
+    emotion_adjustments = analyze_emotion_impact(
+        llm=llm_json_mode,
+        situation=action_situation,
+        emotion_system=person.emotion_system,
+        maslow_needs=person.maslow_needs,
+    )
+    if emotion_adjustments:
+        person.emotion_system.apply_adjustments(emotion_adjustments)
+        st.write("Emotion changes: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
+    else:
+        st.write("No significant emotional changes.")
+
+    # Update person's needs (also decays emotions)
     person.update_all_needs()
     
     # Calculate duration
@@ -184,6 +211,7 @@ def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations
                     "duration_seconds": result["iteration_duration"],
                     "action_decision": result["action_decision"],
                     "needs_state": result["person_dict"]["maslow_needs"],
+                    "emotions_state": result["person_dict"].get("emotions", {}),
                     "world_summary": result["world_summary"]
                 }
                 results.append(iteration_record)

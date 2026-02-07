@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
 from ..needs.maslow_needs import MaslowNeedsSystem
+from ..emotions.emotion_system import EmotionSystem
 from datetime import datetime
 
 
@@ -47,15 +48,19 @@ class Conversation:
 class Person:
     name: str = "Jenbina"
     maslow_needs: MaslowNeedsSystem = None
+    emotion_system: EmotionSystem = None
     conversations: Dict[str, Conversation] = field(default_factory=dict)
-    
+
     def __post_init__(self):
         if self.maslow_needs is None:
             self.maslow_needs = MaslowNeedsSystem()
+        if self.emotion_system is None:
+            self.emotion_system = EmotionSystem()
     
     def update_all_needs(self):
-        """Update all needs for this person"""
+        """Update all needs and decay emotions for this person"""
         self.maslow_needs.update_all_needs()
+        self.emotion_system.update_all()
     
     def add_conversation(self, outsider_name: str) -> Conversation:
         """Start a new conversation with an outsider"""
@@ -125,17 +130,22 @@ class Person:
     def get_current_state(self):
         """Get a summary of the person's current state"""
         state = {"name": self.name}
-        
+
         # Add Maslow needs state
         state["maslow_needs"] = self.maslow_needs.get_needs_summary()
-        
+
+        # Add emotional state
+        state["emotions"] = self.emotion_system.get_emotional_state_summary()
+
         # Add communication state
         comm_stats = self.get_communication_stats()
         state["communication"] = comm_stats
-        
+
         return state
     
     def __str__(self):
         comm_stats = self.get_communication_stats()
         maslow_summary = self.maslow_needs.get_needs_summary()
-        return f"Person(name={self.name}, maslow_stage={maslow_summary['stage_name']}, conversations={comm_stats['total_conversations']}, messages={comm_stats['total_messages']})"
+        dominant = self.emotion_system.get_dominant_emotions(2)
+        emotions_str = ", ".join(f"{d['name']}:{d['intensity']}" for d in dominant)
+        return f"Person(name={self.name}, maslow_stage={maslow_summary['stage_name']}, emotions=[{emotions_str}], conversations={comm_stats['total_conversations']}, messages={comm_stats['total_messages']})"

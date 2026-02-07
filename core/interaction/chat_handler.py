@@ -56,7 +56,8 @@ def handle_chat_interaction(
     person_state=None,
     conversation_context=None,
     memory_manager: ChromaMemoryManager = None,
-    debug_mode=False
+    debug_mode=False,
+    emotional_state=None
 ):
     """Handle chat interactions with Jenbina using Chroma memory."""
     if user_input:
@@ -136,6 +137,14 @@ def handle_chat_interaction(
         context_parts.append(f"Current needs: {needs_response}")
         context_parts.append(f"World state: {world_description}")
         context_parts.append(f"Chosen action: {action_decision}")
+
+        if emotional_state:
+            dominant = emotional_state.get("dominant_emotions", [])
+            emotions_str = ", ".join(f"{d['name']} ({d['intensity']})" for d in dominant)
+            all_emotions = emotional_state.get("emotions", {})
+            all_str = ", ".join(f"{k}: {v}" for k, v in all_emotions.items())
+            context_parts.append(f"Current emotional state - Dominant: {emotions_str}. All emotions: {all_str}")
+            context_parts.append("Let your emotions color your response naturally. For example, if you're feeling joyful, be more upbeat; if fearful, be more cautious in tone.")
         
         if state_response:
             context_parts.append(f"State analysis: {state_response}")
