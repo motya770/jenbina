@@ -57,22 +57,25 @@ def handle_chat_interaction(
     conversation_context=None,
     memory_manager: ChromaMemoryManager = None,
     debug_mode=False,
-    emotional_state=None
+    emotional_state=None,
+    user_id=None,
 ):
     """Handle chat interactions with Jenbina using Chroma memory."""
     if user_input:
         # Display user message
         st.chat_message("user").write(user_input)
-        
+
+        # Scope ChromaDB entries per user
+        chroma_person = f"user_{user_id}" if user_id else "User"
+
         # Store user message in Chroma
         if memory_manager:
             print(f"🔵 Storing user message in memory: {user_input[:50]}...")
-            
+
             # Create metadata with JSON-serialized BasicNeeds
             metadata = create_metadata_from_person_state(person_state, world_description)
-            
             embedding_id = memory_manager.store_conversation(
-                person_name="User",
+                person_name=chroma_person,
                 message_content=user_input,
                 message_type="user_message",
                 metadata=metadata
@@ -86,7 +89,7 @@ def handle_chat_interaction(
         if memory_manager:
             print(f"Retrieving relevant context for message: {user_input[:50]}...")
             relevant_context_docs = memory_manager.retrieve_relevant_context(
-                person_name="User",
+                person_name=chroma_person,
                 current_message=user_input,
                 top_k=3
             )
@@ -171,7 +174,7 @@ Keep the response natural and in-character. Consider your current needs and how 
             metadata = create_metadata_from_person_state(person_state, world_description, action_decision)
             
             embedding_id = memory_manager.store_conversation(
-                person_name="Jenbina",
+                person_name=chroma_person,
                 message_content=response.content,
                 message_type="jenbina_response",
                 metadata=metadata
