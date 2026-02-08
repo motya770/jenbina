@@ -51,6 +51,7 @@ class Person:
     emotion_system: EmotionSystem = None
     learning_system: Any = None  # Initialized separately (needs LLM)
     goal_system: Any = None  # Initialized separately (needs LLM)
+    planning_system: Any = None  # Initialized separately (needs LLM)
     conversations: Dict[str, Conversation] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -70,6 +71,12 @@ class Person:
         Called separately because LLM isn't available at Person creation time."""
         from ..goals.goal_system import GoalSystem
         self.goal_system = GoalSystem(llm)
+
+    def init_planning_system(self, llm):
+        """Initialize the planning system with an LLM instance.
+        Called separately because LLM isn't available at Person creation time."""
+        from ..planning.planning_system import PlanningSystem
+        self.planning_system = PlanningSystem(llm)
     
     def update_all_needs(self):
         """Update all needs, decay emotions, and decay lessons"""
@@ -180,6 +187,10 @@ class Person:
         # Add goal state
         if self.goal_system is not None:
             state["goals"] = self.goal_system.get_goal_stats()
+
+        # Add planning state
+        if self.planning_system is not None:
+            state["planning"] = self.planning_system.get_planning_stats()
 
         return state
     

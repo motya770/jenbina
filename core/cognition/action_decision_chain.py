@@ -11,7 +11,7 @@ from ..environment.world_state import WorldState
 def create_action_decision_chain(llm: BaseLLM) -> callable:
     # Create prompt for action decision
     action_prompt = PromptTemplate(
-        input_variables=["descriptions", "actions", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "emotional_state", "world_state_info", "learned_lessons", "current_goals"],
+        input_variables=["descriptions", "actions", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "emotional_state", "world_state_info", "current_plan_step", "learned_lessons", "current_goals"],
         template="""Given the current situation, the person's needs, emotions, and the world state, decide on the most appropriate action to take.
 
     Current Description:
@@ -32,6 +32,8 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
     World State Information:
     {world_state_info}
 
+    {current_plan_step}
+
     Lessons Learned from Past Experiences:
     {learned_lessons}
 
@@ -46,6 +48,7 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
     - The person's emotional state (e.g., high fear → seek safety, high joy → social actions, high sadness → comforting activities)
     - Lessons learned from past experiences (prioritize high-confidence lessons)
     - Current goals (choose actions that advance active goals when possible)
+    - Current plan step (follow the suggested action unless urgent needs require otherwise)
 
     Select one action from the available actions that best addresses the person's most pressing needs and emotional state while considering the current world state and past lessons.
     Explain your reasoning for choosing this action, including how emotions, world state, and past lessons influenced your decision.
@@ -129,7 +132,12 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
         current_goals = "No goals set yet."
         if person.goal_system is not None:
             current_goals = person.goal_system.format_goals_for_prompt()
-        
+
+        # Get current plan step from the planning system
+        current_plan_step = "No active plan."
+        if person.planning_system is not None:
+            current_plan_step = person.planning_system.format_plan_for_prompt()
+
         # Get decision using invoke directly
         response = llm.invoke(
             action_prompt.format(
@@ -141,6 +149,7 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
                 overall_satisfaction=overall_satisfaction,
                 emotional_state=emotional_state,
                 world_state_info=world_state_info,
+                current_plan_step=current_plan_step,
                 learned_lessons=learned_lessons,
                 current_goals=current_goals
             )
