@@ -4,6 +4,7 @@ from ..needs.maslow_needs import MaslowNeedsSystem
 from ..emotions.emotion_system import EmotionSystem
 from ..working_memory.working_memory_system import WorkingMemorySystem
 from datetime import datetime
+import json
 
 
 @dataclass
@@ -199,6 +200,60 @@ class Person:
 
         return state
     
+    def serialize(self) -> str:
+        """Serialize the full Person state to a JSON string."""
+        data = {
+            "name": self.name,
+            "maslow_needs": self.maslow_needs.to_dict(),
+            "emotion_system": self.emotion_system.to_dict(),
+            "working_memory": self.working_memory.to_dict(),
+        }
+        if self.learning_system is not None:
+            data["learning_system"] = self.learning_system.to_dict()
+        if self.goal_system is not None:
+            data["goal_system"] = self.goal_system.to_dict()
+        if self.planning_system is not None:
+            data["planning_system"] = self.planning_system.to_dict()
+        return json.dumps(data)
+
+    @classmethod
+    def deserialize(cls, json_str: str, llm=None) -> "Person":
+        """Reconstruct a Person from a JSON string.
+
+        Args:
+            json_str: JSON produced by serialize().
+            llm: LLM instance needed by learning/goal/planning systems.
+                 If None those systems stay uninitialised.
+        """
+        data = json.loads(json_str)
+        person = cls.__new__(cls)
+        person.name = data.get("name", "Jenbina")
+        person.maslow_needs = MaslowNeedsSystem.from_dict(data["maslow_needs"])
+        person.emotion_system = EmotionSystem.from_dict(data["emotion_system"])
+        person.working_memory = WorkingMemorySystem.from_dict(data.get("working_memory", {}))
+        person.conversations = {}
+
+        # LLM-dependent systems
+        if "learning_system" in data and llm is not None:
+            from ..learning.learning_system import LearningSystem
+            person.learning_system = LearningSystem.from_dict(data["learning_system"], llm)
+        else:
+            person.learning_system = None
+
+        if "goal_system" in data and llm is not None:
+            from ..goals.goal_system import GoalSystem
+            person.goal_system = GoalSystem.from_dict(data["goal_system"], llm)
+        else:
+            person.goal_system = None
+
+        if "planning_system" in data and llm is not None:
+            from ..planning.planning_system import PlanningSystem
+            person.planning_system = PlanningSystem.from_dict(data["planning_system"], llm)
+        else:
+            person.planning_system = None
+
+        return person
+
     def __str__(self):
         comm_stats = self.get_communication_stats()
         maslow_summary = self.maslow_needs.get_needs_summary()
