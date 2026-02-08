@@ -155,6 +155,40 @@ def display_goal_stats(person, iteration):
                 st.write(f"- ✅ {goal['description']}")
 
 
+def display_planning_stats(person, iteration):
+    """Display planning system stats"""
+    if person.planning_system is None:
+        return
+
+    stats = person.planning_system.get_planning_stats()
+    show_plans = st.checkbox(
+        f"📋 Show Planning Stats",
+        value=False,
+        key=f"planning_stats_{iteration}"
+    )
+    if show_plans:
+        st.write(f"**Active Plans:** {stats['active_plans']} | **Completed:** {stats['completed_plans']} | **Failed:** {stats['failed_plans']}")
+
+        if stats['plans']:
+            st.write("**Active Plans:**")
+            for plan_data in stats['plans']:
+                steps = plan_data.get('steps', [])
+                current_idx = plan_data.get('current_step_index', 0)
+                total = len(steps)
+                completed_count = len([s for s in steps if s['status'] == 'completed'])
+                st.write(
+                    f"- **{plan_data['goal_description']}**\n"
+                    f"  Step {current_idx + 1} of {total} | "
+                    f"Completed: {completed_count}/{total} | "
+                    f"Replanned: {plan_data.get('times_replanned', 0)}x"
+                )
+                for i, step in enumerate(steps):
+                    icon = "✅" if step['status'] == 'completed' else "▶️" if step['status'] == 'active' else "⏳" if step['status'] == 'pending' else "❌"
+                    st.write(f"  {icon} {step['description']} ({step['actual_cycles']}/{step['estimated_cycles']} cycles)")
+        else:
+            st.write("*No active plans.*")
+
+
 def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration):
     """Run a single simulation iteration and return results"""
     iteration_start_time = datetime.now()
@@ -188,6 +222,13 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     world_response = world_chain(person, world)
     st.write(world_response)
     
+    # Show current plan step before making a decision
+    if person.planning_system is not None:
+        plan_text = person.planning_system.format_plan_for_prompt()
+        if plan_text != "No active plan.":
+            st.write("**2.3 Current Plan Step:**")
+            st.info(plan_text)
+
     # Show current goals before making a decision
     if person.goal_system is not None:
         goals_text = person.goal_system.format_goals_for_prompt()
@@ -312,13 +353,74 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                     personality_traits=personality,
                     lessons=lesson_stats.get("lessons", []),
                 )
+
+        # ── PLANNING: evaluate step, create plans, check replans ─────────
+        if person.planning_system is not None:
+            # Evaluate current plan step against this experience
+            step_result = person.planning_system.evaluate_step(experience)
+            if step_result == "step_completed":
+                st.write("**📋 Plan step completed!**")
+                current = person.planning_system.get_current_step()
+                if current:
+                    _, next_step = current
+                    st.write(f"Next step: {next_step.description}")
+                else:
+                    # Check if plan completed
+                    for p in person.planning_system.plans:
+                        if p.status == "completed" and p.goal_id is not None:
+                            st.write(f"**📋 Plan completed:** {p.goal_description}")
+                            # Advance goal progress
+                            if person.goal_system is not None:
+                                for g in person.goal_system.goals:
+                                    if g.description == p.goal_description and g.is_active():
+                                        g.advance(0.3)
+                                        break
+            elif step_result == "step_overridden":
+                st.write("*📋 Plan step overridden by urgent needs.*")
+
+            # Check if any plan needs replanning
+            replan_result = person.planning_system.check_for_replan(
+                needs=needs_after,
+                world_context=world_ctx,
+            )
+            if replan_result is not None:
+                st.write(f"**📋 Replanned:** {replan_result.goal_description}")
+                st.write(f"New first step: {replan_result.steps[0].description}")
+
+            # Create plans for active goals that don't have one
+            if person.goal_system is not None:
+                for idx, goal in enumerate(person.goal_system.goals):
+                    if not goal.is_active():
+                        continue
+                    if person.planning_system.get_plan_for_goal(idx) is not None:
+                        continue
+                    # Short-term: plan immediately. Mid/long: wait for low needs.
+                    should_plan = goal.horizon == "short_term"
+                    if not should_plan:
+                        low_source = any(
+                            needs_after.get(n, 100) < 50
+                            for n in goal.source_needs
+                        )
+                        should_plan = low_source
+                    if should_plan:
+                        person.planning_system.create_plan(
+                            goal_description=goal.description,
+                            goal_id=idx,
+                            needs=needs_after,
+                            emotions=emotions_after,
+                            world_context=world_ctx,
+                            lessons=lesson_stats.get("lessons", []) if 'lesson_stats' in dir() else [],
+                        )
     
     # Show learning stats toggle
     display_learning_stats(person, iteration)
 
     # Show goal stats toggle
     display_goal_stats(person, iteration)
-    
+
+    # Show planning stats toggle
+    display_planning_stats(person, iteration)
+
     # Calculate duration
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
     st.write(f"✅ Iteration {iteration + 1} completed in {iteration_duration:.2f}s")
@@ -437,6 +539,19 @@ def display_simulation_summary(simulation_history, iterations, person=None):
                     st.write("**Active Goals:**")
                     for goal in goal_stats['goals']:
                         st.write(f"- [{goal['horizon']}] **{goal['description']}** (progress: {goal['progress']:.0%}, confidence: {goal['confidence']:.0%})")
+
+            if person is not None and person.planning_system is not None:
+                plan_stats = person.planning_system.get_planning_stats()
+                st.write(f"**📋 Planning Summary:**")
+                st.write(f"- Active plans: {plan_stats['active_plans']}")
+                st.write(f"- Completed plans: {plan_stats['completed_plans']}")
+                st.write(f"- Failed plans: {plan_stats['failed_plans']}")
+                if plan_stats['plans']:
+                    st.write("**Active Plans:**")
+                    for p in plan_stats['plans']:
+                        steps = p.get('steps', [])
+                        done = len([s for s in steps if s['status'] == 'completed'])
+                        st.write(f"- **{p['goal_description']}** ({done}/{len(steps)} steps done, replanned {p.get('times_replanned', 0)}x)")
 
 
 def render_simulation_controls():
