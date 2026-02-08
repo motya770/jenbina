@@ -12,8 +12,8 @@ import shutil
 from datetime import datetime, timedelta
 import json
 
-# Add the core directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
+# Add the project root to the path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from core.memory.memory_integration import MemoryIntegration, create_memory_integration
 from core.memory.hybrid_memory_system import HybridMemorySystem

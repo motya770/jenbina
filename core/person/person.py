@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from ..needs.maslow_needs import MaslowNeedsSystem
 from ..emotions.emotion_system import EmotionSystem
+from ..working_memory.working_memory_system import WorkingMemorySystem
 from datetime import datetime
 
 
@@ -52,6 +53,7 @@ class Person:
     learning_system: Any = None  # Initialized separately (needs LLM)
     goal_system: Any = None  # Initialized separately (needs LLM)
     planning_system: Any = None  # Initialized separately (needs LLM)
+    working_memory: WorkingMemorySystem = field(default_factory=WorkingMemorySystem)
     conversations: Dict[str, Conversation] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -191,6 +193,9 @@ class Person:
         # Add planning state
         if self.planning_system is not None:
             state["planning"] = self.planning_system.get_planning_stats()
+
+        # Add working memory state
+        state["working_memory"] = self.working_memory.get_stats()
 
         return state
     

@@ -155,6 +155,25 @@ def display_goal_stats(person, iteration):
                 st.write(f"- ✅ {goal['description']}")
 
 
+def display_working_memory_stats(person, iteration):
+    """Display working memory stats"""
+    stats = person.working_memory.get_stats()
+    show_wm = st.checkbox(
+        f"🧠 Show Working Memory",
+        value=False,
+        key=f"working_memory_{iteration}"
+    )
+    if show_wm:
+        st.write(f"**Focus:** {stats['focus']:.0f}% | **Capacity:** {stats['buffer_size']}/{stats['capacity']} | **Context Switches:** {stats['context_switches']}")
+        if stats['items']:
+            for item in stats['items']:
+                bar_len = int(item['salience'] * 10)
+                bar = "█" * bar_len + "░" * (10 - bar_len)
+                st.write(f"- [{item['source']}] {item['content']} | {bar} {item['salience']:.2f}")
+        else:
+            st.write("*Mind is clear.*")
+
+
 def display_planning_stats(person, iteration):
     """Display planning system stats"""
     if person.planning_system is None:
@@ -222,6 +241,46 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     world_response = world_chain(person, world)
     st.write(world_response)
     
+    # ── UPDATE WORKING MEMORY ──────────────────────────────────────────
+    active_plan_step = None
+    if person.planning_system is not None:
+        result = person.planning_system.get_current_step()
+        if result:
+            _, step = result
+            active_plan_step = {"description": step.description, "action_hint": step.action_hint}
+
+    active_goals_data = []
+    if person.goal_system is not None:
+        goal_stats = person.goal_system.get_goal_stats()
+        active_goals_data = goal_stats.get("goals", [])
+
+    world_ctx_wm = {
+        "location": world_summary.get("location", {}).get("name", ""),
+        "time_of_day": world_summary.get("time", {}).get("time_of_day", ""),
+        "weather": world_summary.get("weather", {}).get("description", ""),
+    }
+
+    # Build needs dict with level info for salience scoring
+    needs_with_levels = {}
+    for name, need in person.maslow_needs.needs.items():
+        needs_with_levels[name] = {"satisfaction": need.satisfaction, "level": need.level.value}
+
+    person.working_memory.update(
+        needs=needs_with_levels,
+        emotions=emotions_before,
+        active_plan_step=active_plan_step,
+        active_goals=active_goals_data,
+        recent_experience=None,  # Will be set after experience is recorded
+        world_context=world_ctx_wm,
+        sleep_satisfaction=person.maslow_needs.get_need_satisfaction("sleep"),
+    )
+
+    # Display working memory
+    wm_text = person.working_memory.format_for_prompt()
+    if wm_text != "Mind is clear — no particular focus.":
+        st.write("**2.2 Working Memory:**")
+        st.info(wm_text)
+
     # Show current plan step before making a decision
     if person.planning_system is not None:
         plan_text = person.planning_system.format_plan_for_prompt()
@@ -420,6 +479,9 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
 
     # Show planning stats toggle
     display_planning_stats(person, iteration)
+
+    # Show working memory stats toggle
+    display_working_memory_stats(person, iteration)
 
     # Calculate duration
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
