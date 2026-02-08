@@ -122,6 +122,39 @@ def display_learning_stats(person, iteration):
             st.write("*No lessons learned yet. Jenbina needs more experiences.*")
 
 
+def display_goal_stats(person, iteration):
+    """Display goal system stats"""
+    if person.goal_system is None:
+        return
+
+    stats = person.goal_system.get_goal_stats()
+    show_goals = st.checkbox(
+        f"🎯 Show Goal Stats",
+        value=False,
+        key=f"goal_stats_{iteration}"
+    )
+    if show_goals:
+        st.write(f"**Active Goals:** {stats['active_goals']} | **Completed:** {stats['completed_goals']} | **Abandoned:** {stats['abandoned_goals']}")
+
+        if stats['goals']:
+            st.write("**Active Goals:**")
+            for goal in stats['goals']:
+                progress_bar = "█" * int(goal['progress'] * 10) + "░" * (10 - int(goal['progress'] * 10))
+                st.write(
+                    f"- [{goal['horizon']}] {goal['description']}\n"
+                    f"  Progress: {progress_bar} {goal['progress']:.0%} | "
+                    f"Confidence: {goal['confidence']:.0%} | "
+                    f"Advanced: {goal['times_advanced']}x"
+                )
+        else:
+            st.write("*No active goals. Jenbina needs more experiences to form goals.*")
+
+        if stats['completed']:
+            st.write("**Recently Completed:**")
+            for goal in stats['completed']:
+                st.write(f"- ✅ {goal['description']}")
+
+
 def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration):
     """Run a single simulation iteration and return results"""
     iteration_start_time = datetime.now()
@@ -155,6 +188,13 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     world_response = world_chain(person, world)
     st.write(world_response)
     
+    # Show current goals before making a decision
+    if person.goal_system is not None:
+        goals_text = person.goal_system.format_goals_for_prompt()
+        if goals_text != "No goals set yet.":
+            st.write("**2.4 Current Goals:**")
+            st.info(goals_text)
+
     # Show learned lessons (if any) before making a decision
     if person.learning_system is not None:
         lessons_text = person.learning_system.format_lessons_for_prompt(
@@ -249,9 +289,35 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         # Show lesson count
         stats = person.learning_system.get_learning_stats()
         st.write(f"📚 Active lessons: {stats['active_lessons']} | Total experiences: {stats['total_experiences']}")
+
+        # Update goal progress based on this experience
+        if person.goal_system is not None:
+            person.goal_system.set_experiences(person.learning_system.experiences)
+            advanced_goals = person.goal_system.update_progress(experience)
+            if advanced_goals:
+                st.write("**🎯 Goals Advanced:**")
+                for g in advanced_goals:
+                    st.write(f"- {g.description} → {g.progress:.0%}")
+
+            # Generate new goals periodically
+            if person.goal_system.should_generate():
+                person.goal_system.reset_generation_counter()
+                needs_dict = {name: need.satisfaction for name, need in person.maslow_needs.needs.items()}
+                emotions_dict = person.get_emotions_snapshot()
+                personality = person.maslow_needs.personality_traits
+                lesson_stats = person.learning_system.get_learning_stats()
+                person.goal_system.generate_goals(
+                    needs=needs_dict,
+                    emotions=emotions_dict,
+                    personality_traits=personality,
+                    lessons=lesson_stats.get("lessons", []),
+                )
     
     # Show learning stats toggle
     display_learning_stats(person, iteration)
+
+    # Show goal stats toggle
+    display_goal_stats(person, iteration)
     
     # Calculate duration
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
@@ -360,6 +426,17 @@ def display_simulation_summary(simulation_history, iterations, person=None):
                     st.write("**Learned Lessons:**")
                     for lesson in stats['lessons']:
                         st.write(f"- **{lesson['description']}** (confidence: {lesson['confidence']:.0%}, confirmed {lesson['times_confirmed']}x)")
+
+            if person is not None and person.goal_system is not None:
+                goal_stats = person.goal_system.get_goal_stats()
+                st.write(f"**🎯 Goal Summary:**")
+                st.write(f"- Active goals: {goal_stats['active_goals']}")
+                st.write(f"- Completed goals: {goal_stats['completed_goals']}")
+                st.write(f"- Abandoned goals: {goal_stats['abandoned_goals']}")
+                if goal_stats['goals']:
+                    st.write("**Active Goals:**")
+                    for goal in goal_stats['goals']:
+                        st.write(f"- [{goal['horizon']}] **{goal['description']}** (progress: {goal['progress']:.0%}, confidence: {goal['confidence']:.0%})")
 
 
 def render_simulation_controls():

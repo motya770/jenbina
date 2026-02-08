@@ -50,6 +50,7 @@ class Person:
     maslow_needs: MaslowNeedsSystem = None
     emotion_system: EmotionSystem = None
     learning_system: Any = None  # Initialized separately (needs LLM)
+    goal_system: Any = None  # Initialized separately (needs LLM)
     conversations: Dict[str, Conversation] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -63,6 +64,12 @@ class Person:
         Called separately because LLM isn't available at Person creation time."""
         from ..learning.learning_system import LearningSystem
         self.learning_system = LearningSystem(llm)
+
+    def init_goal_system(self, llm):
+        """Initialize the goal system with an LLM instance.
+        Called separately because LLM isn't available at Person creation time."""
+        from ..goals.goal_system import GoalSystem
+        self.goal_system = GoalSystem(llm)
     
     def update_all_needs(self):
         """Update all needs, decay emotions, and decay lessons"""
@@ -71,6 +78,9 @@ class Person:
         # Decay learned lessons over time (small amount per update cycle)
         if self.learning_system is not None:
             self.learning_system.decay_all_lessons(hours=0.5)
+        # Decay goal confidence over time
+        if self.goal_system is not None:
+            self.goal_system.decay_all_goals(hours=0.5)
     
     def get_needs_snapshot(self) -> Dict[str, float]:
         """Get current needs as a flat dict (for learning system)"""
@@ -166,6 +176,10 @@ class Person:
         # Add learning state
         if self.learning_system is not None:
             state["learning"] = self.learning_system.get_learning_stats()
+
+        # Add goal state
+        if self.goal_system is not None:
+            state["goals"] = self.goal_system.get_goal_stats()
 
         return state
     
