@@ -58,9 +58,29 @@ def init_session_state():
     if 'person' not in st.session_state:
         person = Person()
         person.update_all_needs()
+        # Initialize learning system with LLM
+        _, llm_json_mode = init_llm()
+        person.init_learning_system(llm_json_mode)
+        person.init_goal_system(llm_json_mode)
+        person.init_planning_system(llm_json_mode)
         st.session_state.person = person
         st.session_state.action_history = []
         print(person)
+    
+    # Ensure learning system is initialized (for existing sessions)
+    if st.session_state.person.learning_system is None:
+        _, llm_json_mode = init_llm()
+        st.session_state.person.init_learning_system(llm_json_mode)
+
+    # Ensure planning system is initialized (for existing sessions)
+    if st.session_state.person.planning_system is None:
+        _, llm_json_mode = init_llm()
+        st.session_state.person.init_planning_system(llm_json_mode)
+
+    # Ensure goal system is initialized (for existing sessions)
+    if st.session_state.person.goal_system is None:
+        _, llm_json_mode = init_llm()
+        st.session_state.person.init_goal_system(llm_json_mode)
     
     # Meta-cognitive system
     if 'meta_cognitive_system' not in st.session_state:
@@ -153,7 +173,7 @@ def main():
                 st.session_state.needs_response = last.get("needs_state")
             
             # Display summary
-            display_simulation_summary(st.session_state.simulation_history, iterations)
+            display_simulation_summary(st.session_state.simulation_history, iterations, person=person)
             
             # Mark as completed
             st.session_state.simulation_completed = True

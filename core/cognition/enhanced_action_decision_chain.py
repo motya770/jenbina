@@ -20,9 +20,10 @@ def create_meta_cognitive_action_chain(llm, person, world_description, meta_cogn
         f"Selected action: {original_decision.get('chosen_action', 'unknown')}"
     ]
     
-    # Prepare input data including world state
+    # Prepare input data including world state and emotions
     input_data = {
         "needs": {name: need.satisfaction for name, need in person.maslow_needs.needs.items()},
+        "emotions": person.emotion_system.get_emotional_state_summary(),
         "world_description": world_description
     }
     
@@ -53,6 +54,7 @@ def create_meta_cognitive_action_chain(llm, person, world_description, meta_cogn
     # Get thinking strategies for improvement
     current_situation = {
         "needs": {name: need.satisfaction for name, need in person.maslow_needs.needs.items()},
+        "emotions": person.emotion_system.get_emotional_state_summary(),
         "decision_context": "action_selection",
         "world_state_available": world_state is not None
     }

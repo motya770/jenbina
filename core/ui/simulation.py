@@ -2,12 +2,14 @@
 import streamlit as st
 from datetime import datetime
 import time
+import json
 
 from core.needs.maslow_needs import create_basic_needs_chain
 from core.cognition.asimov_check_chain import create_asimov_check_system
 from core.cognition.state_analysis_chain import create_state_analysis_system
 from core.environment.world_state import create_world_description_system, create_comprehensive_world_state, get_world_state_summary
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
+from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 
 
 def get_person_dict(person):
@@ -23,7 +25,8 @@ def get_person_dict(person):
             },
             "critical_needs": person.maslow_needs.get_critical_needs(),
             "low_needs": person.maslow_needs.get_low_needs()
-        }
+        },
+        "emotions": person.emotion_system.get_emotional_state_summary()
     }
 
 
@@ -35,6 +38,17 @@ def display_person_state(person):
     st.write(f"- Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
     st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
     st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
+
+    # Display emotional state
+    dominant = person.emotion_system.get_dominant_emotions(3)
+    st.write("**Emotional State:**")
+    for emo in dominant:
+        st.write(f"- {emo['name'].capitalize()}: {emo['intensity']}")
+    all_emotions = person.emotion_system.get_emotional_state_summary()["emotions"]
+    show_all_emo = st.checkbox("Show All Emotions", value=False, key=f"all_emotions_{id(person)}_{hash(str(all_emotions))}")
+    if show_all_emo:
+        for name, val in all_emotions.items():
+            st.write(f"- {name}: {val}")
 
 
 def display_world_state(world_summary, world):
@@ -79,9 +93,110 @@ def display_meta_cognitive_insights(meta_cognitive_system, iteration):
                 st.write(f"- **{insight['type']}**: {insight['description']}")
 
 
+def display_learning_stats(person, iteration):
+    """Display learning system stats"""
+    if person.learning_system is None:
+        return
+    
+    stats = person.learning_system.get_learning_stats()
+    show_learning = st.checkbox(
+        f"📚 Show Learning Stats",
+        value=False,
+        key=f"learning_stats_{iteration}"
+    )
+    if show_learning:
+        st.write(f"**Total Experiences:** {stats['total_experiences']}")
+        st.write(f"**Active Lessons:** {stats['active_lessons']} / {stats['total_lessons']}")
+        
+        if stats['lessons']:
+            st.write("**Learned Lessons:**")
+            for lesson in stats['lessons']:
+                confidence_bar = "█" * int(lesson['confidence'] * 10) + "░" * (10 - int(lesson['confidence'] * 10))
+                st.write(
+                    f"- [{lesson['category']}] {lesson['description']}\n"
+                    f"  Confidence: {confidence_bar} {lesson['confidence']:.0%} | "
+                    f"Confirmed: {lesson['times_confirmed']}x | "
+                    f"Action: {lesson['recommended_action']}"
+                )
+        else:
+            st.write("*No lessons learned yet. Jenbina needs more experiences.*")
+
+
+def display_goal_stats(person, iteration):
+    """Display goal system stats"""
+    if person.goal_system is None:
+        return
+
+    stats = person.goal_system.get_goal_stats()
+    show_goals = st.checkbox(
+        f"🎯 Show Goal Stats",
+        value=False,
+        key=f"goal_stats_{iteration}"
+    )
+    if show_goals:
+        st.write(f"**Active Goals:** {stats['active_goals']} | **Completed:** {stats['completed_goals']} | **Abandoned:** {stats['abandoned_goals']}")
+
+        if stats['goals']:
+            st.write("**Active Goals:**")
+            for goal in stats['goals']:
+                progress_bar = "█" * int(goal['progress'] * 10) + "░" * (10 - int(goal['progress'] * 10))
+                st.write(
+                    f"- [{goal['horizon']}] {goal['description']}\n"
+                    f"  Progress: {progress_bar} {goal['progress']:.0%} | "
+                    f"Confidence: {goal['confidence']:.0%} | "
+                    f"Advanced: {goal['times_advanced']}x"
+                )
+        else:
+            st.write("*No active goals. Jenbina needs more experiences to form goals.*")
+
+        if stats['completed']:
+            st.write("**Recently Completed:**")
+            for goal in stats['completed']:
+                st.write(f"- ✅ {goal['description']}")
+
+
+def display_planning_stats(person, iteration):
+    """Display planning system stats"""
+    if person.planning_system is None:
+        return
+
+    stats = person.planning_system.get_planning_stats()
+    show_plans = st.checkbox(
+        f"📋 Show Planning Stats",
+        value=False,
+        key=f"planning_stats_{iteration}"
+    )
+    if show_plans:
+        st.write(f"**Active Plans:** {stats['active_plans']} | **Completed:** {stats['completed_plans']} | **Failed:** {stats['failed_plans']}")
+
+        if stats['plans']:
+            st.write("**Active Plans:**")
+            for plan_data in stats['plans']:
+                steps = plan_data.get('steps', [])
+                current_idx = plan_data.get('current_step_index', 0)
+                total = len(steps)
+                completed_count = len([s for s in steps if s['status'] == 'completed'])
+                st.write(
+                    f"- **{plan_data['goal_description']}**\n"
+                    f"  Step {current_idx + 1} of {total} | "
+                    f"Completed: {completed_count}/{total} | "
+                    f"Replanned: {plan_data.get('times_replanned', 0)}x"
+                )
+                for i, step in enumerate(steps):
+                    icon = "✅" if step['status'] == 'completed' else "▶️" if step['status'] == 'active' else "⏳" if step['status'] == 'pending' else "❌"
+                    st.write(f"  {icon} {step['description']} ({step['actual_cycles']}/{step['estimated_cycles']} cycles)")
+        else:
+            st.write("*No active plans.*")
+
+
 def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration):
     """Run a single simulation iteration and return results"""
     iteration_start_time = datetime.now()
+    
+    # ── SNAPSHOT BEFORE ─────────────────────────────────────────────────
+    needs_before = person.get_needs_snapshot()
+    emotions_before = person.get_emotions_snapshot()
+    satisfaction_before = person.maslow_needs.get_overall_satisfaction()
     
     # Display person state
     display_person_state(person)
@@ -107,6 +222,30 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     world_response = world_chain(person, world)
     st.write(world_response)
     
+    # Show current plan step before making a decision
+    if person.planning_system is not None:
+        plan_text = person.planning_system.format_plan_for_prompt()
+        if plan_text != "No active plan.":
+            st.write("**2.3 Current Plan Step:**")
+            st.info(plan_text)
+
+    # Show current goals before making a decision
+    if person.goal_system is not None:
+        goals_text = person.goal_system.format_goals_for_prompt()
+        if goals_text != "No goals set yet.":
+            st.write("**2.4 Current Goals:**")
+            st.info(goals_text)
+
+    # Show learned lessons (if any) before making a decision
+    if person.learning_system is not None:
+        lessons_text = person.learning_system.format_lessons_for_prompt(
+            needs=needs_before,
+            emotions=emotions_before
+        )
+        if lessons_text != "No lessons learned yet.":
+            st.write("**2.5 Lessons Applied to Decision:**")
+            st.info(lessons_text)
+    
     # Enhanced action decision with meta-cognition
     st.write("**3. Action Decision (with Meta-Cognition):**")
     action_response = create_meta_cognitive_action_chain(
@@ -130,15 +269,158 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     # State analysis
     st.write("**4. State Analysis:**")
     state_response = create_state_analysis_system(
-        llm_json_mode, 
-        action_decision=action_response, 
+        llm_json_mode,
+        action_decision=action_response,
         compliance_check=asimov_response
     )
     st.write(state_response)
-    
-    # Update person's needs
+
+    # Emotion analysis based on action outcome
+    st.write("**6. Emotion Analysis:**")
+    action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
+    emotion_adjustments = analyze_emotion_impact(
+        llm=llm_json_mode,
+        situation=action_situation,
+        emotion_system=person.emotion_system,
+        maslow_needs=person.maslow_needs,
+    )
+    if emotion_adjustments:
+        person.emotion_system.apply_adjustments(emotion_adjustments)
+        st.write("Emotion changes: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
+    else:
+        st.write("No significant emotional changes.")
+
+    # Update person's needs (also decays emotions and lessons)
     person.update_all_needs()
     
+    # ── SNAPSHOT AFTER ──────────────────────────────────────────────────
+    needs_after = person.get_needs_snapshot()
+    emotions_after = person.get_emotions_snapshot()
+    satisfaction_after = person.maslow_needs.get_overall_satisfaction()
+    
+    # ── RECORD EXPERIENCE ───────────────────────────────────────────────
+    if person.learning_system is not None:
+        chosen_action = action_response.get("chosen_action", "unknown") if isinstance(action_response, dict) else str(action_response)
+        reasoning = action_response.get("reasoning", "") if isinstance(action_response, dict) else ""
+        
+        world_ctx = {
+            "location": world_summary.get("location", {}).get("name", "unknown"),
+            "time_of_day": world_summary.get("time", {}).get("time_of_day", "unknown"),
+            "weather": world_summary.get("weather", {}).get("description", "unknown"),
+        }
+        
+        experience = person.learning_system.record_experience(
+            action_taken=chosen_action,
+            action_reasoning=reasoning,
+            needs_before=needs_before,
+            needs_after=needs_after,
+            emotions_before=emotions_before,
+            emotions_after=emotions_after,
+            world_context=world_ctx,
+            overall_satisfaction_before=satisfaction_before,
+            overall_satisfaction_after=satisfaction_after,
+        )
+        
+        # Show experience delta
+        st.write("**7. Learning - Experience Recorded:**")
+        sat_delta = satisfaction_after - satisfaction_before
+        delta_icon = "📈" if sat_delta >= 0 else "📉"
+        st.write(f"{delta_icon} Satisfaction: {satisfaction_before:.1f}% → {satisfaction_after:.1f}% ({sat_delta:+.1f}%)")
+        
+        # Show lesson count
+        stats = person.learning_system.get_learning_stats()
+        st.write(f"📚 Active lessons: {stats['active_lessons']} | Total experiences: {stats['total_experiences']}")
+
+        # Update goal progress based on this experience
+        if person.goal_system is not None:
+            person.goal_system.set_experiences(person.learning_system.experiences)
+            advanced_goals = person.goal_system.update_progress(experience)
+            if advanced_goals:
+                st.write("**🎯 Goals Advanced:**")
+                for g in advanced_goals:
+                    st.write(f"- {g.description} → {g.progress:.0%}")
+
+            # Generate new goals periodically
+            if person.goal_system.should_generate():
+                person.goal_system.reset_generation_counter()
+                needs_dict = {name: need.satisfaction for name, need in person.maslow_needs.needs.items()}
+                emotions_dict = person.get_emotions_snapshot()
+                personality = person.maslow_needs.personality_traits
+                lesson_stats = person.learning_system.get_learning_stats()
+                person.goal_system.generate_goals(
+                    needs=needs_dict,
+                    emotions=emotions_dict,
+                    personality_traits=personality,
+                    lessons=lesson_stats.get("lessons", []),
+                )
+
+        # ── PLANNING: evaluate step, create plans, check replans ─────────
+        if person.planning_system is not None:
+            # Evaluate current plan step against this experience
+            step_result = person.planning_system.evaluate_step(experience)
+            if step_result == "step_completed":
+                st.write("**📋 Plan step completed!**")
+                current = person.planning_system.get_current_step()
+                if current:
+                    _, next_step = current
+                    st.write(f"Next step: {next_step.description}")
+                else:
+                    # Check if plan completed
+                    for p in person.planning_system.plans:
+                        if p.status == "completed" and p.goal_id is not None:
+                            st.write(f"**📋 Plan completed:** {p.goal_description}")
+                            # Advance goal progress
+                            if person.goal_system is not None:
+                                for g in person.goal_system.goals:
+                                    if g.description == p.goal_description and g.is_active():
+                                        g.advance(0.3)
+                                        break
+            elif step_result == "step_overridden":
+                st.write("*📋 Plan step overridden by urgent needs.*")
+
+            # Check if any plan needs replanning
+            replan_result = person.planning_system.check_for_replan(
+                needs=needs_after,
+                world_context=world_ctx,
+            )
+            if replan_result is not None:
+                st.write(f"**📋 Replanned:** {replan_result.goal_description}")
+                st.write(f"New first step: {replan_result.steps[0].description}")
+
+            # Create plans for active goals that don't have one
+            if person.goal_system is not None:
+                for idx, goal in enumerate(person.goal_system.goals):
+                    if not goal.is_active():
+                        continue
+                    if person.planning_system.get_plan_for_goal(idx) is not None:
+                        continue
+                    # Short-term: plan immediately. Mid/long: wait for low needs.
+                    should_plan = goal.horizon == "short_term"
+                    if not should_plan:
+                        low_source = any(
+                            needs_after.get(n, 100) < 50
+                            for n in goal.source_needs
+                        )
+                        should_plan = low_source
+                    if should_plan:
+                        person.planning_system.create_plan(
+                            goal_description=goal.description,
+                            goal_id=idx,
+                            needs=needs_after,
+                            emotions=emotions_after,
+                            world_context=world_ctx,
+                            lessons=lesson_stats.get("lessons", []) if 'lesson_stats' in dir() else [],
+                        )
+    
+    # Show learning stats toggle
+    display_learning_stats(person, iteration)
+
+    # Show goal stats toggle
+    display_goal_stats(person, iteration)
+
+    # Show planning stats toggle
+    display_planning_stats(person, iteration)
+
     # Calculate duration
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
     st.write(f"✅ Iteration {iteration + 1} completed in {iteration_duration:.2f}s")
@@ -151,7 +433,8 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         "state_response": state_response,
         "person_dict": person_dict,
         "world_summary": world_summary,
-        "iteration_duration": iteration_duration
+        "iteration_duration": iteration_duration,
+        "satisfaction_delta": satisfaction_after - satisfaction_before,
     }
 
 
@@ -184,6 +467,7 @@ def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations
                     "duration_seconds": result["iteration_duration"],
                     "action_decision": result["action_decision"],
                     "needs_state": result["person_dict"]["maslow_needs"],
+                    "emotions_state": result["person_dict"].get("emotions", {}),
                     "world_summary": result["world_summary"]
                 }
                 results.append(iteration_record)
@@ -200,7 +484,7 @@ def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations
     return results
 
 
-def display_simulation_summary(simulation_history, iterations):
+def display_simulation_summary(simulation_history, iterations, person=None):
     """Display summary of simulation history"""
     st.success(f"🎉 Completed {iterations} simulation cycles!")
     
@@ -214,9 +498,16 @@ def display_simulation_summary(simulation_history, iterations):
                 action = record.get("action_decision", {})
                 if isinstance(action, dict):
                     chosen = action.get("chosen_action", "Unknown")
+                    lessons_applied = action.get("lessons_applied", "")
                 else:
                     chosen = str(action)[:100]
-                st.write(f"- Iteration {record['iteration']}: {chosen}")
+                    lessons_applied = ""
+                
+                delta = record.get("satisfaction_delta", 0)
+                delta_icon = "📈" if delta >= 0 else "📉"
+                st.write(f"- Iteration {record['iteration']}: {chosen} {delta_icon} ({delta:+.1f}%)")
+                if lessons_applied:
+                    st.write(f"  *Lessons applied: {lessons_applied}*")
             
             # Show needs evolution
             st.write("**Needs Evolution:**")
@@ -224,6 +515,43 @@ def display_simulation_summary(simulation_history, iterations):
                 needs = record.get("needs_state", {})
                 overall = needs.get("overall_satisfaction", 0)
                 st.write(f"- Iteration {record['iteration']}: Overall Satisfaction {overall:.1f}%")
+            
+            # Show learning summary
+            if person is not None and person.learning_system is not None:
+                stats = person.learning_system.get_learning_stats()
+                st.write("---")
+                st.write(f"**📚 Learning Summary:**")
+                st.write(f"- Total experiences recorded: {stats['total_experiences']}")
+                st.write(f"- Active lessons: {stats['active_lessons']}")
+                
+                if stats['lessons']:
+                    st.write("**Learned Lessons:**")
+                    for lesson in stats['lessons']:
+                        st.write(f"- **{lesson['description']}** (confidence: {lesson['confidence']:.0%}, confirmed {lesson['times_confirmed']}x)")
+
+            if person is not None and person.goal_system is not None:
+                goal_stats = person.goal_system.get_goal_stats()
+                st.write(f"**🎯 Goal Summary:**")
+                st.write(f"- Active goals: {goal_stats['active_goals']}")
+                st.write(f"- Completed goals: {goal_stats['completed_goals']}")
+                st.write(f"- Abandoned goals: {goal_stats['abandoned_goals']}")
+                if goal_stats['goals']:
+                    st.write("**Active Goals:**")
+                    for goal in goal_stats['goals']:
+                        st.write(f"- [{goal['horizon']}] **{goal['description']}** (progress: {goal['progress']:.0%}, confidence: {goal['confidence']:.0%})")
+
+            if person is not None and person.planning_system is not None:
+                plan_stats = person.planning_system.get_planning_stats()
+                st.write(f"**📋 Planning Summary:**")
+                st.write(f"- Active plans: {plan_stats['active_plans']}")
+                st.write(f"- Completed plans: {plan_stats['completed_plans']}")
+                st.write(f"- Failed plans: {plan_stats['failed_plans']}")
+                if plan_stats['plans']:
+                    st.write("**Active Plans:**")
+                    for p in plan_stats['plans']:
+                        steps = p.get('steps', [])
+                        done = len([s for s in steps if s['status'] == 'completed'])
+                        st.write(f"- **{p['goal_description']}** ({done}/{len(steps)} steps done, replanned {p.get('times_replanned', 0)}x)")
 
 
 def render_simulation_controls():

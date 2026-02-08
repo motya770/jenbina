@@ -16,22 +16,37 @@ from langchain_ollama import ChatOllama
 
 class TestChains(unittest.TestCase):
     """Test cases for all chain functions in the Jenbina system"""
-    
+
     def setUp(self):
         """Set up test fixtures"""
-        # Mock LLM for testing
+        # Mock LLM for testing — returns realistic JSON for each chain
         self.mock_llm = Mock()
-        self.mock_llm.invoke.return_value.content = '{"response": "test response"}'
-        
+        self._set_mock_response({
+            "chosen_action": "eat",
+            "reasoning": "Hunger is low",
+            "world_state_influence": "none",
+            "emotional_influence": "none",
+            "lessons_applied": "none",
+            "goals_advanced": "none",
+            "compliant": True,
+            "explanation": "Safe action",
+            "hunger_level": -10,
+            "response": "test response"
+        })
+
         # Create test person with needs
         self.person = Person()
         self.person.update_all_needs()
-        
+
         # Create test world state
         self.world = WorldState()
-        
+
         # Create meta-cognitive system
         self.meta_cognitive_system = MetaCognitiveSystem(self.mock_llm)
+
+    def _set_mock_response(self, response_dict):
+        """Helper to set mock LLM response"""
+        self.mock_llm.invoke.return_value.content = json.dumps(response_dict)
 
     def test_create_basic_needs_chain(self):
         """Test the basic needs chain creation and execution"""
@@ -122,61 +137,59 @@ class TestChains(unittest.TestCase):
     def test_create_state_analysis_system(self):
         """Test the state analysis system"""
         from core.cognition.state_analysis_chain import create_state_analysis_system
-        
+
         # Test execution
         action_decision = "Eat a healthy meal"
         compliance_check = {"compliant": True, "explanation": "Safe action"}
-        
+
         result = create_state_analysis_system(
-            self.mock_llm, 
-            action_decision=action_decision, 
+            self.mock_llm,
+            action_decision=action_decision,
             compliance_check=compliance_check
         )
-        
+
         # Verify the function was called
         self.mock_llm.invoke.assert_called()
-        self.assertIsInstance(result, str)
+        # create_state_analysis_system returns parsed JSON dict (or None)
+        self.assertIsInstance(result, dict)
 
     def test_maslow_decision_chain(self):
         """Test the Maslow decision chain"""
         from core.needs.maslow_decision_chain import create_maslow_decision_chain
-        
-        # Create the chain
-        maslow_chain = create_maslow_decision_chain(self.mock_llm)
-        
-        # Test execution
-        result = maslow_chain.invoke({
-            "current_needs": self.person.maslow_needs.get_current_needs_state(),
-            "growth_insights": self.person.maslow_needs.get_growth_insights(),
-            "priority_needs": self.person.maslow_needs.get_priority_needs(3)
-        })
-        
+
+        # create_maslow_decision_chain invokes the LLM directly and returns
+        # the response content string
+        result = create_maslow_decision_chain(self.mock_llm, self.person.maslow_needs)
+
         # Verify the function was called
         self.mock_llm.invoke.assert_called()
-        self.assertIsInstance(result, dict)
+        self.assertIsInstance(result, str)
 
     def test_chain_integration(self):
         """Test integration between multiple chains"""
-        from core.environment.world_state import create_world_description_system
         from core.cognition.action_decision_chain import create_action_decision_chain
         from core.cognition.asimov_check_chain import create_asimov_check_system
-        
-        # Step 1: Generate world description
-        world_chain = create_world_description_system(self.mock_llm)
-        world_description = world_chain(self.person, self.world)
-        
-        # Step 2: Make action decision
+
+        # Use a valid JSON world description directly (world_chain returns
+        # the raw LLM content which isn't guaranteed to be parseable JSON)
+        world_description = json.dumps({
+            "list_of_descriptions": ["A cozy room"],
+            "list_of_actions": ["eat", "sleep"]
+        })
+
+        # Make action decision
         action_chain = create_action_decision_chain(self.mock_llm)
         action_decision = action_chain(self.person, world_description, self.mock_llm)
-        
-        # Step 3: Check Asimov compliance
+
+        # Check Asimov compliance
         asimov_chain = create_asimov_check_system(self.mock_llm)
         compliance = asimov_chain(action_decision.get('chosen_action', ''))
-        
+
         # Verify all chains executed
-        self.assertIsInstance(world_description, str)
         self.assertIsInstance(action_decision, dict)
+        self.assertIn('chosen_action', action_decision)
         self.assertIsInstance(compliance, dict)
+        self.assertIn('compliant', compliance)
 
     def test_error_handling(self):
         """Test error handling in chains"""
