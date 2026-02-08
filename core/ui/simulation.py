@@ -45,8 +45,7 @@ def display_person_state(person):
     for emo in dominant:
         st.write(f"- {emo['name'].capitalize()}: {emo['intensity']}")
     all_emotions = person.emotion_system.get_emotional_state_summary()["emotions"]
-    show_all_emo = st.checkbox("Show All Emotions", value=False, key=f"all_emotions_{id(person)}_{hash(str(all_emotions))}")
-    if show_all_emo:
+    with st.expander("Show All Emotions"):
         for name, val in all_emotions.items():
             st.write(f"- {name}: {val}")
 
@@ -71,13 +70,8 @@ def display_world_state(world_summary, world):
 
 
 def display_meta_cognitive_insights(meta_cognitive_system, iteration):
-    """Display meta-cognitive insights with checkbox toggle"""
-    show_meta = st.checkbox(
-        f"🧠 Show Meta-Cognitive Insights", 
-        value=False, 
-        key=f"meta_insights_{iteration}"
-    )
-    if show_meta:
+    """Display meta-cognitive insights with expander toggle"""
+    with st.expander("🧠 Show Meta-Cognitive Insights"):
         meta_stats = meta_cognitive_system.get_meta_cognitive_stats()
         st.write(f"**Total Cognitive Processes:** {meta_stats['total_processes']}")
         st.write(f"**Total Insights:** {meta_stats['total_insights']}")
@@ -99,12 +93,7 @@ def display_learning_stats(person, iteration):
         return
     
     stats = person.learning_system.get_learning_stats()
-    show_learning = st.checkbox(
-        f"📚 Show Learning Stats",
-        value=False,
-        key=f"learning_stats_{iteration}"
-    )
-    if show_learning:
+    with st.expander("📚 Show Learning Stats"):
         st.write(f"**Total Experiences:** {stats['total_experiences']}")
         st.write(f"**Active Lessons:** {stats['active_lessons']} / {stats['total_lessons']}")
         
@@ -128,12 +117,7 @@ def display_goal_stats(person, iteration):
         return
 
     stats = person.goal_system.get_goal_stats()
-    show_goals = st.checkbox(
-        f"🎯 Show Goal Stats",
-        value=False,
-        key=f"goal_stats_{iteration}"
-    )
-    if show_goals:
+    with st.expander("🎯 Show Goal Stats"):
         st.write(f"**Active Goals:** {stats['active_goals']} | **Completed:** {stats['completed_goals']} | **Abandoned:** {stats['abandoned_goals']}")
 
         if stats['goals']:
@@ -158,12 +142,7 @@ def display_goal_stats(person, iteration):
 def display_working_memory_stats(person, iteration):
     """Display working memory stats"""
     stats = person.working_memory.get_stats()
-    show_wm = st.checkbox(
-        f"🧠 Show Working Memory",
-        value=False,
-        key=f"working_memory_{iteration}"
-    )
-    if show_wm:
+    with st.expander("🧠 Show Working Memory"):
         st.write(f"**Focus:** {stats['focus']:.0f}% | **Capacity:** {stats['buffer_size']}/{stats['capacity']} | **Context Switches:** {stats['context_switches']}")
         if stats['items']:
             for item in stats['items']:
@@ -180,12 +159,7 @@ def display_planning_stats(person, iteration):
         return
 
     stats = person.planning_system.get_planning_stats()
-    show_plans = st.checkbox(
-        f"📋 Show Planning Stats",
-        value=False,
-        key=f"planning_stats_{iteration}"
-    )
-    if show_plans:
+    with st.expander("📋 Show Planning Stats"):
         st.write(f"**Active Plans:** {stats['active_plans']} | **Completed:** {stats['completed_plans']} | **Failed:** {stats['failed_plans']}")
 
         if stats['plans']:
