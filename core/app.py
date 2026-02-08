@@ -61,6 +61,7 @@ def init_session_state():
         # Initialize learning system with LLM
         _, llm_json_mode = init_llm()
         person.init_learning_system(llm_json_mode)
+        person.init_goal_system(llm_json_mode)
         st.session_state.person = person
         st.session_state.action_history = []
         print(person)
@@ -69,6 +70,11 @@ def init_session_state():
     if st.session_state.person.learning_system is None:
         _, llm_json_mode = init_llm()
         st.session_state.person.init_learning_system(llm_json_mode)
+
+    # Ensure goal system is initialized (for existing sessions)
+    if st.session_state.person.goal_system is None:
+        _, llm_json_mode = init_llm()
+        st.session_state.person.init_goal_system(llm_json_mode)
     
     # Meta-cognitive system
     if 'meta_cognitive_system' not in st.session_state:
