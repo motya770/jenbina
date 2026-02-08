@@ -9,7 +9,7 @@ import sys
 import os
 from datetime import datetime, timedelta
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from core.emotions.emotion_system import Emotion, EmotionSystem
 
