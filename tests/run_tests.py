@@ -9,8 +9,8 @@ import sys
 import os
 import time
 
-# Add the core directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
+# Add the project root to the path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 def run_all_tests():
     """Run all test modules"""
