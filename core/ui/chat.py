@@ -198,6 +198,15 @@ def display_memory_debug(memory_manager):
 
 
 def render_chat_interface(person, llm, memory_manager, debug_mode):
-    """Render the chat interface (compact version for grid panel)"""
+    """Render the complete chat interface"""
+    st.write("**6. Interaction with User:**")
+    st.write("### Chat with Jenbina")
+
     display_person_state_compact(person)
     handle_user_input(person, llm, memory_manager, debug_mode)
+    display_communication_stats(person)
+    display_conversation_history(person)
+    display_memory_stats(memory_manager)
+
+    if debug_mode:
+        display_memory_debug(memory_manager)
