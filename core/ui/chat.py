@@ -1,6 +1,8 @@
 """Chat UI components for Jenbina app"""
 import streamlit as st
 from core.interaction.chat_handler import handle_chat_interaction
+from core.emotions.emotion_analysis_chain import analyze_emotion_impact
+from core.auth.user_db import UserDatabase
 
 
 def display_person_state_compact(person):
@@ -11,25 +13,54 @@ def display_person_state_compact(person):
     st.write(f"- Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
     st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
     st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
+    dominant = person.emotion_system.get_dominant_emotions(3)
+    emotions_str = ", ".join(f"{d['name']}: {d['intensity']}" for d in dominant)
+    st.write(f"- Emotions: {emotions_str}")
+
+
+def _get_user_display_name() -> str:
+    """Return the authenticated user's display name, or 'User' as fallback."""
+    user = st.session_state.get("current_user")
+    if user:
+        return user.get("display_name") or user.get("email", "User")
+    return "User"
+
+
+def _get_user_db_and_id():
+    """Return (UserDatabase, user_id) if authenticated, else (None, None)."""
+    user = st.session_state.get("current_user")
+    if not user:
+        return None, None
+    user_db = st.session_state.get("user_db")
+    if user_db is None:
+        user_db = UserDatabase()
+        st.session_state.user_db = user_db
+    return user_db, user["id"]
 
 
 def handle_user_input(person, llm, memory_manager, debug_mode):
     """Handle user chat input and return result"""
+    display_name = _get_user_display_name()
     user_input = st.chat_input("Talk to Jenbina...")
-    
+
     if user_input:
         print("User input:", user_input)
-        
+
         # Store the user message in person's communication history
-        person.receive_message("User", user_input, "text")
-        
+        person.receive_message(display_name, user_input, "text")
+
+        # Store in SQLite
+        user_db, user_id = _get_user_db_and_id()
+        if user_db and user_id:
+            user_db.store_message(user_id, display_name, user_input, "user_message")
+
         # Get conversation history for context
-        conversation_history = person.get_conversation_history("User", count=1000)
+        conversation_history = person.get_conversation_history(display_name, count=1000)
         recent_context = "\n".join([
-            f"{msg.sender}: {msg.content}" 
+            f"{msg.sender}: {msg.content}"
             for msg in conversation_history
         ])
-        
+
         # Handle chat interaction
         chat_result = handle_chat_interaction(
             st=st,
@@ -42,15 +73,34 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             person_state=person.get_current_state(),
             conversation_context=recent_context,
             memory_manager=memory_manager,
-            debug_mode=debug_mode
+            debug_mode=debug_mode,
+            emotional_state=person.emotion_system.get_emotional_state_summary(),
+            user_id=st.session_state.get("current_user", {}).get("id"),
         )
-        
+
         print(chat_result)
-        
-        # Store the person's response
-        if "assistant_response" in chat_result:
-            person.send_message("User", chat_result["assistant_response"], "text")
-        
+
+        # Analyze emotion impact from the conversation
+        if chat_result and "assistant_response" in chat_result:
+            person.send_message(display_name, chat_result["assistant_response"], "text")
+
+            # Store Jenbina's reply in SQLite
+            if user_db and user_id:
+                user_db.store_message(user_id, "Jenbina", chat_result["assistant_response"], "jenbina_response")
+
+            try:
+                chat_situation = f"User said: \"{user_input}\". Jenbina responded: \"{chat_result['assistant_response']}\""
+                emotion_adjustments = analyze_emotion_impact(
+                    llm=llm,
+                    situation=chat_situation,
+                    emotion_system=person.emotion_system,
+                    maslow_needs=person.maslow_needs,
+                )
+                if emotion_adjustments:
+                    person.emotion_system.apply_adjustments(emotion_adjustments)
+            except Exception as e:
+                print(f"Emotion analysis after chat failed: {e}")
+
         # Add to action history
         if "user_message" in chat_result:
             st.session_state.action_history.append({
@@ -61,9 +111,9 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             "role": "assistant",
             "content": chat_result["assistant_response"]
         })
-        
+
         return chat_result
-    
+
     return None
 
 
@@ -82,15 +132,16 @@ def display_communication_stats(person):
 
 def display_conversation_history(person):
     """Display recent conversation history"""
+    display_name = _get_user_display_name()
     with st.expander("Recent Conversation History", expanded=False):
-        user_summary = person.get_conversation_summary("User")
+        user_summary = person.get_conversation_summary(display_name)
         if user_summary['message_count'] > 0:
-            st.write(f"**Messages with User:** {user_summary['message_count']}")
+            st.write(f"**Messages with {display_name}:** {user_summary['message_count']}")
             st.write(f"**Last Interaction:** {user_summary['last_interaction'].strftime('%Y-%m-%d %H:%M')}")
-            
+
             st.write("**Recent Messages:**")
             for msg in user_summary['recent_messages']:
-                sender_icon = "👤" if msg['sender'] == "User" else "🤖"
+                sender_icon = "👤" if msg['sender'] != "person" else "🤖"
                 st.write(f"{sender_icon} **{msg['sender']}** ({msg['timestamp'].strftime('%H:%M')}): {msg['content']}")
         else:
             st.write("No conversation history yet.")
