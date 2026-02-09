@@ -182,56 +182,57 @@ def main():
 
     st.title("Jenbina:")
 
-    # Render sidebar and get debug mode setting
-    debug_mode = render_full_sidebar(environment_simulator, memory_manager, debug_mode=True)
+    # Debug mode toggle at the top
+    debug_mode = st.checkbox("🔧 Debug Mode", value=True, help="Show detailed debugging information")
 
-    # Create main layout columns
-    col1, col2 = st.columns([2, 1])
+    st.subheader("System Stages and Responses")
 
-    with col1:
-        st.subheader("System Stages and Responses")
+    # --------------------------------------------------------------------
+    # SIMULATION CONTROLS
+    # --------------------------------------------------------------------
+    controls = render_simulation_controls()
 
-        # --------------------------------------------------------------------
-        # SIMULATION CONTROLS
-        # --------------------------------------------------------------------
-        controls = render_simulation_controls()
+    if controls["run_loop"] or controls["single_run"]:
+        iterations = controls["num_iterations"] if controls["run_loop"] else 1
 
-        if controls["run_loop"] or controls["single_run"]:
-            iterations = controls["num_iterations"] if controls["run_loop"] else 1
-
-            # Run simulation
-            results = run_simulation_loop(
-                person=person,
-                llm_json_mode=llm_json_mode,
-                meta_cognitive_system=meta_cognitive_system,
-                iterations=iterations,
-                delay_seconds=controls["delay_seconds"]
-            )
-
-            # Update session state
-            st.session_state.simulation_history.extend(results)
-
-            if results:
-                # Store last result in session state for chat context
-                last = results[-1]
-                st.session_state.action_decision = last.get("action_decision")
-                st.session_state.needs_response = last.get("needs_state")
-
-            # Display summary
-            display_simulation_summary(st.session_state.simulation_history, iterations, person=person)
-
-            # Mark as completed
-            st.session_state.simulation_completed = True
-
-        # --------------------------------------------------------------------
-        # CHAT INTERFACE
-        # --------------------------------------------------------------------
-        render_chat_interface(
+        # Run simulation
+        results = run_simulation_loop(
             person=person,
-            llm=llm,
-            memory_manager=memory_manager,
-            debug_mode=debug_mode
+            llm_json_mode=llm_json_mode,
+            meta_cognitive_system=meta_cognitive_system,
+            iterations=iterations,
+            delay_seconds=controls["delay_seconds"]
         )
+
+        # Update session state
+        st.session_state.simulation_history.extend(results)
+
+        if results:
+            # Store last result in session state for chat context
+            last = results[-1]
+            st.session_state.action_decision = last.get("action_decision")
+            st.session_state.needs_response = last.get("needs_state")
+
+        # Display summary
+        display_simulation_summary(st.session_state.simulation_history, iterations, person=person)
+
+        # Mark as completed
+        st.session_state.simulation_completed = True
+
+    # --------------------------------------------------------------------
+    # CHAT INTERFACE
+    # --------------------------------------------------------------------
+    render_chat_interface(
+        person=person,
+        llm=llm,
+        memory_manager=memory_manager,
+        debug_mode=debug_mode
+    )
+
+    # --------------------------------------------------------------------
+    # ENVIRONMENT & DEBUG (below simulation results)
+    # --------------------------------------------------------------------
+    render_full_sidebar(environment_simulator, memory_manager, debug_mode=debug_mode)
 
     # ── Persist Person state after every interaction ──────────────────────
     save_person_state()
