@@ -183,38 +183,32 @@ def display_planning_stats(person, iteration):
 
 
 def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration):
-    """Run a single simulation iteration and return results"""
+    """Run a single simulation iteration and display results in a 3x3 grid"""
     iteration_start_time = datetime.now()
-    
+
+    # ==================================================================
+    # COMPUTE all results sequentially (LLM calls depend on each other)
+    # ==================================================================
+
     # ── SNAPSHOT BEFORE ─────────────────────────────────────────────────
     needs_before = person.get_needs_snapshot()
     emotions_before = person.get_emotions_snapshot()
     satisfaction_before = person.maslow_needs.get_overall_satisfaction()
-    
-    # Display person state
-    display_person_state(person)
-    
-    # JSON representation
+
+    # Person data
     person_dict = get_person_dict(person)
-    st.write("**Person Object (JSON):**")
-    st.json(person_dict)
-    
-    # Basic needs analysis
-    st.write("**1. Basic Needs Analysis:**")
+
+    # 1. Basic needs analysis
     needs_response = create_basic_needs_chain(llm_json_mode, person.maslow_needs)
-    st.write(needs_response)
-    
-    # World state and description
+
+    # 2. World state
     world = create_comprehensive_world_state(person_location="Jenbina's House")
     world_summary = get_world_state_summary(world)
-    display_world_state(world_summary, world)
-    
-    # World description from LLM
-    st.write("**2.1 World Description:**")
+
+    # 2.1 World description from LLM
     world_chain = create_world_description_system(llm_json_mode)
     world_response = world_chain(person, world)
-    st.write(world_response)
-    
+
     # ── UPDATE WORKING MEMORY ──────────────────────────────────────────
     active_plan_step = None
     if person.planning_system is not None:
@@ -234,7 +228,6 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         "weather": world_summary.get("weather", {}).get("description", ""),
     }
 
-    # Build needs dict with level info for salience scoring
     needs_with_levels = {}
     for name, need in person.maslow_needs.needs.items():
         needs_with_levels[name] = {"satisfaction": need.satisfaction, "level": need.level.value}
@@ -244,43 +237,22 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         emotions=emotions_before,
         active_plan_step=active_plan_step,
         active_goals=active_goals_data,
-        recent_experience=None,  # Will be set after experience is recorded
+        recent_experience=None,
         world_context=world_ctx_wm,
         sleep_satisfaction=person.maslow_needs.get_need_satisfaction("sleep"),
     )
 
-    # Display working memory
+    # Collect context texts for display
     wm_text = person.working_memory.format_for_prompt()
-    if wm_text != "Mind is clear — no particular focus.":
-        st.write("**2.2 Working Memory:**")
-        st.info(wm_text)
-
-    # Show current plan step before making a decision
-    if person.planning_system is not None:
-        plan_text = person.planning_system.format_plan_for_prompt()
-        if plan_text != "No active plan.":
-            st.write("**2.3 Current Plan Step:**")
-            st.info(plan_text)
-
-    # Show current goals before making a decision
-    if person.goal_system is not None:
-        goals_text = person.goal_system.format_goals_for_prompt()
-        if goals_text != "No goals set yet.":
-            st.write("**2.4 Current Goals:**")
-            st.info(goals_text)
-
-    # Show learned lessons (if any) before making a decision
+    plan_text = person.planning_system.format_plan_for_prompt() if person.planning_system is not None else "No active plan."
+    goals_text = person.goal_system.format_goals_for_prompt() if person.goal_system is not None else "No goals set yet."
+    lessons_text = "No lessons learned yet."
     if person.learning_system is not None:
         lessons_text = person.learning_system.format_lessons_for_prompt(
-            needs=needs_before,
-            emotions=emotions_before
+            needs=needs_before, emotions=emotions_before
         )
-        if lessons_text != "No lessons learned yet.":
-            st.write("**2.5 Lessons Applied to Decision:**")
-            st.info(lessons_text)
-    
-    # Enhanced action decision with meta-cognition
-    st.write("**3. Action Decision (with Meta-Cognition):**")
+
+    # 3. Action decision (depends on world_response)
     action_response = create_meta_cognitive_action_chain(
         llm=llm_json_mode,
         person=person,
@@ -288,28 +260,22 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         meta_cognitive_system=meta_cognitive_system,
         world_state=world
     )
-    st.write(action_response)
-    
-    # Meta-cognitive insights
-    display_meta_cognitive_insights(meta_cognitive_system, iteration)
-    
-    # Asimov compliance check
-    st.write("**5. Asimov Compliance Check:**")
+
+    # Meta-cognitive stats
+    meta_stats = meta_cognitive_system.get_meta_cognitive_stats()
+
+    # 4. Asimov compliance check (depends on action_response)
     asimov_chain = create_asimov_check_system(llm_json_mode)
     asimov_response = asimov_chain(action_response)
-    st.write(asimov_response)
-    
-    # State analysis
-    st.write("**4. State Analysis:**")
+
+    # 5. State analysis (depends on action_response + asimov_response)
     state_response = create_state_analysis_system(
         llm_json_mode,
         action_decision=action_response,
         compliance_check=asimov_response
     )
-    st.write(state_response)
 
-    # Emotion analysis based on action outcome
-    st.write("**6. Emotion Analysis:**")
+    # 6. Emotion analysis
     action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
     emotion_adjustments = analyze_emotion_impact(
         llm=llm_json_mode,
@@ -319,29 +285,31 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     )
     if emotion_adjustments:
         person.emotion_system.apply_adjustments(emotion_adjustments)
-        st.write("Emotion changes: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
-    else:
-        st.write("No significant emotional changes.")
 
     # Update person's needs (also decays emotions and lessons)
     person.update_all_needs()
-    
+
     # ── SNAPSHOT AFTER ──────────────────────────────────────────────────
     needs_after = person.get_needs_snapshot()
     emotions_after = person.get_emotions_snapshot()
     satisfaction_after = person.maslow_needs.get_overall_satisfaction()
-    
-    # ── RECORD EXPERIENCE ───────────────────────────────────────────────
+    sat_delta = satisfaction_after - satisfaction_before
+
+    # ── RECORD EXPERIENCE & UPDATE GOALS/PLANS ─────────────────────────
+    learning_messages = []
+    goal_messages = []
+    plan_messages = []
+
     if person.learning_system is not None:
         chosen_action = action_response.get("chosen_action", "unknown") if isinstance(action_response, dict) else str(action_response)
         reasoning = action_response.get("reasoning", "") if isinstance(action_response, dict) else ""
-        
+
         world_ctx = {
             "location": world_summary.get("location", {}).get("name", "unknown"),
             "time_of_day": world_summary.get("time", {}).get("time_of_day", "unknown"),
             "weather": world_summary.get("weather", {}).get("description", "unknown"),
         }
-        
+
         experience = person.learning_system.record_experience(
             action_taken=chosen_action,
             action_reasoning=reasoning,
@@ -353,27 +321,20 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             overall_satisfaction_before=satisfaction_before,
             overall_satisfaction_after=satisfaction_after,
         )
-        
-        # Show experience delta
-        st.write("**7. Learning - Experience Recorded:**")
-        sat_delta = satisfaction_after - satisfaction_before
-        delta_icon = "📈" if sat_delta >= 0 else "📉"
-        st.write(f"{delta_icon} Satisfaction: {satisfaction_before:.1f}% → {satisfaction_after:.1f}% ({sat_delta:+.1f}%)")
-        
-        # Show lesson count
-        stats = person.learning_system.get_learning_stats()
-        st.write(f"📚 Active lessons: {stats['active_lessons']} | Total experiences: {stats['total_experiences']}")
 
-        # Update goal progress based on this experience
+        delta_icon = "📈" if sat_delta >= 0 else "📉"
+        learning_messages.append(f"{delta_icon} Satisfaction: {satisfaction_before:.1f}% → {satisfaction_after:.1f}% ({sat_delta:+.1f}%)")
+        stats = person.learning_system.get_learning_stats()
+        learning_messages.append(f"📚 Active lessons: {stats['active_lessons']} | Total experiences: {stats['total_experiences']}")
+
+        # Update goal progress
         if person.goal_system is not None:
             person.goal_system.set_experiences(person.learning_system.experiences)
             advanced_goals = person.goal_system.update_progress(experience)
             if advanced_goals:
-                st.write("**🎯 Goals Advanced:**")
                 for g in advanced_goals:
-                    st.write(f"- {g.description} → {g.progress:.0%}")
+                    goal_messages.append(f"🎯 {g.description} → {g.progress:.0%}")
 
-            # Generate new goals periodically
             if person.goal_system.should_generate():
                 person.goal_system.reset_generation_counter()
                 needs_dict = {name: need.satisfaction for name, need in person.maslow_needs.needs.items()}
@@ -387,47 +348,40 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                     lessons=lesson_stats.get("lessons", []),
                 )
 
-        # ── PLANNING: evaluate step, create plans, check replans ─────────
+        # ── PLANNING ─────────────────────────────────────────────────
         if person.planning_system is not None:
-            # Evaluate current plan step against this experience
             step_result = person.planning_system.evaluate_step(experience)
             if step_result == "step_completed":
-                st.write("**📋 Plan step completed!**")
+                plan_messages.append("📋 Plan step completed!")
                 current = person.planning_system.get_current_step()
                 if current:
                     _, next_step = current
-                    st.write(f"Next step: {next_step.description}")
+                    plan_messages.append(f"Next step: {next_step.description}")
                 else:
-                    # Check if plan completed
                     for p in person.planning_system.plans:
                         if p.status == "completed" and p.goal_id is not None:
-                            st.write(f"**📋 Plan completed:** {p.goal_description}")
-                            # Advance goal progress
+                            plan_messages.append(f"📋 Plan completed: {p.goal_description}")
                             if person.goal_system is not None:
                                 for g in person.goal_system.goals:
                                     if g.description == p.goal_description and g.is_active():
                                         g.advance(0.3)
                                         break
             elif step_result == "step_overridden":
-                st.write("*📋 Plan step overridden by urgent needs.*")
+                plan_messages.append("📋 Plan step overridden by urgent needs.")
 
-            # Check if any plan needs replanning
             replan_result = person.planning_system.check_for_replan(
-                needs=needs_after,
-                world_context=world_ctx,
+                needs=needs_after, world_context=world_ctx,
             )
             if replan_result is not None:
-                st.write(f"**📋 Replanned:** {replan_result.goal_description}")
-                st.write(f"New first step: {replan_result.steps[0].description}")
+                plan_messages.append(f"📋 Replanned: {replan_result.goal_description}")
+                plan_messages.append(f"New first step: {replan_result.steps[0].description}")
 
-            # Create plans for active goals that don't have one
             if person.goal_system is not None:
                 for idx, goal in enumerate(person.goal_system.goals):
                     if not goal.is_active():
                         continue
                     if person.planning_system.get_plan_for_goal(idx) is not None:
                         continue
-                    # Short-term: plan immediately. Mid/long: wait for low needs.
                     should_plan = goal.horizon == "short_term"
                     if not should_plan:
                         low_source = any(
@@ -444,23 +398,114 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                             world_context=world_ctx,
                             lessons=lesson_stats.get("lessons", []) if 'lesson_stats' in dir() else [],
                         )
-    
-    # Show learning stats toggle
+
+    iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
+
+    # ==================================================================
+    # DISPLAY results in 3x3 grid
+    # ==================================================================
+
+    # --- Row 1: Person State & Emotions | Person JSON | Needs Analysis ---
+    r1c1, r1c2, r1c3 = st.columns(3)
+
+    with r1c1:
+        st.write("**Person State**")
+        st.write(f"Name: {person.name}")
+        st.write(f"Overall: {person.maslow_needs.get_overall_satisfaction():.1f}%")
+        st.write(f"Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
+        st.write(f"Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
+        st.write(f"Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
+        dominant = person.emotion_system.get_dominant_emotions(3)
+        if dominant:
+            st.write("**Emotions:**")
+            for emo in dominant:
+                st.write(f"- {emo['name'].capitalize()}: {emo['intensity']}")
+
+    with r1c2:
+        st.write("**Person Object (JSON)**")
+        st.json(person_dict)
+
+    with r1c3:
+        st.write("**1. Basic Needs Analysis**")
+        st.write(needs_response)
+
+    # --- Row 2: World State & Context | World Description | Action Decision ---
+    r2c1, r2c2, r2c3 = st.columns(3)
+
+    with r2c1:
+        st.write("**2. World State**")
+        st.write(f"Location: {world_summary['location']['name']}")
+        st.write(f"Time: {world_summary['time']['time_of_day']}")
+        st.write(f"Weather: {world_summary['weather']['description']}")
+        st.write(f"Temp: {world_summary['weather']['temperature']:.1f}°C")
+        st.write(f"Humidity: {world_summary['weather']['humidity']:.1f}%")
+        st.write(f"Nearby: {world_summary['environment']['nearby_locations_count']}")
+        st.write(f"Events: {world_summary['environment']['current_events_count']}")
+        if wm_text != "Mind is clear — no particular focus.":
+            with st.expander("2.2 Working Memory"):
+                st.info(wm_text)
+        if plan_text != "No active plan.":
+            with st.expander("2.3 Current Plan"):
+                st.info(plan_text)
+        if goals_text != "No goals set yet.":
+            with st.expander("2.4 Current Goals"):
+                st.info(goals_text)
+        if lessons_text != "No lessons learned yet.":
+            with st.expander("2.5 Lessons"):
+                st.info(lessons_text)
+
+    with r2c2:
+        st.write("**2.1 World Description**")
+        st.write(world_response)
+
+    with r2c3:
+        st.write("**3. Action Decision**")
+        st.write(action_response)
+        st.write("**Meta-Cognition**")
+        st.write(f"Processes: {meta_stats['total_processes']} | Insights: {meta_stats['total_insights']}")
+        biases = {k: v for k, v in meta_stats['cognitive_biases'].items() if v > 0}
+        if biases:
+            for bias, level in biases.items():
+                st.write(f"- {bias}: {level:.2f}")
+
+    # --- Row 3: Asimov & State Analysis | Emotions & Learning | Goals & Planning ---
+    r3c1, r3c2, r3c3 = st.columns(3)
+
+    with r3c1:
+        st.write("**4. Asimov Compliance**")
+        st.write(asimov_response)
+        st.write("**5. State Analysis**")
+        st.write(state_response)
+
+    with r3c2:
+        st.write("**6. Emotion Analysis**")
+        if emotion_adjustments:
+            st.write("Changes: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
+        else:
+            st.write("No significant emotional changes.")
+        st.write("**7. Learning**")
+        for msg in learning_messages:
+            st.write(msg)
+
+    with r3c3:
+        st.write("**Goals & Planning**")
+        if goal_messages:
+            for msg in goal_messages:
+                st.write(msg)
+        if plan_messages:
+            for msg in plan_messages:
+                st.write(msg)
+        if not goal_messages and not plan_messages:
+            st.write("No goal/plan updates this iteration.")
+
+    # --- Stats expanders (full width below grid) ---
     display_learning_stats(person, iteration)
-
-    # Show goal stats toggle
     display_goal_stats(person, iteration)
-
-    # Show planning stats toggle
     display_planning_stats(person, iteration)
-
-    # Show working memory stats toggle
     display_working_memory_stats(person, iteration)
 
-    # Calculate duration
-    iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
-    st.write(f"✅ Iteration {iteration + 1} completed in {iteration_duration:.2f}s")
-    
+    st.success(f"Iteration {iteration + 1} completed in {iteration_duration:.2f}s")
+
     # Return results for session state
     return {
         "needs_response": needs_response,
@@ -470,7 +515,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         "person_dict": person_dict,
         "world_summary": world_summary,
         "iteration_duration": iteration_duration,
-        "satisfaction_delta": satisfaction_after - satisfaction_before,
+        "satisfaction_delta": sat_delta,
     }
 
 
