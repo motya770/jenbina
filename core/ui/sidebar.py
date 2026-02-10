@@ -104,14 +104,17 @@ def render_debug_controls(memory_manager):
 
 
 def render_full_sidebar(environment_simulator, memory_manager, debug_mode):
-    """Render the complete sidebar"""
-    with st.sidebar:
+    """Render environment info as a full-width section (formerly sidebar)"""
+    st.markdown("---")
+    st.subheader("Environment & Debug")
+
+    env_col, loc_col = st.columns(2)
+    with env_col:
         render_environment_sidebar(environment_simulator)
         render_location_exploration(environment_simulator)
+    with loc_col:
         render_dynamic_events(environment_simulator)
         render_location_recommendations(environment_simulator)
-        
-        if debug_mode:
-            render_debug_controls(memory_manager)
-    
-    return st.sidebar.checkbox("🔧 Debug Mode", value=True, help="Show detailed debugging information")
+
+    if debug_mode:
+        render_debug_controls(memory_manager)
