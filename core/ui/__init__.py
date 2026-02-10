@@ -8,6 +8,7 @@ from .simulation import (
     get_person_dict
 )
 from .chat import render_chat_interface
+from .shared_init import require_auth, init_llm, init_session_state, save_person_state
 
 __all__ = [
     'render_full_sidebar',
@@ -16,5 +17,9 @@ __all__ = [
     'run_single_iteration',
     'display_simulation_summary',
     'get_person_dict',
-    'render_chat_interface'
+    'render_chat_interface',
+    'require_auth',
+    'init_llm',
+    'init_session_state',
+    'save_person_state',
 ]
