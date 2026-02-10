@@ -189,6 +189,22 @@ def display_planning_stats(person, iteration):
             st.write("*No active plans.*")
 
 
+def _print_json(label: str, data):
+    """Pretty-print an LLM response to console."""
+    try:
+        if isinstance(data, dict):
+            formatted = json.dumps(data, indent=2, default=str)
+        elif isinstance(data, str):
+            formatted = data
+        else:
+            formatted = json.dumps(str(data), indent=2)
+        print(f"  {label}:")
+        for line in formatted.splitlines():
+            print(f"    {line}")
+    except Exception:
+        print(f"  {label}: {data}")
+
+
 @contextmanager
 def _card(title: str):
     """Render a bordered card with a bold title."""
@@ -252,6 +268,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"  📊 [2a] Analyzing basic needs...")
     needs_response = create_basic_needs_chain(llm_json_mode, person.maslow_needs)
     print(f"  ✅ Needs analysis complete")
+    _print_json("📊 Needs Response", needs_response)
     with r1c1:
         with _card("Needs Analysis"):
             st.write(needs_response)
@@ -261,6 +278,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     world_chain = create_world_description_system(llm_json_mode)
     world_response = world_chain(person, world)
     print(f"  ✅ World description complete")
+    _print_json("🌐 World Description", world_response)
 
     active_plan_step = None
     if person.planning_system is not None:
@@ -334,6 +352,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     )
     chosen = action_response.get('chosen_action', '?') if isinstance(action_response, dict) else str(action_response)[:50]
     print(f"  ✅ Action chosen: {chosen}")
+    _print_json("⚡ Action Response", action_response)
     with r1c3:
         with _card("Action Decision"):
             st.write(action_response)
@@ -352,6 +371,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     asimov_chain = create_asimov_check_system(llm_json_mode)
     asimov_response = asimov_chain(action_response)
     print(f"  ✅ Safety check complete")
+    _print_json("⚖️  Asimov Response", asimov_response)
     with r2c1:
         with _card("Safety Check"):
             st.write(asimov_response)
@@ -364,6 +384,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         compliance_check=asimov_response
     )
     print(f"  ✅ State analysis complete")
+    _print_json("🔍 State Analysis", state_response)
     with r2c2:
         with _card("State Analysis"):
             st.write(state_response)
@@ -380,6 +401,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     if emotion_adjustments:
         person.emotion_system.apply_adjustments(emotion_adjustments)
         print(f"  ✅ Emotions: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
+        _print_json("💭 Emotion Adjustments", emotion_adjustments)
     else:
         print(f"  ✅ No significant emotional changes")
     with r2c3:
