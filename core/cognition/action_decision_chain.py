@@ -11,11 +11,14 @@ from ..environment.world_state import WorldState
 def create_action_decision_chain(llm: BaseLLM) -> callable:
     # Create prompt for action decision
     action_prompt = PromptTemplate(
-        input_variables=["descriptions", "actions", "working_memory", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "emotional_state", "world_state_info", "current_plan_step", "learned_lessons", "current_goals"],
+        input_variables=["descriptions", "actions", "working_memory", "inner_monologue", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "emotional_state", "world_state_info", "current_plan_step", "learned_lessons", "current_goals"],
         template="""Given the current situation, the person's needs, emotions, and the world state, decide on the most appropriate action to take.
 
     What's on my mind right now:
     {working_memory}
+
+    Inner voice (stream of consciousness):
+    {inner_monologue}
 
     Current Description:
     {descriptions}
@@ -144,12 +147,18 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
         # Get working memory state
         working_memory = person.working_memory.format_for_prompt()
 
+        # Get inner monologue state
+        inner_monologue = "No inner thoughts at the moment."
+        if person.inner_monologue is not None:
+            inner_monologue = person.inner_monologue.format_for_prompt()
+
         # Get decision using invoke directly
         response = llm.invoke(
             action_prompt.format(
                 descriptions=description_data["list_of_descriptions"],
                 actions=description_data["list_of_actions"],
                 working_memory=working_memory,
+                inner_monologue=inner_monologue,
                 hunger_satisfaction=hunger_satisfaction,
                 sleep_satisfaction=sleep_satisfaction,
                 safety_satisfaction=safety_satisfaction,

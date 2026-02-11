@@ -30,19 +30,30 @@ from .asimov_check_chain import (
     create_asimov_check_system
 )
 
+from .inner_monologue import (
+    InnerMonologueSystem,
+    InnerThought,
+    ThoughtMode
+)
+
 __all__ = [
     # Meta-cognition
     'MetaCognitiveSystem',
     'CognitiveProcess',
     'MetaCognitiveInsight',
-    
+
     # Action decision making
     'create_action_decision_chain',
     'create_meta_cognitive_action_chain',
-    
+
     # State analysis
     'create_state_analysis_system',
-    
+
     # Safety and compliance
-    'create_asimov_check_system'
+    'create_asimov_check_system',
+
+    # Inner monologue
+    'InnerMonologueSystem',
+    'InnerThought',
+    'ThoughtMode',
 ] 
