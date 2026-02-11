@@ -55,6 +55,7 @@ class Person:
     goal_system: Any = None  # Initialized separately (needs LLM)
     planning_system: Any = None  # Initialized separately (needs LLM)
     working_memory: WorkingMemorySystem = field(default_factory=WorkingMemorySystem)
+    inner_monologue: Any = None  # Initialized separately (needs LLM)
     conversations: Dict[str, Conversation] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -80,6 +81,12 @@ class Person:
         Called separately because LLM isn't available at Person creation time."""
         from ..planning.planning_system import PlanningSystem
         self.planning_system = PlanningSystem(llm)
+
+    def init_inner_monologue(self, llm):
+        """Initialize the inner monologue system with an LLM instance.
+        Called separately because LLM isn't available at Person creation time."""
+        from ..cognition.inner_monologue import InnerMonologueSystem
+        self.inner_monologue = InnerMonologueSystem(llm)
     
     def update_all_needs(self):
         """Update all needs, decay emotions, and decay lessons"""
@@ -198,6 +205,10 @@ class Person:
         # Add working memory state
         state["working_memory"] = self.working_memory.get_stats()
 
+        # Add inner monologue state
+        if self.inner_monologue is not None:
+            state["inner_monologue"] = self.inner_monologue.get_stats()
+
         return state
     
     def serialize(self) -> str:
@@ -214,6 +225,8 @@ class Person:
             data["goal_system"] = self.goal_system.to_dict()
         if self.planning_system is not None:
             data["planning_system"] = self.planning_system.to_dict()
+        if self.inner_monologue is not None:
+            data["inner_monologue"] = self.inner_monologue.to_dict()
         return json.dumps(data)
 
     @classmethod
@@ -251,6 +264,12 @@ class Person:
             person.planning_system = PlanningSystem.from_dict(data["planning_system"], llm)
         else:
             person.planning_system = None
+
+        if "inner_monologue" in data and llm is not None:
+            from ..cognition.inner_monologue import InnerMonologueSystem
+            person.inner_monologue = InnerMonologueSystem.from_dict(data["inner_monologue"], llm)
+        else:
+            person.inner_monologue = None
 
         return person
 
