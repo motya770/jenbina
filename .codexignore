@@ -1,0 +1,27 @@
+# Hidden/dot directories
+.venv/
+.git/
+.github/
+.devcontainer/
+.claude/
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Data and storage
+*.db
+*.sqlite
+*.sqlite3
+jenbina_memory/
+*.chroma/
+*.vectorstore/
+
+# Old notebooks
+old/
+
+# OS files
+.DS_Store
