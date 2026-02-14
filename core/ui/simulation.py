@@ -323,6 +323,55 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             needs=needs_before, emotions=emotions_before
         )
 
+    inner_voice_text = "No inner thoughts at the moment."
+    if person.inner_monologue is not None:
+        print(f"  🧠 [2d] Generating inner monologue...")
+        recent_exp_list = None
+        recent_exp_str = "No notable recent experiences."
+        if person.learning_system is not None:
+            stats = person.learning_system.get_learning_stats()
+            recent_exp_list = stats.get("recent_experiences", [])
+            if recent_exp_list:
+                recent_exp_str = "\n".join(
+                    f"- {e.get('action_taken', 'unknown')}: satisfaction "
+                    f"{e.get('overall_satisfaction_before', 0):.0f}→{e.get('overall_satisfaction_after', 0):.0f}"
+                    for e in recent_exp_list[-3:]
+                )
+
+        emotional_state_str = ", ".join(
+            f"{name}: {val}" for name, val in emotions_before.items()
+        )
+        needs_summary_str = ", ".join(
+            f"{name}: {sat:.0f}%" for name, sat in needs_before.items()
+        )
+        world_context_str = (
+            f"Location: {world_summary.get('location', {}).get('name', 'Unknown')}, "
+            f"Time: {world_summary.get('time', {}).get('time_of_day', 'unknown')}, "
+            f"Weather: {world_summary.get('weather', {}).get('description', 'unknown')}"
+        )
+
+        last_action = "Nothing in particular."
+        if st.session_state.get("simulation_history"):
+            prev = st.session_state["simulation_history"][-1].get("action_decision", {})
+            if isinstance(prev, dict):
+                last_action = prev.get("chosen_action", last_action)
+
+        person.inner_monologue.think(
+            needs=needs_before,
+            emotions=emotions_before,
+            working_memory_str=wm_text,
+            needs_summary_str=needs_summary_str,
+            emotional_state_str=emotional_state_str,
+            world_context_str=world_context_str,
+            recent_action_str=last_action,
+            recent_experiences_list=recent_exp_list,
+            recent_experiences_str=recent_exp_str,
+            lessons_learned_str=lessons_text,
+            goals_str=goals_text,
+        )
+        inner_voice_text = person.inner_monologue.format_for_prompt()
+        print(f"  ✅ Inner monologue generated")
+
     with r1c2:
         with _card("Context"):
             if wm_text != "Mind is clear — no particular focus.":
@@ -337,6 +386,9 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             if lessons_text != "No lessons learned yet.":
                 st.caption("Lessons Applied")
                 st.info(lessons_text)
+            if inner_voice_text != "No inner thoughts at the moment.":
+                st.caption("Inner Voice")
+                st.info(inner_voice_text)
 
     # Card 3: Action Decision (LLM call → display)
     print(f"\n{'─'*40}")

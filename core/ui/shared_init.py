@@ -29,7 +29,7 @@ def init_llm():
 
 def _load_or_create_person(user_db: UserDatabase, user_id: int) -> Person:
     """Load a user's Person state from SQLite, or create a fresh one."""
-    _, llm_json_mode = init_llm()
+    llm, llm_json_mode = init_llm()
     saved_json = user_db.load_person_state(user_id)
     if saved_json:
         person = Person.deserialize(saved_json, llm_json_mode)
@@ -42,6 +42,8 @@ def _load_or_create_person(user_db: UserDatabase, user_id: int) -> Person:
         person.init_goal_system(llm_json_mode)
     if person.planning_system is None:
         person.init_planning_system(llm_json_mode)
+    if person.inner_monologue is None:
+        person.init_inner_monologue(llm)
     return person
 
 
@@ -68,10 +70,11 @@ def init_session_state():
         else:
             person = Person()
             person.update_all_needs()
-            _, llm_json_mode = init_llm()
+            llm, llm_json_mode = init_llm()
             person.init_learning_system(llm_json_mode)
             person.init_goal_system(llm_json_mode)
             person.init_planning_system(llm_json_mode)
+            person.init_inner_monologue(llm)
         st.session_state.person = person
         st.session_state.action_history = []
         print(person)
@@ -86,6 +89,9 @@ def init_session_state():
     if st.session_state.person.goal_system is None:
         _, llm_json_mode = init_llm()
         st.session_state.person.init_goal_system(llm_json_mode)
+    if st.session_state.person.inner_monologue is None:
+        llm, _ = init_llm()
+        st.session_state.person.init_inner_monologue(llm)
 
     if 'meta_cognitive_system' not in st.session_state:
         _, llm_json_mode = init_llm()
