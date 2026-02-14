@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
-from maslow_needs import MaslowNeedsSystem
+from core.needs.maslow_needs import MaslowNeedsSystem
 from datetime import datetime
 
 

@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime
 import time
 import json
+from types import SimpleNamespace
 
 from core.needs.maslow_needs import create_basic_needs_chain
 from core.cognition.asimov_check_chain import create_asimov_check_system
@@ -157,6 +158,52 @@ def display_working_memory_stats(person, iteration):
                 st.write(f"- [{item['source']}] {item['content']} | {bar} {item['salience']:.2f}")
         else:
             st.write("*Mind is clear.*")
+
+
+def display_identity_stats(person, iteration):
+    """Display self-narrative and identity stats."""
+    if getattr(person, "self_narrative", None) is None:
+        return
+
+    stats = person.self_narrative.get_stats()
+    with st.container(border=True):
+        st.caption("🪞 Identity & Narrative")
+        st.write(f"**Coherence:** {stats['identity_coherence']:.2f} | **Crisis:** {stats['identity_crisis_level']:.2f}")
+        st.write("**Self Concept:**")
+        for line in stats.get("self_concept", [])[:3]:
+            st.write(f"- {line}")
+        st.write("**Life Story:**")
+        st.write(stats.get("life_story", ""))
+        values = stats.get("values", {})
+        if values:
+            top = sorted(values.items(), key=lambda kv: kv[1], reverse=True)[:5]
+            st.write("**Top Values:**")
+            for name, score in top:
+                st.write(f"- {name}: {score:.2f}")
+
+
+def display_curiosity_stats(person, iteration):
+    """Display curiosity and exploration stats."""
+    if getattr(person, "curiosity_system", None) is None:
+        return
+
+    stats = person.curiosity_system.get_stats()
+    with st.container(border=True):
+        st.caption("🔎 Curiosity & Exploration")
+        st.write(
+            f"**Curiosity:** {stats['curiosity_level']:.2f} | "
+            f"**Boredom:** {stats['boredom_level']:.2f} | "
+            f"**Novelty:** {stats['last_novelty_score']:.2f} | "
+            f"**Explore?:** {'yes' if stats['should_explore'] else 'no'}"
+        )
+        if stats.get("open_questions"):
+            st.write("**Open Questions:**")
+            for q in stats["open_questions"][:3]:
+                st.write(f"- {q}")
+        if stats.get("suggested_explorations"):
+            st.write("**Exploration Candidates:**")
+            for a in stats["suggested_explorations"][:5]:
+                st.write(f"- {a}")
 
 
 def display_planning_stats(person, iteration):
@@ -323,6 +370,29 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             needs=needs_before, emotions=emotions_before
         )
 
+    curiosity_text = "Curiosity is low; prioritize practical actions."
+    if getattr(person, "curiosity_system", None) is not None:
+        available_actions = []
+        try:
+            world_data = json.loads(world_response) if isinstance(world_response, str) else {}
+            available_actions = world_data.get("list_of_actions", []) if isinstance(world_data, dict) else []
+        except Exception:
+            available_actions = []
+
+        recent_actions = []
+        for record in st.session_state.get("simulation_history", [])[-6:]:
+            action = (record.get("action_decision", {}) or {}).get("chosen_action")
+            if action:
+                recent_actions.append(action)
+
+        person.curiosity_system.observe_cycle(
+            needs=needs_before,
+            world_context=world_ctx_wm,
+            available_actions=available_actions,
+            recent_actions=recent_actions,
+        )
+        curiosity_text = person.curiosity_system.format_for_prompt()
+
     inner_voice_text = "No inner thoughts at the moment."
     if person.inner_monologue is not None:
         print(f"  🧠 [2d] Generating inner monologue...")
@@ -386,6 +456,9 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             if lessons_text != "No lessons learned yet.":
                 st.caption("Lessons Applied")
                 st.info(lessons_text)
+            if curiosity_text != "Curiosity is low; prioritize practical actions.":
+                st.caption("Curiosity")
+                st.info(curiosity_text)
             if inner_voice_text != "No inner thoughts at the moment.":
                 st.caption("Inner Voice")
                 st.info(inner_voice_text)
@@ -404,6 +477,8 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     )
     chosen = action_response.get('chosen_action', '?') if isinstance(action_response, dict) else str(action_response)[:50]
     print(f"  ✅ Action chosen: {chosen}")
+    if getattr(person, "curiosity_system", None) is not None and isinstance(action_response, dict):
+        person.curiosity_system.update_after_action(action_response.get("chosen_action", ""))
     _print_json("⚡ Action Response", action_response)
     with r1c3:
         with _card("Action Decision"):
@@ -476,22 +551,21 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     emotions_after = person.get_emotions_snapshot()
     satisfaction_after = person.maslow_needs.get_overall_satisfaction()
     sat_delta = satisfaction_after - satisfaction_before
+    chosen_action = action_response.get("chosen_action", "unknown") if isinstance(action_response, dict) else str(action_response)
+    reasoning = action_response.get("reasoning", "") if isinstance(action_response, dict) else ""
+    world_ctx = {
+        "location": world_summary.get("location", {}).get("name", "unknown"),
+        "time_of_day": world_summary.get("time", {}).get("time_of_day", "unknown"),
+        "weather": world_summary.get("weather", {}).get("description", "unknown"),
+    }
 
     learning_messages = []
     goal_messages = []
     plan_messages = []
     lesson_stats = {}
+    experience = None
 
     if person.learning_system is not None:
-        chosen_action = action_response.get("chosen_action", "unknown") if isinstance(action_response, dict) else str(action_response)
-        reasoning = action_response.get("reasoning", "") if isinstance(action_response, dict) else ""
-
-        world_ctx = {
-            "location": world_summary.get("location", {}).get("name", "unknown"),
-            "time_of_day": world_summary.get("time", {}).get("time_of_day", "unknown"),
-            "weather": world_summary.get("weather", {}).get("description", "unknown"),
-        }
-
         print(f"  📓 Recording experience...")
         experience = person.learning_system.record_experience(
             action_taken=chosen_action,
@@ -585,6 +659,21 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                             lessons=lesson_stats.get("lessons", []),
                         )
 
+    # Keep identity updates independent of learning-system availability
+    if getattr(person, "self_narrative", None) is not None:
+        if experience is None:
+            experience = SimpleNamespace(
+                action_taken=chosen_action,
+                action_reasoning=reasoning,
+                overall_satisfaction_before=satisfaction_before,
+                overall_satisfaction_after=satisfaction_after,
+                timestamp=time.time(),
+            )
+            lessons_for_identity = []
+        else:
+            lessons_for_identity = person.learning_system.lessons if person.learning_system is not None else []
+        person.self_narrative.integrate_experience(experience, lessons_for_identity)
+
     # ==================================================================
     # Row 3 — Learning (display after post-processing completes)
     # ==================================================================
@@ -611,6 +700,8 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     display_goal_stats(person, iteration)
     display_planning_stats(person, iteration)
     display_working_memory_stats(person, iteration)
+    display_identity_stats(person, iteration)
+    display_curiosity_stats(person, iteration)
 
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
     print(f"\n{'='*60}")

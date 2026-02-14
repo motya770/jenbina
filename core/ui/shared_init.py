@@ -46,6 +46,10 @@ def _load_or_create_person(user_db: UserDatabase, user_id: int) -> Person:
         person.init_inner_monologue(llm)
     if person.social_cognition is None:
         person.init_social_cognition()
+    if person.self_narrative is None:
+        person.init_self_narrative()
+    if person.curiosity_system is None:
+        person.init_curiosity_system()
     return person
 
 
@@ -78,6 +82,8 @@ def init_session_state():
             person.init_planning_system(llm_json_mode)
             person.init_inner_monologue(llm)
             person.init_social_cognition()
+            person.init_self_narrative()
+            person.init_curiosity_system()
         st.session_state.person = person
         st.session_state.action_history = []
         print(person)
@@ -97,6 +103,10 @@ def init_session_state():
         st.session_state.person.init_inner_monologue(llm)
     if st.session_state.person.social_cognition is None:
         st.session_state.person.init_social_cognition()
+    if st.session_state.person.self_narrative is None:
+        st.session_state.person.init_self_narrative()
+    if st.session_state.person.curiosity_system is None:
+        st.session_state.person.init_curiosity_system()
 
     if 'meta_cognitive_system' not in st.session_state:
         _, llm_json_mode = init_llm()
@@ -117,7 +127,27 @@ def init_session_state():
 
 
 def require_auth():
-    """Auth gate + session init. Returns False if not logged in."""
+    """Auth gate + session init. Returns False if not logged in.
+
+    Set env var JENBINA_SKIP_AUTH=1 to bypass Google SSO (for E2E tests).
+    """
+    if os.environ.get("JENBINA_SKIP_AUTH") == "1":
+        # Seed minimal session state so the rest of the app works
+        if "authenticated" not in st.session_state:
+            user_db = UserDatabase()
+            st.session_state.user_db = user_db
+            user = user_db.create_or_update_user(
+                firebase_uid="test:e2e@test.local",
+                email="e2e@test.local",
+                display_name="E2E Test User",
+                photo_url="",
+                provider="test",
+            )
+            st.session_state.authenticated = True
+            st.session_state.current_user = user
+        init_session_state()
+        return True
+
     if not render_auth_page():
         return False
     user = st.session_state.current_user

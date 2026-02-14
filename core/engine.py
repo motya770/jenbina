@@ -18,6 +18,8 @@ def run_simulation():
     person = Person()
     person.init_inner_monologue(llm)
     person.init_social_cognition()
+    person.init_self_narrative()
+    person.init_curiosity_system()
     world = WorldState()
 
     # Create system components
@@ -31,6 +33,15 @@ def run_simulation():
     while True:
         # Get world description
         world_description = world_description_system(person, world)
+
+        if person.curiosity_system is not None:
+            needs_snapshot_for_curiosity = person.get_needs_snapshot()
+            person.curiosity_system.observe_cycle(
+                needs=needs_snapshot_for_curiosity,
+                world_context={"location": "simulation world", "time_of_day": "unknown", "weather": "unknown"},
+                available_actions=[],
+                recent_actions=[last_action] if last_action else [],
+            )
 
         # Generate internal monologue before decision
         if person.inner_monologue is not None:
@@ -82,6 +93,8 @@ def run_simulation():
         # Decide on action
         action_decision = process_action_decision(person, world_description, llm)
         last_action = action_decision.get("chosen_action", "unknown")
+        if person.curiosity_system is not None:
+            person.curiosity_system.update_after_action(last_action)
 
         # Check if action complies with Asimov's Laws
         compliance_check = asimov_check_system(action_decision["chosen_action"])
