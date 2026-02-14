@@ -13,9 +13,11 @@ from .person import (
     Message,
     Conversation
 )
+from ..identity import SelfNarrativeSystem
 
 __all__ = [
     'Person',
     'Message', 
-    'Conversation'
-] 
+    'Conversation',
+    'SelfNarrativeSystem',
+]

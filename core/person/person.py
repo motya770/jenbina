@@ -57,6 +57,8 @@ class Person:
     working_memory: WorkingMemorySystem = field(default_factory=WorkingMemorySystem)
     inner_monologue: Any = None  # Initialized separately (needs LLM)
     social_cognition: Any = None  # Initialized separately
+    self_narrative: Any = None  # Initialized separately
+    curiosity_system: Any = None  # Initialized separately
     conversations: Dict[str, Conversation] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -93,6 +95,16 @@ class Person:
         """Initialize social cognition / theory-of-mind system."""
         from ..social.social_cognition import SocialCognitionSystem
         self.social_cognition = SocialCognitionSystem()
+
+    def init_self_narrative(self):
+        """Initialize self-narrative / identity system."""
+        from ..identity.self_narrative import SelfNarrativeSystem
+        self.self_narrative = SelfNarrativeSystem()
+
+    def init_curiosity_system(self):
+        """Initialize curiosity / exploration system."""
+        from ..cognition.curiosity_system import CuriositySystem
+        self.curiosity_system = CuriositySystem()
     
     def update_all_needs(self):
         """Update all needs, decay emotions, and decay lessons"""
@@ -217,6 +229,12 @@ class Person:
         # Add social cognition state
         if self.social_cognition is not None:
             state["social_cognition"] = self.social_cognition.get_stats()
+        # Add self narrative state
+        if self.self_narrative is not None:
+            state["self_narrative"] = self.self_narrative.get_stats()
+        # Add curiosity state
+        if self.curiosity_system is not None:
+            state["curiosity"] = self.curiosity_system.get_stats()
 
         return state
     
@@ -238,6 +256,10 @@ class Person:
             data["inner_monologue"] = self.inner_monologue.to_dict()
         if self.social_cognition is not None:
             data["social_cognition"] = self.social_cognition.to_dict()
+        if self.self_narrative is not None:
+            data["self_narrative"] = self.self_narrative.to_dict()
+        if self.curiosity_system is not None:
+            data["curiosity_system"] = self.curiosity_system.to_dict()
         return json.dumps(data)
 
     @classmethod
@@ -287,6 +309,18 @@ class Person:
             person.social_cognition = SocialCognitionSystem.from_dict(data["social_cognition"])
         else:
             person.social_cognition = None
+
+        if "self_narrative" in data:
+            from ..identity.self_narrative import SelfNarrativeSystem
+            person.self_narrative = SelfNarrativeSystem.from_dict(data["self_narrative"])
+        else:
+            person.self_narrative = None
+
+        if "curiosity_system" in data:
+            from ..cognition.curiosity_system import CuriositySystem
+            person.curiosity_system = CuriositySystem.from_dict(data["curiosity_system"])
+        else:
+            person.curiosity_system = None
 
         return person
 

@@ -35,6 +35,10 @@ from .inner_monologue import (
     InnerThought,
     ThoughtMode
 )
+from .curiosity_system import (
+    CuriositySystem,
+    NoveltyEvent,
+)
 
 __all__ = [
     # Meta-cognition
@@ -56,4 +60,8 @@ __all__ = [
     'InnerMonologueSystem',
     'InnerThought',
     'ThoughtMode',
-] 
+
+    # Curiosity
+    'CuriositySystem',
+    'NoveltyEvent',
+]

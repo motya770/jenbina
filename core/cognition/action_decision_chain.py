@@ -11,7 +11,7 @@ from ..environment.world_state import WorldState
 def create_action_decision_chain(llm: BaseLLM) -> callable:
     # Create prompt for action decision
     action_prompt = PromptTemplate(
-        input_variables=["descriptions", "actions", "working_memory", "inner_monologue", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "emotional_state", "world_state_info", "current_plan_step", "learned_lessons", "current_goals"],
+        input_variables=["descriptions", "actions", "working_memory", "inner_monologue", "self_narrative", "curiosity_context", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "emotional_state", "world_state_info", "current_plan_step", "learned_lessons", "current_goals"],
         template="""Given the current situation, the person's needs, emotions, and the world state, decide on the most appropriate action to take.
 
     What's on my mind right now:
@@ -19,6 +19,12 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
 
     Inner voice (stream of consciousness):
     {inner_monologue}
+
+    Identity and self-narrative:
+    {self_narrative}
+
+    Curiosity and exploration drive:
+    {curiosity_context}
 
     Current Description:
     {descriptions}
@@ -55,6 +61,7 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
     - Lessons learned from past experiences (prioritize high-confidence lessons)
     - Current goals (choose actions that advance active goals when possible)
     - Current plan step (follow the suggested action unless urgent needs require otherwise)
+    - Curiosity and novelty signals (when basic needs are stable, information-seeking and exploration can be beneficial)
 
     Select one action from the available actions that best addresses the person's most pressing needs and emotional state while considering the current world state and past lessons.
     Explain your reasoning for choosing this action, including how emotions, world state, and past lessons influenced your decision.
@@ -151,6 +158,16 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
         inner_monologue = "No inner thoughts at the moment."
         if person.inner_monologue is not None:
             inner_monologue = person.inner_monologue.format_for_prompt()
+        
+        # Get identity / self-narrative state
+        self_narrative = "Identity is still forming."
+        if getattr(person, "self_narrative", None) is not None:
+            self_narrative = person.self_narrative.format_for_prompt()
+
+        # Get curiosity / exploration state
+        curiosity_context = "Curiosity is low; prioritize practical actions."
+        if getattr(person, "curiosity_system", None) is not None:
+            curiosity_context = person.curiosity_system.format_for_prompt()
 
         # Get decision using invoke directly
         response = llm.invoke(
@@ -159,6 +176,8 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
                 actions=description_data["list_of_actions"],
                 working_memory=working_memory,
                 inner_monologue=inner_monologue,
+                self_narrative=self_narrative,
+                curiosity_context=curiosity_context,
                 hunger_satisfaction=hunger_satisfaction,
                 sleep_satisfaction=sleep_satisfaction,
                 safety_satisfaction=safety_satisfaction,
