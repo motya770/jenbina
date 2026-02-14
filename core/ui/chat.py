@@ -76,6 +76,8 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             debug_mode=debug_mode,
             emotional_state=person.emotion_system.get_emotional_state_summary(),
             user_id=st.session_state.get("current_user", {}).get("id"),
+            person=person,
+            conversation_partner_name=display_name,
         )
 
         print(chat_result)
@@ -197,6 +199,32 @@ def display_memory_debug(memory_manager):
                 st.error(f"❌ Memory test failed: {str(e)}")
 
 
+def display_social_model(person):
+    """Display social model stats for current user conversation partner."""
+    if getattr(person, "social_cognition", None) is None:
+        return
+
+    display_name = _get_user_display_name()
+    model = person.social_cognition.get_or_create_model(display_name)
+    rel = model.relationship
+    interests = sorted(model.interests.items(), key=lambda kv: kv[1], reverse=True)[:5]
+
+    with st.expander("Social Model (Theory of Mind)", expanded=False):
+        st.write(f"**User:** {display_name}")
+        st.write(f"**Inferred Emotion:** {model.inferred_emotional_state}")
+        st.write(
+            f"**Relationship:** trust={rel.trust:.1f}, closeness={rel.closeness:.1f}, conflict={rel.conflict:.1f}, interactions={rel.interactions}"
+        )
+        if interests:
+            st.write("**Top Interests:**")
+            for topic, score in interests:
+                st.write(f"- {topic}: {score:.2f}")
+        if model.beliefs:
+            st.write("**Recent Beliefs:**")
+            for belief in model.beliefs[-5:]:
+                st.write(f"- {belief}")
+
+
 def render_chat_interface(person, llm, memory_manager, debug_mode):
     """Render the complete chat interface"""
     st.write("**6. Interaction with User:**")
@@ -206,6 +234,7 @@ def render_chat_interface(person, llm, memory_manager, debug_mode):
     handle_user_input(person, llm, memory_manager, debug_mode)
     display_communication_stats(person)
     display_conversation_history(person)
+    display_social_model(person)
     display_memory_stats(memory_manager)
 
     if debug_mode:
