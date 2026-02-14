@@ -46,6 +46,17 @@ def make_needs(**overrides):
     return defaults
 
 
+def make_high_needs():
+    """Create a clearly well-satisfied needs profile."""
+    return {
+        "hunger": 85.0,
+        "sleep": 85.0,
+        "security": 85.0,
+        "friendship": 85.0,
+        "self_esteem": 85.0,
+    }
+
+
 def make_emotions(**overrides):
     defaults = {"joy": 40.0, "sadness": 15.0, "fear": 10.0, "anger": 5.0,
                 "trust": 50.0, "anticipation": 30.0}
@@ -155,7 +166,7 @@ class TestModeSelection:
             emotions=make_emotions(sadness=60.0),
             recent_experiences=None,  # no experiences to replay
         )
-        # Should fall through to daydreaming (or worry if trends bad)
+        # Should fall through to a non-rumination mode
         assert mode != ThoughtMode.RUMINATION
 
     def test_worry_when_needs_trending_down(self):
@@ -179,10 +190,18 @@ class TestModeSelection:
     def test_daydreaming_when_all_fine(self):
         system = InnerMonologueSystem(make_mock_llm())
         mode = system.select_mode(
-            needs=make_needs(),  # all above 50
+            needs=make_high_needs(),  # all above boredom threshold
             emotions=make_emotions(),  # no strong negatives
         )
         assert mode == ThoughtMode.DAYDREAMING
+
+    def test_default_deliberation_when_not_bored(self):
+        system = InnerMonologueSystem(make_mock_llm())
+        mode = system.select_mode(
+            needs=make_needs(),  # not critical, but not fully "bored/content" either
+            emotions=make_emotions(),
+        )
+        assert mode == ThoughtMode.DELIBERATION
 
     def test_deliberation_takes_priority_over_rumination(self):
         """Even with high negative emotions, critical needs override to deliberation."""
@@ -534,7 +553,7 @@ class TestIntegration:
 
         # Cycle 3: Everything fine — should daydream
         t3 = system.think(
-            needs=make_needs(),
+            needs=make_high_needs(),
             emotions=make_emotions(),
             working_memory_str="mind is clear",
             needs_summary_str="all needs met",
