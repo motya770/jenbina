@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime
 import time
 import json
+from types import SimpleNamespace
 
 from core.needs.maslow_needs import create_basic_needs_chain
 from core.cognition.asimov_check_chain import create_asimov_check_system
@@ -550,22 +551,21 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     emotions_after = person.get_emotions_snapshot()
     satisfaction_after = person.maslow_needs.get_overall_satisfaction()
     sat_delta = satisfaction_after - satisfaction_before
+    chosen_action = action_response.get("chosen_action", "unknown") if isinstance(action_response, dict) else str(action_response)
+    reasoning = action_response.get("reasoning", "") if isinstance(action_response, dict) else ""
+    world_ctx = {
+        "location": world_summary.get("location", {}).get("name", "unknown"),
+        "time_of_day": world_summary.get("time", {}).get("time_of_day", "unknown"),
+        "weather": world_summary.get("weather", {}).get("description", "unknown"),
+    }
 
     learning_messages = []
     goal_messages = []
     plan_messages = []
     lesson_stats = {}
+    experience = None
 
     if person.learning_system is not None:
-        chosen_action = action_response.get("chosen_action", "unknown") if isinstance(action_response, dict) else str(action_response)
-        reasoning = action_response.get("reasoning", "") if isinstance(action_response, dict) else ""
-
-        world_ctx = {
-            "location": world_summary.get("location", {}).get("name", "unknown"),
-            "time_of_day": world_summary.get("time", {}).get("time_of_day", "unknown"),
-            "weather": world_summary.get("weather", {}).get("description", "unknown"),
-        }
-
         print(f"  📓 Recording experience...")
         experience = person.learning_system.record_experience(
             action_taken=chosen_action,
@@ -585,9 +585,6 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         learning_messages.append(f"📚 Active lessons: {stats['active_lessons']} | Total experiences: {stats['total_experiences']}")
         print(f"  {delta_icon} Satisfaction: {satisfaction_before:.1f}% → {satisfaction_after:.1f}% ({sat_delta:+.1f}%)")
         print(f"  📚 Lessons: {stats['active_lessons']} active | {stats['total_experiences']} total experiences")
-
-        if getattr(person, "self_narrative", None) is not None:
-            person.self_narrative.integrate_experience(experience, person.learning_system.lessons)
 
         if person.goal_system is not None:
             print(f"  🎯 Updating goal progress...")
@@ -661,6 +658,21 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                             world_context=world_ctx,
                             lessons=lesson_stats.get("lessons", []),
                         )
+
+    # Keep identity updates independent of learning-system availability
+    if getattr(person, "self_narrative", None) is not None:
+        if experience is None:
+            experience = SimpleNamespace(
+                action_taken=chosen_action,
+                action_reasoning=reasoning,
+                overall_satisfaction_before=satisfaction_before,
+                overall_satisfaction_after=satisfaction_after,
+                timestamp=time.time(),
+            )
+            lessons_for_identity = []
+        else:
+            lessons_for_identity = person.learning_system.lessons if person.learning_system is not None else []
+        person.self_narrative.integrate_experience(experience, lessons_for_identity)
 
     # ==================================================================
     # Row 3 — Learning (display after post-processing completes)
