@@ -59,6 +59,8 @@ def handle_chat_interaction(
     debug_mode=False,
     emotional_state=None,
     user_id=None,
+    person=None,
+    conversation_partner_name="User",
 ):
     """Handle chat interactions with Jenbina using Chroma memory."""
     if user_input:
@@ -136,7 +138,16 @@ def handle_chat_interaction(
         
         if conversation_context:
             context_parts.append(f"Recent Conversation Context:\n{conversation_context}")
-        
+
+        social_context = None
+        chosen_social_strategy = "polite"
+        if person is not None and getattr(person, "social_cognition", None) is not None:
+            social = person.social_cognition
+            social.observe_entity_message(conversation_partner_name, user_input)
+            social_context = social.format_for_prompt(conversation_partner_name, user_input)
+            chosen_social_strategy = social.choose_social_strategy(conversation_partner_name, user_input)
+            context_parts.append(f"Social model / theory-of-mind:\n{social_context}")
+
         context_parts.append(f"Current needs: {needs_response}")
         context_parts.append(f"World state: {world_description}")
         context_parts.append(f"Chosen action: {action_decision}")
@@ -161,10 +172,17 @@ def handle_chat_interaction(
 Consider your current state and context:
 {full_context}
 
+Use this social strategy: {chosen_social_strategy}
+
 Keep the response natural and in-character. Consider your current needs and how they might influence your response. If you have conversation history, reference it appropriately to maintain continuity.""")
         ])
         
         st.chat_message("assistant").write(response.content)
+
+        if person is not None and getattr(person, "social_cognition", None) is not None:
+            person.social_cognition.observe_response_effect(
+                conversation_partner_name, chosen_social_strategy
+            )
         
         # Store Jenbina's response in Chroma
         if memory_manager:
@@ -185,7 +203,9 @@ Keep the response natural and in-character. Consider your current needs and how 
         
         return {
             "user_message": user_input,
-            "assistant_response": response.content
+            "assistant_response": response.content,
+            "social_strategy": chosen_social_strategy,
+            "social_context": social_context,
         }
     
     return None 

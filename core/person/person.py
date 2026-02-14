@@ -56,6 +56,7 @@ class Person:
     planning_system: Any = None  # Initialized separately (needs LLM)
     working_memory: WorkingMemorySystem = field(default_factory=WorkingMemorySystem)
     inner_monologue: Any = None  # Initialized separately (needs LLM)
+    social_cognition: Any = None  # Initialized separately
     conversations: Dict[str, Conversation] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -87,6 +88,11 @@ class Person:
         Called separately because LLM isn't available at Person creation time."""
         from ..cognition.inner_monologue import InnerMonologueSystem
         self.inner_monologue = InnerMonologueSystem(llm)
+
+    def init_social_cognition(self):
+        """Initialize social cognition / theory-of-mind system."""
+        from ..social.social_cognition import SocialCognitionSystem
+        self.social_cognition = SocialCognitionSystem()
     
     def update_all_needs(self):
         """Update all needs, decay emotions, and decay lessons"""
@@ -208,6 +214,9 @@ class Person:
         # Add inner monologue state
         if self.inner_monologue is not None:
             state["inner_monologue"] = self.inner_monologue.get_stats()
+        # Add social cognition state
+        if self.social_cognition is not None:
+            state["social_cognition"] = self.social_cognition.get_stats()
 
         return state
     
@@ -227,6 +236,8 @@ class Person:
             data["planning_system"] = self.planning_system.to_dict()
         if self.inner_monologue is not None:
             data["inner_monologue"] = self.inner_monologue.to_dict()
+        if self.social_cognition is not None:
+            data["social_cognition"] = self.social_cognition.to_dict()
         return json.dumps(data)
 
     @classmethod
@@ -270,6 +281,12 @@ class Person:
             person.inner_monologue = InnerMonologueSystem.from_dict(data["inner_monologue"], llm)
         else:
             person.inner_monologue = None
+
+        if "social_cognition" in data:
+            from ..social.social_cognition import SocialCognitionSystem
+            person.social_cognition = SocialCognitionSystem.from_dict(data["social_cognition"])
+        else:
+            person.social_cognition = None
 
         return person
 
