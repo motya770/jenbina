@@ -257,7 +257,8 @@ class InnerMonologueSystem:
         1. Deliberation — if any need is critically low
         2. Rumination  — if strong negative emotions and recent experiences exist
         3. Worry       — if needs are trending downward
-        4. Daydreaming — default / all-needs-met state
+        4. Daydreaming — all-needs-met / bored-content state
+        5. Deliberation — default for non-urgent but not-idle states
         """
         # 1. Deliberation: any need below threshold?
         critical_needs = [
@@ -284,8 +285,14 @@ class InnerMonologueSystem:
             if avg_trend < WORRY_TREND_THRESHOLD or declining_count >= 3:
                 return ThoughtMode.WORRY
 
-        # 4. Daydreaming: everything is fine, mind wanders
-        return ThoughtMode.DAYDREAMING
+        # 4. Daydreaming: only when needs are comfortably met
+        if needs and all(
+            sat >= BOREDOM_SATISFACTION_THRESHOLD for sat in needs.values()
+        ):
+            return ThoughtMode.DAYDREAMING
+
+        # 5. Otherwise, keep a practical inner voice (light deliberation)
+        return ThoughtMode.DELIBERATION
 
     # -- thought generation -------------------------------------------------
 
