@@ -11,7 +11,7 @@ from ..environment.world_state import WorldState
 def create_action_decision_chain(llm: BaseLLM) -> callable:
     # Create prompt for action decision
     action_prompt = PromptTemplate(
-        input_variables=["descriptions", "actions", "working_memory", "inner_monologue", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "emotional_state", "world_state_info", "current_plan_step", "learned_lessons", "current_goals"],
+        input_variables=["descriptions", "actions", "working_memory", "inner_monologue", "self_narrative", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "emotional_state", "world_state_info", "current_plan_step", "learned_lessons", "current_goals"],
         template="""Given the current situation, the person's needs, emotions, and the world state, decide on the most appropriate action to take.
 
     What's on my mind right now:
@@ -19,6 +19,9 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
 
     Inner voice (stream of consciousness):
     {inner_monologue}
+
+    Identity and self-narrative:
+    {self_narrative}
 
     Current Description:
     {descriptions}
@@ -151,6 +154,11 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
         inner_monologue = "No inner thoughts at the moment."
         if person.inner_monologue is not None:
             inner_monologue = person.inner_monologue.format_for_prompt()
+        
+        # Get identity / self-narrative state
+        self_narrative = "Identity is still forming."
+        if getattr(person, "self_narrative", None) is not None:
+            self_narrative = person.self_narrative.format_for_prompt()
 
         # Get decision using invoke directly
         response = llm.invoke(
@@ -159,6 +167,7 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
                 actions=description_data["list_of_actions"],
                 working_memory=working_memory,
                 inner_monologue=inner_monologue,
+                self_narrative=self_narrative,
                 hunger_satisfaction=hunger_satisfaction,
                 sleep_satisfaction=sleep_satisfaction,
                 safety_satisfaction=safety_satisfaction,

@@ -18,6 +18,7 @@ def run_simulation():
     person = Person()
     person.init_inner_monologue(llm)
     person.init_social_cognition()
+    person.init_self_narrative()
     world = WorldState()
 
     # Create system components
