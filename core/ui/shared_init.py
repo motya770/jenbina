@@ -46,6 +46,8 @@ def _load_or_create_person(user_db: UserDatabase, user_id: int) -> Person:
         person.init_inner_monologue(llm)
     if person.social_cognition is None:
         person.init_social_cognition()
+    if person.self_narrative is None:
+        person.init_self_narrative()
     return person
 
 
@@ -78,6 +80,7 @@ def init_session_state():
             person.init_planning_system(llm_json_mode)
             person.init_inner_monologue(llm)
             person.init_social_cognition()
+            person.init_self_narrative()
         st.session_state.person = person
         st.session_state.action_history = []
         print(person)
@@ -97,6 +100,8 @@ def init_session_state():
         st.session_state.person.init_inner_monologue(llm)
     if st.session_state.person.social_cognition is None:
         st.session_state.person.init_social_cognition()
+    if st.session_state.person.self_narrative is None:
+        st.session_state.person.init_self_narrative()
 
     if 'meta_cognitive_system' not in st.session_state:
         _, llm_json_mode = init_llm()

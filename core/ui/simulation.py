@@ -159,6 +159,28 @@ def display_working_memory_stats(person, iteration):
             st.write("*Mind is clear.*")
 
 
+def display_identity_stats(person, iteration):
+    """Display self-narrative and identity stats."""
+    if getattr(person, "self_narrative", None) is None:
+        return
+
+    stats = person.self_narrative.get_stats()
+    with st.container(border=True):
+        st.caption("🪞 Identity & Narrative")
+        st.write(f"**Coherence:** {stats['identity_coherence']:.2f} | **Crisis:** {stats['identity_crisis_level']:.2f}")
+        st.write("**Self Concept:**")
+        for line in stats.get("self_concept", [])[:3]:
+            st.write(f"- {line}")
+        st.write("**Life Story:**")
+        st.write(stats.get("life_story", ""))
+        values = stats.get("values", {})
+        if values:
+            top = sorted(values.items(), key=lambda kv: kv[1], reverse=True)[:5]
+            st.write("**Top Values:**")
+            for name, score in top:
+                st.write(f"- {name}: {score:.2f}")
+
+
 def display_planning_stats(person, iteration):
     """Display planning system stats"""
     if person.planning_system is None:
@@ -512,6 +534,9 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         print(f"  {delta_icon} Satisfaction: {satisfaction_before:.1f}% → {satisfaction_after:.1f}% ({sat_delta:+.1f}%)")
         print(f"  📚 Lessons: {stats['active_lessons']} active | {stats['total_experiences']} total experiences")
 
+        if getattr(person, "self_narrative", None) is not None:
+            person.self_narrative.integrate_experience(experience, person.learning_system.lessons)
+
         if person.goal_system is not None:
             print(f"  🎯 Updating goal progress...")
             person.goal_system.set_experiences(person.learning_system.experiences)
@@ -611,6 +636,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     display_goal_stats(person, iteration)
     display_planning_stats(person, iteration)
     display_working_memory_stats(person, iteration)
+    display_identity_stats(person, iteration)
 
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
     print(f"\n{'='*60}")

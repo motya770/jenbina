@@ -139,6 +139,10 @@ def handle_chat_interaction(
         if conversation_context:
             context_parts.append(f"Recent Conversation Context:\n{conversation_context}")
 
+        if person is not None and getattr(person, "self_narrative", None) is not None:
+            identity_context = person.self_narrative.format_for_prompt()
+            context_parts.append(f"Identity / self-narrative:\n{identity_context}")
+
         social_context = None
         chosen_social_strategy = "polite"
         if person is not None and getattr(person, "social_cognition", None) is not None:
