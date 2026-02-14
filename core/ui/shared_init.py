@@ -127,7 +127,27 @@ def init_session_state():
 
 
 def require_auth():
-    """Auth gate + session init. Returns False if not logged in."""
+    """Auth gate + session init. Returns False if not logged in.
+
+    Set env var JENBINA_SKIP_AUTH=1 to bypass Google SSO (for E2E tests).
+    """
+    if os.environ.get("JENBINA_SKIP_AUTH") == "1":
+        # Seed minimal session state so the rest of the app works
+        if "authenticated" not in st.session_state:
+            user_db = UserDatabase()
+            st.session_state.user_db = user_db
+            user = user_db.create_or_update_user(
+                firebase_uid="test:e2e@test.local",
+                email="e2e@test.local",
+                display_name="E2E Test User",
+                photo_url="",
+                provider="test",
+            )
+            st.session_state.authenticated = True
+            st.session_state.current_user = user
+        init_session_state()
+        return True
+
     if not render_auth_page():
         return False
     user = st.session_state.current_user
