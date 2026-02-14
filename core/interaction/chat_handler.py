@@ -27,15 +27,22 @@ def create_metadata_from_person_state(person_state, world_description=None, acti
     metadata = {}
     
     if person_state:
-        # Store BasicNeeds as JSON
-        if "needs" in person_state and person_state["needs"]:
+        # Store needs state (current schema uses "maslow_needs")
+        if "maslow_needs" in person_state and person_state["maslow_needs"]:
+            metadata["basic_needs_json"] = json.dumps(person_state["maslow_needs"])
+        # Backward compatibility with older schema
+        elif "needs" in person_state and person_state["needs"]:
             needs = person_state["needs"][0] if isinstance(person_state["needs"], list) else person_state["needs"]
-            metadata["basic_needs_json"] = basic_needs_to_json(needs)
+            try:
+                metadata["basic_needs_json"] = basic_needs_to_json(needs)
+            except Exception:
+                pass
         
         # Add other person state info
         metadata["person_name"] = person_state.get("name", "Unknown")
-        metadata["conversations"] = person_state.get("conversations", 0)
-        metadata["messages"] = person_state.get("messages", 0)
+        comm = person_state.get("communication", {}) if isinstance(person_state, dict) else {}
+        metadata["conversations"] = comm.get("total_conversations", person_state.get("conversations", 0))
+        metadata["messages"] = comm.get("total_messages", person_state.get("messages", 0))
     
     if world_description:
         metadata["world_description"] = str(world_description)[:500]  # Truncate if too long
@@ -143,6 +150,26 @@ def handle_chat_interaction(
             identity_context = person.self_narrative.format_for_prompt()
             context_parts.append(f"Identity / self-narrative:\n{identity_context}")
 
+        curiosity_context = None
+        if person is not None and getattr(person, "curiosity_system", None) is not None:
+            available_actions = []
+            try:
+                wd = json.loads(world_description) if isinstance(world_description, str) else {}
+                if isinstance(wd, dict):
+                    available_actions = wd.get("list_of_actions", []) or []
+            except Exception:
+                available_actions = []
+
+            needs_snapshot = person.get_needs_snapshot() if hasattr(person, "get_needs_snapshot") else {}
+            person.curiosity_system.observe_cycle(
+                needs=needs_snapshot,
+                world_context={"location": "chat_context", "time_of_day": "unknown", "weather": "unknown"},
+                available_actions=available_actions,
+                recent_actions=person.curiosity_system.recent_actions,
+            )
+            curiosity_context = person.curiosity_system.format_for_prompt()
+            context_parts.append(f"Curiosity and exploration:\n{curiosity_context}")
+
         social_context = None
         chosen_social_strategy = "polite"
         if person is not None and getattr(person, "social_cognition", None) is not None:
@@ -187,6 +214,8 @@ Keep the response natural and in-character. Consider your current needs and how 
             person.social_cognition.observe_response_effect(
                 conversation_partner_name, chosen_social_strategy
             )
+        if person is not None and getattr(person, "curiosity_system", None) is not None:
+            person.curiosity_system.update_after_action("chat_with_user")
         
         # Store Jenbina's response in Chroma
         if memory_manager:
@@ -210,6 +239,7 @@ Keep the response natural and in-character. Consider your current needs and how 
             "assistant_response": response.content,
             "social_strategy": chosen_social_strategy,
             "social_context": social_context,
+            "curiosity_context": curiosity_context,
         }
     
     return None 
