@@ -483,6 +483,20 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     with r1c3:
         with _card("Action Decision"):
             st.write(action_response)
+            # Display chain-of-thought reasoning trace
+            trace = action_response.get("reasoning_trace", []) if isinstance(action_response, dict) else []
+            if trace:
+                with st.container(border=True):
+                    st.caption("Chain of Thought")
+                    step_labels = {"assess": "Assess", "deliberate": "Deliberate", "decide": "Decide"}
+                    for entry in trace:
+                        if isinstance(entry, dict):
+                            label = step_labels.get(entry.get("step", ""), entry.get("step", ""))
+                            st.write(f"**{label}:**")
+                            output = entry.get("output", entry)
+                            st.json(output)
+                        else:
+                            st.write(str(entry))
             display_meta_cognitive_insights(meta_cognitive_system, iteration)
 
     # ==================================================================
