@@ -58,6 +58,7 @@ class Person:
     inner_monologue: Any = None  # Initialized separately (needs LLM)
     social_cognition: Any = None  # Initialized separately
     self_narrative: Any = None  # Initialized separately
+    curiosity_system: Any = None  # Initialized separately
     conversations: Dict[str, Conversation] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -99,6 +100,11 @@ class Person:
         """Initialize self-narrative / identity system."""
         from ..identity.self_narrative import SelfNarrativeSystem
         self.self_narrative = SelfNarrativeSystem()
+
+    def init_curiosity_system(self):
+        """Initialize curiosity / exploration system."""
+        from ..cognition.curiosity_system import CuriositySystem
+        self.curiosity_system = CuriositySystem()
     
     def update_all_needs(self):
         """Update all needs, decay emotions, and decay lessons"""
@@ -226,6 +232,9 @@ class Person:
         # Add self narrative state
         if self.self_narrative is not None:
             state["self_narrative"] = self.self_narrative.get_stats()
+        # Add curiosity state
+        if self.curiosity_system is not None:
+            state["curiosity"] = self.curiosity_system.get_stats()
 
         return state
     
@@ -249,6 +258,8 @@ class Person:
             data["social_cognition"] = self.social_cognition.to_dict()
         if self.self_narrative is not None:
             data["self_narrative"] = self.self_narrative.to_dict()
+        if self.curiosity_system is not None:
+            data["curiosity_system"] = self.curiosity_system.to_dict()
         return json.dumps(data)
 
     @classmethod
@@ -304,6 +315,12 @@ class Person:
             person.self_narrative = SelfNarrativeSystem.from_dict(data["self_narrative"])
         else:
             person.self_narrative = None
+
+        if "curiosity_system" in data:
+            from ..cognition.curiosity_system import CuriositySystem
+            person.curiosity_system = CuriositySystem.from_dict(data["curiosity_system"])
+        else:
+            person.curiosity_system = None
 
         return person
 
