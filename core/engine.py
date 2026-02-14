@@ -16,33 +16,84 @@ def run_simulation():
 
     # Initialize person and world state
     person = Person()
+    person.init_inner_monologue(llm)
     world = WorldState()
-    
+
     # Create system components
     world_description_system = create_world_description_system(llm)
     asimov_check_system = create_asimov_check_system(llm)
     state_analysis_system = create_state_analysis_system(llm)
-    
+
+    last_action = "Nothing yet."
+
     # Main simulation loop
     while True:
         # Get world description
         world_description = world_description_system(person, world)
-        
+
+        # Generate internal monologue before decision
+        if person.inner_monologue is not None:
+            needs_snapshot = person.get_needs_snapshot()
+            emotions_snapshot = person.get_emotions_snapshot()
+            working_memory_str = person.working_memory.format_for_prompt()
+
+            needs_summary_str = ", ".join(
+                f"{name}: {sat:.0f}%" for name, sat in needs_snapshot.items()
+            )
+            emotion_summary = person.emotion_system.get_emotional_state_summary()
+            emotional_state_str = ", ".join(
+                f"{name}: {val}" for name, val in emotion_summary["emotions"].items()
+            )
+
+            recent_exp_list = None
+            recent_exp_str = "No notable recent experiences."
+            if person.learning_system is not None:
+                stats = person.learning_system.get_learning_stats()
+                recent_exp_list = stats.get("recent_experiences", [])
+                if recent_exp_list:
+                    recent_exp_str = "\n".join(
+                        f"- {e.get('action_taken', 'unknown')}: satisfaction {e.get('overall_satisfaction_before', 0):.0f}→{e.get('overall_satisfaction_after', 0):.0f}"
+                        for e in recent_exp_list[-3:]
+                    )
+
+            lessons_str = "No lessons yet."
+            if person.learning_system is not None:
+                lessons_str = person.learning_system.format_lessons_for_prompt()
+
+            goals_str = "No particular goals right now."
+            if person.goal_system is not None:
+                goals_str = person.goal_system.format_goals_for_prompt()
+
+            person.inner_monologue.think(
+                needs=needs_snapshot,
+                emotions=emotions_snapshot,
+                working_memory_str=working_memory_str,
+                needs_summary_str=needs_summary_str,
+                emotional_state_str=emotional_state_str,
+                world_context_str="Simulation world.",
+                recent_action_str=last_action,
+                recent_experiences_list=recent_exp_list,
+                recent_experiences_str=recent_exp_str,
+                lessons_learned_str=lessons_str,
+                goals_str=goals_str,
+            )
+
         # Decide on action
         action_decision = process_action_decision(person, world_description, llm)
-        
+        last_action = action_decision.get("chosen_action", "unknown")
+
         # Check if action complies with Asimov's Laws
         compliance_check = asimov_check_system(action_decision["chosen_action"])
-        
+
         # Analyze state changes if action is compliant
         state_changes = state_analysis_system(
-            action_decision["chosen_action"], 
+            action_decision["chosen_action"],
             compliance_check
         )
-        
+
         # Update person's state if changes were analyzed
         if state_changes:
             person.update_all_needs()
 
-        # TODO remove 
+        # TODO remove
         break
