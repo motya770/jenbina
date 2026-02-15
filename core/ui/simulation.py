@@ -239,6 +239,131 @@ def display_jenbina_image(image_path, caption=None):
             st.image(base, caption=caption or "Jenbina", width=250)
 
 
+def render_environment_ribbon(world_summary):
+    """Render a single-line environment ribbon at the top."""
+    location = world_summary.get("location", {}).get("name", "Unknown")
+    time_of_day = world_summary.get("time", {}).get("time_of_day", "unknown")
+    weather = world_summary.get("weather", {}).get("description", "unknown")
+    temp = world_summary.get("weather", {}).get("temperature", 0)
+
+    weather_icons = {
+        "sunny": "☀️", "clear": "☀️", "cloudy": "☁️", "overcast": "☁️",
+        "rain": "🌧️", "storm": "⛈️", "snow": "❄️", "fog": "🌫️",
+        "wind": "💨", "hot": "🔥", "cold": "🥶",
+    }
+    weather_icon = "🌤️"
+    for keyword, icon in weather_icons.items():
+        if keyword in weather.lower():
+            weather_icon = icon
+            break
+
+    st.markdown(
+        f'<div class="env-ribbon">{weather_icon} {location} · {time_of_day.capitalize()} · {weather} · {temp:.0f}°C</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_needs_bars(person):
+    """Render Maslow needs as colored game-style progress bars."""
+    needs_config = [
+        ("hunger", "🍔", "Hunger"),
+        ("sleep", "😴", "Sleep"),
+        ("security", "🛡️", "Safety"),
+        ("love", "💕", "Social"),
+        ("esteem", "⭐", "Esteem"),
+        ("self_actualization", "🌟", "Growth"),
+    ]
+
+    html_parts = []
+    for need_name, icon, label in needs_config:
+        satisfaction = person.maslow_needs.get_need_satisfaction(need_name)
+        pct = max(0, min(100, satisfaction))
+
+        if pct < 30:
+            color = "#FF6B6B"
+        elif pct < 60:
+            color = "#FFD93D"
+        else:
+            color = "#6BCB77"
+
+        critical_class = "need-critical" if pct < 30 else ""
+
+        html_parts.append(f"""
+        <div class="need-row {critical_class}">
+            <span class="need-icon">{icon}</span>
+            <span class="need-label">{label}</span>
+            <div class="need-bar-bg">
+                <div class="need-bar-fill" style="width: {pct}%; background: {color};"></div>
+            </div>
+            <span class="need-pct">{pct:.0f}%</span>
+        </div>
+        """)
+
+    st.markdown("".join(html_parts), unsafe_allow_html=True)
+
+
+def render_emotion_chips(person):
+    """Render top emotions as colored pill chips."""
+    emotion_icons = {
+        "joy": "😊", "sadness": "😢", "anger": "😠", "fear": "😨",
+        "surprise": "😮", "disgust": "🤢", "trust": "🤝", "anticipation": "🤩",
+    }
+
+    all_emotions = person.emotion_system.get_emotional_state_summary().get("emotions", {})
+    visible = sorted(
+        [(name, val) for name, val in all_emotions.items() if val > 15],
+        key=lambda x: x[1],
+        reverse=True,
+    )[:4]
+
+    if not visible:
+        return
+
+    chips_html = '<div class="emotion-chips">'
+    for name, intensity in visible:
+        icon = emotion_icons.get(name.lower(), "💭")
+        chips_html += f'<span class="emotion-chip">{icon} {name.capitalize()} ({intensity:.0f})</span>'
+    chips_html += "</div>"
+
+    st.markdown(chips_html, unsafe_allow_html=True)
+
+
+def render_action_narrative(action_response, satisfaction_before, satisfaction_after):
+    """Render the action decision as a narrative story card."""
+    if not isinstance(action_response, dict):
+        st.write(str(action_response))
+        return
+
+    chosen = action_response.get("chosen_action", "Unknown action")
+    reasoning = action_response.get("reasoning", "")
+    lessons = action_response.get("lessons_applied", "")
+
+    delta = satisfaction_after - satisfaction_before
+    if delta > 0:
+        delta_class = "delta-positive"
+        delta_icon = "📈"
+    elif delta < 0:
+        delta_class = "delta-negative"
+        delta_icon = "📉"
+    else:
+        delta_class = "delta-neutral"
+        delta_icon = "➡️"
+
+    reasoning_html = f'<div class="action-reasoning">"{reasoning}"</div>' if reasoning else ""
+    lessons_html = f'<div class="action-reasoning">Lessons applied: {lessons}</div>' if lessons else ""
+
+    st.markdown(f"""
+    <div class="action-card">
+        <div class="action-title">▶ Jenbina decided to {chosen.lower()}</div>
+        {reasoning_html}
+        {lessons_html}
+        <span class="satisfaction-delta {delta_class}">
+            {delta_icon} Satisfaction: {satisfaction_before:.0f}% → {satisfaction_after:.0f}% ({delta:+.1f}%)
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def get_person_dict(person):
     """Get person state as dictionary for display"""
     return {
