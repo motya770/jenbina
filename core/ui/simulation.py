@@ -14,6 +14,166 @@ from core.environment.world_state import create_world_description_system, create
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 
+
+def inject_tamagotchi_css():
+    """Inject Tamagotchi-themed CSS. Call once at the start of each page render."""
+    st.markdown("""
+    <style>
+    /* Tamagotchi Theme */
+    .stApp {
+        background-color: #FFF8F0;
+    }
+
+    /* Environment ribbon */
+    .env-ribbon {
+        background: linear-gradient(135deg, #FFE5D9, #FFD7BA);
+        border-radius: 12px;
+        padding: 8px 20px;
+        text-align: center;
+        font-size: 1.1em;
+        color: #5C4033;
+        margin-bottom: 16px;
+        font-weight: 500;
+    }
+
+    /* Character frame */
+    .character-frame {
+        text-align: center;
+        padding: 16px;
+    }
+    .character-frame img {
+        border-radius: 20px;
+        border: 4px solid #FFD7BA;
+        box-shadow: 0 4px 16px rgba(255, 143, 171, 0.2);
+    }
+
+    /* Thought bubble */
+    .thought-bubble {
+        background: white;
+        border-radius: 18px;
+        padding: 12px 20px;
+        margin: 8px auto;
+        max-width: 500px;
+        text-align: center;
+        font-style: italic;
+        color: #666;
+        border: 2px solid #F0E6D8;
+        position: relative;
+    }
+    .thought-bubble::before {
+        content: '💭';
+        position: absolute;
+        top: -14px;
+        left: 20px;
+        font-size: 1.2em;
+    }
+
+    /* Needs bar */
+    .need-row {
+        display: flex;
+        align-items: center;
+        margin: 4px 0;
+        gap: 8px;
+    }
+    .need-icon {
+        font-size: 1.2em;
+        width: 28px;
+        text-align: center;
+    }
+    .need-label {
+        width: 110px;
+        font-size: 0.9em;
+        color: #5C4033;
+    }
+    .need-bar-bg {
+        flex: 1;
+        height: 18px;
+        background: #F0E6D8;
+        border-radius: 9px;
+        overflow: hidden;
+    }
+    .need-bar-fill {
+        height: 100%;
+        border-radius: 9px;
+        transition: width 0.5s ease;
+    }
+    .need-pct {
+        width: 45px;
+        text-align: right;
+        font-size: 0.85em;
+        color: #888;
+        font-weight: 600;
+    }
+
+    /* Pulse animation for critical needs */
+    @keyframes pulse-critical {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+    .need-critical .need-bar-fill {
+        animation: pulse-critical 1.5s ease-in-out infinite;
+    }
+
+    /* Emotion chips */
+    .emotion-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        margin: 8px 0;
+    }
+    .emotion-chip {
+        background: white;
+        border: 2px solid #FFD7BA;
+        border-radius: 20px;
+        padding: 4px 14px;
+        font-size: 0.9em;
+        color: #5C4033;
+    }
+
+    /* Action story card */
+    .action-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        margin: 16px 0;
+        border-left: 5px solid #FF8FAB;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .action-title {
+        font-size: 1.15em;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 6px;
+    }
+    .action-reasoning {
+        font-size: 0.9em;
+        color: #888;
+        margin-bottom: 10px;
+    }
+    .satisfaction-delta {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: 600;
+    }
+    .delta-positive {
+        background: #E8F5E9;
+        color: #2E7D32;
+    }
+    .delta-negative {
+        background: #FFEBEE;
+        color: #C62828;
+    }
+    .delta-neutral {
+        background: #FFF8E1;
+        color: #F57F17;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
 # Path to Jenbina images
 IMAGES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "src", "images")
 
