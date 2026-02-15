@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime
 import time
 import json
+import os
 from types import SimpleNamespace
 
 from core.needs.maslow_needs import create_basic_needs_chain
@@ -12,6 +13,70 @@ from core.cognition.state_analysis_chain import create_state_analysis_system
 from core.environment.world_state import create_world_description_system, create_comprehensive_world_state, get_world_state_summary
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
+
+# Path to Jenbina images
+IMAGES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "src", "images")
+
+
+def _get_image_path(name):
+    """Get absolute path to a Jenbina image."""
+    return os.path.join(IMAGES_DIR, name)
+
+
+def get_jenbina_image_for_action(chosen_action):
+    """Determine which Jenbina image to show based on the chosen action."""
+    action_lower = chosen_action.lower() if chosen_action else ""
+
+    # Action-based mapping
+    action_map = [
+        (["eat", "food", "cook", "meal", "snack", "breakfast", "lunch", "dinner", "hungry"], "jenbina_eat.png"),
+        (["drink", "water", "thirst", "hydrat", "beverage", "tea", "coffee"], "jenbina_drink.png"),
+        (["walk", "move", "explor", "travel", "wander", "go to", "visit", "roam", "stroll"], "jenbina_walks.png"),
+        (["sleep", "rest", "nap", "bed", "doze"], "jenbina_sleep.png"),
+        (["talk", "chat", "convers", "speak", "social", "friend", "greet", "discuss"], "jenbina_talk.png"),
+        (["read", "study", "learn", "book", "research", "reflect", "meditat", "think", "journal"], "jenbina_read.png"),
+    ]
+
+    for keywords, image_name in action_map:
+        for kw in keywords:
+            if kw in action_lower:
+                return _get_image_path(image_name)
+
+    return None  # No action-specific image matched
+
+
+def get_jenbina_image_for_emotion(person):
+    """Determine which Jenbina image to show based on dominant emotion."""
+    dominant = person.emotion_system.get_dominant_emotions(1)
+    if not dominant:
+        return _get_image_path("jenbina_base.png")
+
+    top_emotion = dominant[0]["name"].lower()
+    intensity = dominant[0]["intensity"]
+
+    if top_emotion == "joy" and intensity > 30:
+        return _get_image_path("jenbina_smile.png")
+    elif top_emotion == "sadness" and intensity > 30:
+        return _get_image_path("jenbina_sad.png")
+    elif top_emotion == "anger" and intensity > 30:
+        return _get_image_path("jenbina_angry.png")
+    elif top_emotion == "fear" and intensity > 30:
+        return _get_image_path("jenbina_scary.png")
+    elif top_emotion == "surprise" and intensity > 30:
+        return _get_image_path("jenbina_surprised.png")
+
+    return _get_image_path("jenbina_base.png")
+
+
+def display_jenbina_image(image_path, caption=None):
+    """Display a Jenbina image in the UI if the file exists."""
+    if os.path.exists(image_path):
+        st.image(image_path, caption=caption, width=250)
+    else:
+        # Fallback to base image if the specific one doesn't exist
+        base = _get_image_path("jenbina_base.png")
+        if os.path.exists(base):
+            st.image(base, caption=caption or "Jenbina", width=250)
 
 
 def get_person_dict(person):
@@ -292,16 +357,26 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"  🕐 Time: {world_summary['time']['time_of_day']}")
     print(f"  🌤️  Weather: {world_summary['weather']['description']} ({world_summary['weather']['temperature']:.0f}°C)")
 
-    env_left, env_right = st.columns(2)
-    with env_left:
-        with _card("Person State"):
-            display_person_state(person)
-            with st.container(border=True):
-                st.caption("Person JSON")
-                st.json(person_dict)
-    with env_right:
-        with _card("World State"):
-            display_world_state(world_summary, world)
+    # Jenbina avatar placeholder — starts with emotion-based image, updates after action
+    avatar_col, env_col = st.columns([1, 2])
+    with avatar_col:
+        avatar_placeholder = st.empty()
+        # Show emotion-based image initially
+        initial_image = get_jenbina_image_for_emotion(person)
+        with avatar_placeholder.container():
+            display_jenbina_image(initial_image, caption=f"{person.name}")
+
+    with env_col:
+        env_left, env_right = st.columns(2)
+        with env_left:
+            with _card("Person State"):
+                display_person_state(person)
+                with st.container(border=True):
+                    st.caption("Person JSON")
+                    st.json(person_dict)
+        with env_right:
+            with _card("World State"):
+                display_world_state(world_summary, world)
 
     # ==================================================================
     # Row 1 — Perception & Context  (compute → display per card)
@@ -468,6 +543,11 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"  ⚡ Stage 3: Action Decision")
     print(f"{'─'*40}")
     print(f"  🤔 Running meta-cognitive action chain...")
+
+    # Show thinking image while deciding
+    with avatar_placeholder.container():
+        display_jenbina_image(_get_image_path("jenbina_thinking.png"), caption=f"{person.name} is thinking...")
+
     action_response = create_meta_cognitive_action_chain(
         llm=llm_json_mode,
         person=person,
@@ -477,6 +557,14 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     )
     chosen = action_response.get('chosen_action', '?') if isinstance(action_response, dict) else str(action_response)[:50]
     print(f"  ✅ Action chosen: {chosen}")
+
+    # Update avatar to reflect the chosen action (or fall back to emotion)
+    action_image = get_jenbina_image_for_action(chosen)
+    if action_image is None:
+        action_image = get_jenbina_image_for_emotion(person)
+    with avatar_placeholder.container():
+        display_jenbina_image(action_image, caption=f"{person.name}: {chosen}")
+
     if getattr(person, "curiosity_system", None) is not None and isinstance(action_response, dict):
         person.curiosity_system.update_after_action(action_response.get("chosen_action", ""))
     _print_json("⚡ Action Response", action_response)
@@ -716,6 +804,11 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     display_working_memory_stats(person, iteration)
     display_identity_stats(person, iteration)
     display_curiosity_stats(person, iteration)
+
+    # Final avatar update — reflect post-action emotional state
+    final_image = get_jenbina_image_for_emotion(person)
+    with avatar_placeholder.container():
+        display_jenbina_image(final_image, caption=f"{person.name}")
 
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
     print(f"\n{'='*60}")
