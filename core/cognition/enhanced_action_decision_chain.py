@@ -11,14 +11,11 @@ def create_meta_cognitive_action_chain(llm, person, world_description, meta_cogn
     action_chain = create_action_decision_chain(llm)
     original_decision = action_chain(person, world_description, llm, world_state)
     
-    # Extract reasoning chain (you'll need to modify your original chain to return this)
-    reasoning_chain = [
-        "Analyzed current needs",
-        "Evaluated available actions", 
-        "Considered need priorities",
-        "Analyzed world state information" if world_state else "No world state information available",
+    # Use the real chain-of-thought reasoning trace produced by the 3-step
+    # action decision chain (assess -> deliberate -> decide).
+    reasoning_chain = original_decision.get("reasoning_trace", [
         f"Selected action: {original_decision.get('chosen_action', 'unknown')}"
-    ]
+    ])
     
     # Prepare input data including world state and emotions
     input_data = {
