@@ -15,6 +15,11 @@ from core.ui.simulation import (
     render_simulation_controls,
     run_simulation_loop,
     display_simulation_summary,
+    render_environment_ribbon,
+    render_needs_bars,
+    render_emotion_chips,
+    display_jenbina_image,
+    get_jenbina_image_for_emotion,
 )
 
 
@@ -34,11 +39,11 @@ def main():
 
     nav1, nav2, nav3 = st.columns(3)
     with nav1:
-        st.page_link("app.py", label="🧠 Simulation", icon="🧠")
+        st.page_link("app.py", label="Simulation", icon="🧠")
     with nav2:
-        st.page_link("pages/2_💬_Chat.py", label="💬 Chat", icon="💬")
+        st.page_link("pages/2_💬_Chat.py", label="Chat", icon="💬")
     with nav3:
-        st.page_link("pages/3_🌍_Environment.py", label="🌍 Environment", icon="🌍")
+        st.page_link("pages/3_🌍_Environment.py", label="Environment", icon="🌍")
 
     st.markdown("---")
 
@@ -46,6 +51,14 @@ def main():
     st.session_state.debug_mode = debug_mode
 
     controls = render_simulation_controls()
+
+    # Show Jenbina's current state (idle view)
+    _, idle_center, _ = st.columns([1, 2, 1])
+    with idle_center:
+        idle_image = get_jenbina_image_for_emotion(person)
+        display_jenbina_image(idle_image, caption=f"{person.name}")
+        render_needs_bars(person)
+        render_emotion_chips(person)
 
     if controls["run_loop"] or controls["single_run"]:
         iterations = controls["num_iterations"] if controls["run_loop"] else 1
