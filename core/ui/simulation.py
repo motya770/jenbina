@@ -314,12 +314,12 @@ def get_jenbina_image_for_emotion(person):
 def display_jenbina_image(image_path, caption=None):
     """Display a Jenbina image in the UI if the file exists."""
     if os.path.exists(image_path):
-        st.image(image_path, caption=caption, width=350)
+        st.image(image_path, caption=caption, width=175)
     else:
         # Fallback to base image if the specific one doesn't exist
         base = _get_image_path("jenbina_base.png")
         if os.path.exists(base):
-            st.image(base, caption=caption or "Jenbina", width=250)
+            st.image(base, caption=caption or "Jenbina", width=125)
 
 
 def render_environment_ribbon(world_summary):
@@ -1321,23 +1321,13 @@ def display_simulation_summary(simulation_history, iterations, person=None):
 
 
 def render_simulation_controls():
-    """Render simulation control UI and return settings"""
-    st.write("### Simulation Controls")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        num_iterations = st.number_input("Iterations", min_value=1, max_value=20, value=5, step=1)
-    
-    with col2:
-        delay_seconds = st.number_input("Delay (seconds)", min_value=1, max_value=60, value=3, step=1)
-    
-    with col3:
-        st.write("")  # Spacer
-        st.write("")  # Align with other inputs
-        run_loop = st.button("🔄 Run Simulation Loop", type="primary")
-    
-    single_run = st.button("▶️ Run Single Iteration")
-    
+    """Render simulation control UI and return settings (designed for sidebar)"""
+    st.markdown("### Simulation Controls")
+    num_iterations = st.number_input("Iterations", min_value=1, max_value=20, value=5, step=1)
+    delay_seconds = st.number_input("Delay (seconds)", min_value=1, max_value=60, value=3, step=1)
+    run_loop = st.button("🔄 Run Simulation Loop", type="primary", use_container_width=True)
+    single_run = st.button("▶️ Run Single Iteration", use_container_width=True)
+
     return {
         "num_iterations": num_iterations,
         "delay_seconds": delay_seconds,

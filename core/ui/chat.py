@@ -225,8 +225,21 @@ def display_social_model(person):
                 st.write(f"- {belief}")
 
 
+def render_chat_simple(person, llm, memory_manager, debug_mode):
+    """Render a minimal chat: message history + input only."""
+    display_name = _get_user_display_name()
+    conversation_history = person.get_conversation_history(display_name, count=50)
+
+    for msg in conversation_history:
+        is_user = msg.sender != "person" and msg.sender != person.name
+        with st.chat_message("user" if is_user else "assistant"):
+            st.write(msg.content)
+
+    handle_user_input(person, llm, memory_manager, debug_mode)
+
+
 def render_chat_interface(person, llm, memory_manager, debug_mode):
-    """Render the complete chat interface"""
+    """Render the complete chat interface with statistics"""
     st.write("**6. Interaction with User:**")
     st.write("### Chat with Jenbina")
 
