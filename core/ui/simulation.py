@@ -701,7 +701,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     """
     iteration_start_time = datetime.now()
     iter_num = iteration + 1
-    print(f"\n{'='*60}")
+    print(f"{'='*60}")
     print(f"  🔄 ITERATION {iter_num}")
     print(f"{'='*60}")
 
@@ -709,12 +709,12 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     needs_before = person.get_needs_snapshot()
     emotions_before = person.get_emotions_snapshot()
     satisfaction_before = person.maslow_needs.get_overall_satisfaction()
-    print(f"\n📸 Snapshot | Satisfaction: {satisfaction_before:.1f}%")
+    print(f"📸 Snapshot | Satisfaction: {satisfaction_before:.1f}%")
 
     # ==================================================================
     # Environment row — fast local data, render immediately
     # ==================================================================
-    print(f"\n{'─'*40}")
+    print(f"{'─'*40}")
     print(f"  🌍 Stage 1: Environment")
     print(f"{'─'*40}")
     person_dict = get_person_dict(person)
@@ -742,7 +742,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     # ==================================================================
 
     # Needs Analysis (LLM call)
-    print(f"\n{'─'*40}")
+    print(f"{'─'*40}")
     print(f"  🧠 Stage 2: Perception & Context")
     print(f"{'─'*40}")
     print(f"  📊 [2a] Analyzing basic needs...")
@@ -883,7 +883,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         render_emotion_chips(person)
 
     # Card 3: Action Decision (LLM call → display)
-    print(f"\n{'─'*40}")
+    print(f"{'─'*40}")
     print(f"  ⚡ Stage 3: Action Decision")
     print(f"{'─'*40}")
     print(f"  🤔 Running meta-cognitive action chain...")
@@ -927,7 +927,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     # ==================================================================
     # Stage 4 — Checks & Analysis  (compute only, render in debug)
     # ==================================================================
-    print(f"\n{'─'*40}")
+    print(f"{'─'*40}")
     print(f"  🛡️  Stage 4: Checks & Analysis")
     print(f"{'─'*40}")
     print(f"  ⚖️  [4a] Running Asimov safety check...")
@@ -963,7 +963,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     # ==================================================================
     # Post-processing: needs update, experience recording, goals, plans
     # ==================================================================
-    print(f"\n{'─'*40}")
+    print(f"{'─'*40}")
     print(f"  📝 Stage 5: Learning & Updates")
     print(f"{'─'*40}")
     print(f"  🔄 Updating needs & decaying emotions...")
@@ -1187,9 +1187,9 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         st.json(world_summary)
 
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
-    print(f"\n{'='*60}")
+    print(f"{'='*60}")
     print(f"  ✅ ITERATION {iter_num} COMPLETE — {iteration_duration:.2f}s")
-    print(f"{'='*60}\n")
+    print(f"{'='*60}")
     st.success(f"Iteration {iter_num} completed in {iteration_duration:.2f}s")
 
     return {
