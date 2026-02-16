@@ -8,6 +8,7 @@ import os
 from types import SimpleNamespace
 
 from core.needs.maslow_needs import create_basic_needs_chain
+from core.needs.maslow_decision_chain import create_maslow_action_executor
 from core.cognition.asimov_check_chain import create_asimov_check_system
 from core.cognition.state_analysis_chain import create_state_analysis_system
 from core.environment.world_state import create_world_description_system, create_comprehensive_world_state, get_world_state_summary
@@ -752,8 +753,14 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
 
     # Card 2: Context — world description LLM + working memory update → display
     print(f"  🌐 [2b] Generating world description...")
+    prev_actions_list = []
+    for record in st.session_state.get("simulation_history", [])[-6:]:
+        action = (record.get("action_decision", {}) or {}).get("chosen_action")
+        if action:
+            prev_actions_list.append(action)
+    recent_actions_str = "\n".join(f"- {a}" for a in prev_actions_list) or "None yet."
     world_chain = create_world_description_system(llm_json_mode)
-    world_response = world_chain(person, world)
+    world_response = world_chain(person, world, recent_actions=recent_actions_str)
     print(f"  ✅ World description complete")
     _print_json("🌐 World Description", world_response)
 
@@ -800,6 +807,12 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             needs=needs_before, emotions=emotions_before
         )
 
+    recent_actions = []
+    for record in st.session_state.get("simulation_history", [])[-6:]:
+        action = (record.get("action_decision", {}) or {}).get("chosen_action")
+        if action:
+            recent_actions.append(action)
+
     curiosity_text = "Curiosity is low; prioritize practical actions."
     if getattr(person, "curiosity_system", None) is not None:
         available_actions = []
@@ -808,12 +821,6 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             available_actions = world_data.get("list_of_actions", []) if isinstance(world_data, dict) else []
         except Exception:
             available_actions = []
-
-        recent_actions = []
-        for record in st.session_state.get("simulation_history", [])[-6:]:
-            action = (record.get("action_decision", {}) or {}).get("chosen_action")
-            if action:
-                recent_actions.append(action)
 
         person.curiosity_system.observe_cycle(
             needs=needs_before,
@@ -897,7 +904,8 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         person=person,
         world_description=world_response,
         meta_cognitive_system=meta_cognitive_system,
-        world_state=world
+        world_state=world,
+        recent_actions=recent_actions,
     )
     chosen = action_response.get('chosen_action', '?') if isinstance(action_response, dict) else str(action_response)[:50]
     print(f"  ✅ Action chosen: {chosen}")
@@ -912,6 +920,54 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     if getattr(person, "curiosity_system", None) is not None and isinstance(action_response, dict):
         person.curiosity_system.update_after_action(action_response.get("chosen_action", ""))
     _print_json("⚡ Action Response", action_response)
+
+    # Apply action effects to needs via fuzzy matching
+    action_executor = create_maslow_action_executor(person.maslow_needs)
+    _action_key_map = {
+        "eat": "eat", "food": "eat", "cook": "eat", "meal": "eat", "breakfast": "eat", "lunch": "eat", "dinner": "eat",
+        "drink": "drink", "water": "drink", "coffee": "drink", "tea": "drink",
+        "sleep": "sleep", "nap": "sleep", "bed": "sleep",
+        "rest": "rest", "relax": "rest",
+        "shelter": "find_shelter", "home": "find_shelter",
+        "health": "maintain_health", "exercise": "maintain_health", "walk": "maintain_health",
+        "safe": "find_safety", "security": "find_safety",
+        "routine": "establish_routine",
+        "order": "create_order", "clean": "create_order", "organize": "create_order",
+        "protect": "seek_protection",
+        "socialize": "socialize", "talk": "socialize", "chat": "socialize", "conversation": "socialize",
+        "friend": "make_friends",
+        "love": "seek_love",
+        "community": "join_community",
+        "relationship": "build_relationships",
+        "goal": "work_on_goals", "work": "work_on_goals",
+        "confidence": "build_confidence",
+        "recognition": "seek_recognition",
+        "skill": "develop_skills", "practice": "develop_skills", "study": "develop_skills",
+        "learn": "learn_new_things", "read": "learn_new_things", "book": "learn_new_things",
+        "creative": "be_creative", "paint": "be_creative", "write": "be_creative", "art": "be_creative",
+        "purpose": "find_purpose",
+        "meaning": "explore_meaning", "reflect": "explore_meaning", "meditat": "explore_meaning",
+        "philosoph": "philosophical_exploration",
+    }
+    import re
+    chosen_lower = chosen.lower()
+    matched_action = None
+    # Try word-boundary match first to avoid false positives (e.g. "rest" in "restaurant")
+    for keyword, action_key in _action_key_map.items():
+        if re.search(r'\b' + re.escape(keyword), chosen_lower):
+            matched_action = action_key
+            break
+    if matched_action is None:
+        # Fall back to substring match
+        for keyword, action_key in _action_key_map.items():
+            if keyword in chosen_lower:
+                matched_action = action_key
+                break
+    if matched_action:
+        effect_result = action_executor(matched_action)
+        print(f"  🎯 Action effect applied: {matched_action} → satisfied {effect_result.get('satisfied_needs', {})}")
+    else:
+        print(f"  ⚠️  No need-satisfaction mapping for action: {chosen}")
 
     # Action narrative placeholder — updated after post-processing with satisfaction delta
     _, action_center, _ = st.columns([1, 2, 1])

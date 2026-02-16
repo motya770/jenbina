@@ -170,8 +170,8 @@ def create_world_description_system(llm: BaseLLM) -> Callable:
         Callable that generates world descriptions
     """
     world_prompt = PromptTemplate(
-        input_variables=["location", "time_of_day", "weather", "last_descriptions", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction"],
-        template="""You are describing a world where a person lives in {location}. Ommit person feelings and thoughts.  
+        input_variables=["location", "time_of_day", "weather", "last_descriptions", "hunger_satisfaction", "sleep_satisfaction", "safety_satisfaction", "overall_satisfaction", "recent_actions"],
+        template="""You are describing a world where a person lives in {location}. Ommit person feelings and thoughts.
         it is only describtion of environment and surroundings.
     Current time: {time_of_day}
     Weather: {weather}
@@ -180,10 +180,13 @@ def create_world_description_system(llm: BaseLLM) -> Callable:
     Safety satisfaction: {safety_satisfaction:.1f}%
     Overall satisfaction: {overall_satisfaction:.1f}%
 
+    Recent actions taken by the person (most recent last):
+    {recent_actions}
+
     Previous context:
     {last_descriptions}
 
-    Describe the current situation and surroundings in two lists maintaining consistency with previous descriptions. :
+    Describe the current situation and surroundings in two lists maintaining consistency with previous descriptions. Reflect the consequences of these recent actions in the environment description:
     - list_of_descriptions: list of descriptions
     - list_of_actions: list of available actions
     The lists should be in JSON format.
@@ -203,7 +206,7 @@ def create_world_description_system(llm: BaseLLM) -> Callable:
     """
     )
 
-    def get_world_description(person: Person, world: WorldState) -> str:
+    def get_world_description(person: Person, world: WorldState, recent_actions: str = "None yet.") -> str:
         """
         Generate a coherent world description based on current state and person's needs.
         
@@ -231,7 +234,8 @@ def create_world_description_system(llm: BaseLLM) -> Callable:
                 hunger_satisfaction=hunger_satisfaction,
                 sleep_satisfaction=sleep_satisfaction,
                 safety_satisfaction=safety_satisfaction,
-                overall_satisfaction=overall_satisfaction
+                overall_satisfaction=overall_satisfaction,
+                recent_actions=recent_actions
             )
         )
         
