@@ -24,6 +24,89 @@ def inject_tamagotchi_css():
         background-color: #FFF8F0;
     }
 
+    /* Force readable text colors on cream background */
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
+        color: #3D2B1F !important;
+    }
+    .stApp p, .stApp span, .stApp label, .stApp div {
+        color: #5C4033;
+    }
+    .stApp .stMarkdown, .stApp .stMarkdown p {
+        color: #5C4033 !important;
+    }
+
+    /* Title styling */
+    .stApp [data-testid="stTitle"],
+    .stApp [data-testid="stHeading"] {
+        color: #3D2B1F !important;
+    }
+
+    /* Page link / nav styling */
+    .stApp a {
+        color: #D4567A !important;
+        font-weight: 500;
+    }
+    .stApp a:hover {
+        color: #FF8FAB !important;
+    }
+
+    /* Number input styling */
+    .stApp [data-testid="stNumberInput"] input {
+        background-color: #FFF !important;
+        color: #3D2B1F !important;
+        border: 2px solid #FFD7BA !important;
+        border-radius: 10px !important;
+    }
+    .stApp [data-testid="stNumberInput"] label {
+        color: #5C4033 !important;
+        font-weight: 500;
+    }
+    .stApp [data-testid="stNumberInput"] button {
+        color: #5C4033 !important;
+        background-color: #FFF3EC !important;
+        border-color: #FFD7BA !important;
+    }
+
+    /* Button styling */
+    .stApp button[kind="primary"],
+    .stApp button[data-testid="stBaseButton-primary"] {
+        background-color: #FF8FAB !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 12px !important;
+        font-weight: 600 !important;
+    }
+    .stApp button[kind="secondary"],
+    .stApp button[data-testid="stBaseButton-secondary"] {
+        background-color: #FFF3EC !important;
+        color: #5C4033 !important;
+        border: 2px solid #FFD7BA !important;
+        border-radius: 12px !important;
+        font-weight: 500 !important;
+    }
+
+    /* Checkbox styling */
+    .stApp [data-testid="stCheckbox"] label {
+        color: #5C4033 !important;
+    }
+
+    /* Divider */
+    .stApp hr {
+        border-color: #F0E6D8 !important;
+    }
+
+    /* Page links in nav */
+    .stApp [data-testid="stPageLink"] {
+        background-color: #FFF3EC !important;
+        border-radius: 10px !important;
+        border: 1px solid #FFD7BA !important;
+    }
+    .stApp [data-testid="stPageLink"] a,
+    .stApp [data-testid="stPageLink"] span {
+        color: #5C4033 !important;
+        font-weight: 500 !important;
+    }
+
     /* Environment ribbon */
     .env-ribbon {
         background: linear-gradient(135deg, #FFE5D9, #FFD7BA);
