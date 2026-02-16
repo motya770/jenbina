@@ -41,7 +41,7 @@ def main():
     with nav1:
         st.page_link("app.py", label="Simulation", icon="🧠")
     with nav2:
-        st.page_link("pages/2_💬_Chat.py", label="Chat", icon="💬")
+        st.page_link("pages/2_👤_Profile.py", label="Profile", icon="👤")
     with nav3:
         st.page_link("pages/3_🌍_Environment.py", label="Environment", icon="🌍")
 

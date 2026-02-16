@@ -150,6 +150,25 @@ def handle_chat_interaction(
             identity_context = person.self_narrative.format_for_prompt()
             context_parts.append(f"Identity / self-narrative:\n{identity_context}")
 
+        # Inner monologue — what Jenbina is currently thinking
+        if person is not None and getattr(person, "inner_monologue", None) is not None:
+            inner_prompt = person.inner_monologue.format_for_prompt()
+            recent_thoughts = person.inner_monologue.format_recent_thoughts(count=3)
+            context_parts.append(
+                f"Inner monologue (current thought):\n{inner_prompt}\n"
+                f"Recent thoughts:\n{recent_thoughts}"
+            )
+
+        # Learning system — lessons learned from past experiences
+        if person is not None and getattr(person, "learning_system", None) is not None:
+            lessons_prompt = person.learning_system.format_lessons_for_prompt()
+            context_parts.append(f"Lessons learned from experience:\n{lessons_prompt}")
+
+        # Working memory — what Jenbina is currently focused on
+        if person is not None and getattr(person, "working_memory", None) is not None:
+            wm_prompt = person.working_memory.format_for_prompt()
+            context_parts.append(f"Working memory / current focus:\n{wm_prompt}")
+
         curiosity_context = None
         if person is not None and getattr(person, "curiosity_system", None) is not None:
             available_actions = []
