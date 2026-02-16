@@ -65,7 +65,7 @@ def get_json_llm(provider: LLMProvider = "openai", temperature: float = 1):
         return ChatOpenAI(
             model=model,
             temperature=temperature,
-            response_format={"type": "json_object"},
+            model_kwargs={"response_format": {"type": "json_object"}},
             api_key=os.getenv('OPENAI_API_KEY')
         )
     
