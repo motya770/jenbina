@@ -21,6 +21,7 @@ from core.ui.simulation import (
     display_jenbina_image,
     get_jenbina_image_for_emotion,
 )
+from core.ui.chat import render_chat_simple
 
 
 def main():
@@ -45,22 +46,31 @@ def main():
 
     st.title("👧 Jenbina")
 
-    st.markdown("---")
+    # ── Sidebar: Simulation Controls & Debug ─────────────────────────────
+    with st.sidebar:
+        debug_mode = st.checkbox("🔧 Debug Mode", value=True, help="Show detailed debugging information")
+        st.session_state.debug_mode = debug_mode
+        controls = render_simulation_controls()
 
-    debug_mode = st.checkbox("🔧 Debug Mode", value=True, help="Show detailed debugging information")
-    st.session_state.debug_mode = debug_mode
-
-    controls = render_simulation_controls()
-
-    # Show Jenbina's current state (idle view) — cleared when simulation runs
+    # Show Jenbina's current state — image left, status right
     idle_placeholder = st.empty()
     with idle_placeholder.container():
-        _, idle_center, _ = st.columns([1, 2, 1])
-        with idle_center:
+        img_col, status_col = st.columns([1, 2])
+        with img_col:
             idle_image = get_jenbina_image_for_emotion(person)
             display_jenbina_image(idle_image, caption=f"{person.name}")
+        with status_col:
             render_needs_bars(person)
             render_emotion_chips(person)
+
+    # ── Chat ─────────────────────────────────────────────────────────────
+    memory_manager = st.session_state.memory_manager
+    render_chat_simple(
+        person=person,
+        llm=llm,
+        memory_manager=memory_manager,
+        debug_mode=st.session_state.get("debug_mode", False),
+    )
 
     if controls["run_loop"] or controls["single_run"]:
         idle_placeholder.empty()
