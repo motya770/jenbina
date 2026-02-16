@@ -59,6 +59,8 @@ if auto_scroll:
 if not filtered:
     st.info("No console output captured yet. Run a simulation or chat to see logs here.")
 else:
+    log_lines = []
     for entry in filtered:
         stream_badge = "🔴" if entry["stream"] == "stderr" else "⚪"
-        st.text(f"{entry['timestamp']} {stream_badge} {entry['message']}")
+        log_lines.append(f"{entry['timestamp']} {stream_badge} {entry['message']}")
+    st.code("\n".join(log_lines), language=None)
