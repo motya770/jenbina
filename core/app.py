@@ -52,15 +52,18 @@ def main():
 
     controls = render_simulation_controls()
 
-    # Show Jenbina's current state (idle view)
-    _, idle_center, _ = st.columns([1, 2, 1])
-    with idle_center:
-        idle_image = get_jenbina_image_for_emotion(person)
-        display_jenbina_image(idle_image, caption=f"{person.name}")
-        render_needs_bars(person)
-        render_emotion_chips(person)
+    # Show Jenbina's current state (idle view) — cleared when simulation runs
+    idle_placeholder = st.empty()
+    with idle_placeholder.container():
+        _, idle_center, _ = st.columns([1, 2, 1])
+        with idle_center:
+            idle_image = get_jenbina_image_for_emotion(person)
+            display_jenbina_image(idle_image, caption=f"{person.name}")
+            render_needs_bars(person)
+            render_emotion_chips(person)
 
     if controls["run_loop"] or controls["single_run"]:
+        idle_placeholder.empty()
         iterations = controls["num_iterations"] if controls["run_loop"] else 1
 
         results = run_simulation_loop(
