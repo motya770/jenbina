@@ -12,7 +12,11 @@
       "Bash(gh pr create:*)",
       "Bash(brew list:*)",
       "Bash(brew install:*)",
-      "Bash(gh auth status:*)"
+      "Bash(gh auth status:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(pip3 show:*)"
     ]
   }
 }
