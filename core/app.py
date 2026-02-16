@@ -24,7 +24,7 @@ from core.ui.simulation import (
 
 
 def main():
-    st.set_page_config(page_title="Jenbina — Simulation", page_icon="🧠", layout="wide")
+    st.set_page_config(page_title="Jenbina — Simulation", page_icon="👧", layout="wide")
     inject_tamagotchi_css()
 
     if not require_auth():
@@ -35,15 +35,15 @@ def main():
     meta_cognitive_system = st.session_state.meta_cognitive_system
 
     # ── Navigation ──────────────────────────────────────────────────────
-    st.title("🧠 Jenbina")
-
     nav1, nav2, nav3 = st.columns(3)
     with nav1:
-        st.page_link("app.py", label="Simulation", icon="🧠")
+        st.page_link("app.py", label="Simulation", icon="👧")
     with nav2:
         st.page_link("pages/2_💬_Chat.py", label="Chat", icon="💬")
     with nav3:
         st.page_link("pages/3_🌍_Environment.py", label="Environment", icon="🌍")
+
+    st.title("👧 Jenbina")
 
     st.markdown("---")
 
