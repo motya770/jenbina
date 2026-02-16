@@ -1112,9 +1112,9 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     # ==================================================================
     _, tier2_center, _ = st.columns([1, 2, 1])
     with tier2_center:
-        # Learning — auto-expand if big satisfaction change
-        has_new_learning = bool(learning_messages) and abs(sat_delta) > 5
-        with st.expander("📚 Learning", expanded=has_new_learning):
+        # Learning
+        with st.container(border=True):
+            st.caption("📚 Learning")
             for msg in learning_messages:
                 st.write(msg)
             if not learning_messages:
@@ -1128,28 +1128,29 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                 for msg in plan_messages:
                     st.write(msg)
 
-        # Goals — auto-expand if advanced
+        # Goals
         if person.goal_system is not None:
-            has_goal_updates = bool(goal_messages)
-            with st.expander("🎯 Goals", expanded=has_goal_updates):
+            with st.container(border=True):
+                st.caption("🎯 Goals")
                 display_goal_stats(person, iteration)
 
-        # Plans — auto-expand if step completed
+        # Plans
         if person.planning_system is not None:
-            has_plan_updates = bool(plan_messages)
-            with st.expander("📋 Plans", expanded=has_plan_updates):
+            with st.container(border=True):
+                st.caption("📋 Plans")
                 display_planning_stats(person, iteration)
 
-        # Curiosity — auto-expand if exploring
+        # Curiosity
         if getattr(person, "curiosity_system", None) is not None:
-            should_explore = person.curiosity_system.get_stats().get("should_explore", False)
-            with st.expander("🔎 Curiosity", expanded=should_explore):
+            with st.container(border=True):
+                st.caption("🔎 Curiosity")
                 display_curiosity_stats(person, iteration)
 
     # ==================================================================
     # Tier 3 — Debug details (always collapsed)
     # ==================================================================
-    with st.expander("🔧 Debug Details", expanded=False):
+    with st.container(border=True):
+        st.caption("🔧 Debug Details")
         st.caption("Needs Analysis")
         st.json(needs_response if isinstance(needs_response, dict) else {"raw": str(needs_response)})
         st.caption("World Description")
