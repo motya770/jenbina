@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.ui.shared_init import require_auth, init_llm, save_person_state
 from core.ui.simulation import (
+    inject_tamagotchi_css,
     render_simulation_controls,
     run_simulation_loop,
     display_simulation_summary,
@@ -19,6 +20,7 @@ from core.ui.simulation import (
 
 def main():
     st.set_page_config(page_title="Jenbina — Simulation", page_icon="🧠", layout="wide")
+    inject_tamagotchi_css()
 
     if not require_auth():
         return

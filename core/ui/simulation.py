@@ -231,7 +231,7 @@ def get_jenbina_image_for_emotion(person):
 def display_jenbina_image(image_path, caption=None):
     """Display a Jenbina image in the UI if the file exists."""
     if os.path.exists(image_path):
-        st.image(image_path, caption=caption, width=250)
+        st.image(image_path, caption=caption, width=350)
     else:
         # Fallback to base image if the specific one doesn't exist
         base = _get_image_path("jenbina_base.png")
@@ -642,33 +642,23 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"  🕐 Time: {world_summary['time']['time_of_day']}")
     print(f"  🌤️  Weather: {world_summary['weather']['description']} ({world_summary['weather']['temperature']:.0f}°C)")
 
-    # Jenbina avatar placeholder — starts with emotion-based image, updates after action
-    avatar_col, env_col = st.columns([1, 2])
-    with avatar_col:
+    # ── Tamagotchi Screen ─────────────────────────────────────────────
+    inject_tamagotchi_css()
+    render_environment_ribbon(world_summary)
+
+    # Centered Jenbina avatar
+    _, avatar_center, _ = st.columns([1, 2, 1])
+    with avatar_center:
         avatar_placeholder = st.empty()
-        # Show emotion-based image initially
         initial_image = get_jenbina_image_for_emotion(person)
         with avatar_placeholder.container():
             display_jenbina_image(initial_image, caption=f"{person.name}")
 
-    with env_col:
-        env_left, env_right = st.columns(2)
-        with env_left:
-            with _card("Person State"):
-                display_person_state(person)
-                with st.container(border=True):
-                    st.caption("Person JSON")
-                    st.json(person_dict)
-        with env_right:
-            with _card("World State"):
-                display_world_state(world_summary, world)
-
     # ==================================================================
-    # Row 1 — Perception & Context  (compute → display per card)
+    # Stage 2 — Perception & Context  (compute, render later)
     # ==================================================================
-    r1c1, r1c2, r1c3 = st.columns(3)
 
-    # Card 1: Needs Analysis (LLM call → display)
+    # Needs Analysis (LLM call)
     print(f"\n{'─'*40}")
     print(f"  🧠 Stage 2: Perception & Context")
     print(f"{'─'*40}")
@@ -676,9 +666,6 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     needs_response = create_basic_needs_chain(llm_json_mode, person.maslow_needs)
     print(f"  ✅ Needs analysis complete")
     _print_json("📊 Needs Response", needs_response)
-    with r1c1:
-        with _card("Needs Analysis"):
-            st.write(needs_response)
 
     # Card 2: Context — world description LLM + working memory update → display
     print(f"  🌐 [2b] Generating world description...")
@@ -802,26 +789,15 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         inner_voice_text = person.inner_monologue.format_for_prompt()
         print(f"  ✅ Inner monologue generated")
 
-    with r1c2:
-        with _card("Context"):
-            if wm_text != "Mind is clear — no particular focus.":
-                st.caption("Working Memory")
-                st.info(wm_text)
-            if plan_text != "No active plan.":
-                st.caption("Current Plan Step")
-                st.info(plan_text)
-            if goals_text != "No goals set yet.":
-                st.caption("Current Goals")
-                st.info(goals_text)
-            if lessons_text != "No lessons learned yet.":
-                st.caption("Lessons Applied")
-                st.info(lessons_text)
-            if curiosity_text != "Curiosity is low; prioritize practical actions.":
-                st.caption("Curiosity")
-                st.info(curiosity_text)
-            if inner_voice_text != "No inner thoughts at the moment.":
-                st.caption("Inner Voice")
-                st.info(inner_voice_text)
+    # Render Tamagotchi center panel: thought bubble, needs, emotions
+    _, center_col, _ = st.columns([1, 2, 1])
+    with center_col:
+        if inner_voice_text != "No inner thoughts at the moment.":
+            thought_display = inner_voice_text.split(".")[0] + "..." if "." in inner_voice_text else inner_voice_text
+            st.markdown(f'<div class="thought-bubble">{thought_display}</div>', unsafe_allow_html=True)
+
+        render_needs_bars(person)
+        render_emotion_chips(person)
 
     # Card 3: Action Decision (LLM call → display)
     print(f"\n{'─'*40}")
@@ -853,31 +829,21 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     if getattr(person, "curiosity_system", None) is not None and isinstance(action_response, dict):
         person.curiosity_system.update_after_action(action_response.get("chosen_action", ""))
     _print_json("⚡ Action Response", action_response)
-    with r1c3:
-        with _card("Action Decision"):
-            st.write(action_response)
-            # Display chain-of-thought reasoning trace
-            trace = action_response.get("reasoning_trace", []) if isinstance(action_response, dict) else []
-            if trace:
-                with st.container(border=True):
-                    st.caption("Chain of Thought")
-                    step_labels = {"assess": "Assess", "deliberate": "Deliberate", "decide": "Decide"}
-                    for entry in trace:
-                        if isinstance(entry, dict):
-                            label = step_labels.get(entry.get("step", ""), entry.get("step", ""))
-                            st.write(f"**{label}:**")
-                            output = entry.get("output", entry)
-                            st.json(output)
-                        else:
-                            st.write(str(entry))
-            display_meta_cognitive_insights(meta_cognitive_system, iteration)
+
+    # Action narrative placeholder — updated after post-processing with satisfaction delta
+    _, action_center, _ = st.columns([1, 2, 1])
+    with action_center:
+        action_placeholder = st.empty()
+        with action_placeholder.container():
+            st.markdown(f"""
+            <div class="action-card">
+                <div class="action-title">▶ Jenbina decided to {chosen.lower()}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     # ==================================================================
-    # Row 2 — Checks & Analysis  (compute → display per card)
+    # Stage 4 — Checks & Analysis  (compute only, render in debug)
     # ==================================================================
-    r2c1, r2c2, r2c3 = st.columns(3)
-
-    # Card 1: Safety Check (LLM call → display)
     print(f"\n{'─'*40}")
     print(f"  🛡️  Stage 4: Checks & Analysis")
     print(f"{'─'*40}")
@@ -886,11 +852,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     asimov_response = asimov_chain(action_response)
     print(f"  ✅ Safety check complete")
     _print_json("⚖️  Asimov Response", asimov_response)
-    with r2c1:
-        with _card("Safety Check"):
-            st.write(asimov_response)
 
-    # Card 2: State Analysis (LLM call → display)
     print(f"  🔍 [4b] Analyzing state changes...")
     state_response = create_state_analysis_system(
         llm_json_mode,
@@ -899,11 +861,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     )
     print(f"  ✅ State analysis complete")
     _print_json("🔍 State Analysis", state_response)
-    with r2c2:
-        with _card("State Analysis"):
-            st.write(state_response)
 
-    # Card 3: Emotions (LLM call → display)
     print(f"  💭 [4c] Analyzing emotional impact...")
     action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
     emotion_adjustments = analyze_emotion_impact(
@@ -918,12 +876,6 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         _print_json("💭 Emotion Adjustments", emotion_adjustments)
     else:
         print(f"  ✅ No significant emotional changes")
-    with r2c3:
-        with _card("Emotions"):
-            if emotion_adjustments:
-                st.write("Changes: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
-            else:
-                st.write("No significant emotional changes.")
 
     # ==================================================================
     # Post-processing: needs update, experience recording, goals, plans
@@ -1062,38 +1014,93 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         person.self_narrative.integrate_experience(experience, lessons_for_identity)
 
     # ==================================================================
-    # Row 3 — Learning (display after post-processing completes)
+    # Update action narrative with final satisfaction delta
     # ==================================================================
-    with _card("Learning"):
-        lc1, lc2, lc3 = st.columns(3)
-        with lc1:
-            for msg in learning_messages:
-                st.write(msg)
-            if not learning_messages:
-                st.write("*No learning updates.*")
-        with lc2:
-            if goal_messages:
-                st.caption("Goals Advanced")
-                for msg in goal_messages:
-                    st.write(msg)
-        with lc3:
-            if plan_messages:
-                st.caption("Plan Updates")
-                for msg in plan_messages:
-                    st.write(msg)
-
-    # --- Stats expanders (full width below grid) ---
-    display_learning_stats(person, iteration)
-    display_goal_stats(person, iteration)
-    display_planning_stats(person, iteration)
-    display_working_memory_stats(person, iteration)
-    display_identity_stats(person, iteration)
-    display_curiosity_stats(person, iteration)
+    with action_placeholder.container():
+        render_action_narrative(action_response, satisfaction_before, satisfaction_after)
 
     # Final avatar update — reflect post-action emotional state
     final_image = get_jenbina_image_for_emotion(person)
     with avatar_placeholder.container():
         display_jenbina_image(final_image, caption=f"{person.name}")
+
+    # ==================================================================
+    # Tier 2 — Auto-expanding sections (interesting content only)
+    # ==================================================================
+    _, tier2_center, _ = st.columns([1, 2, 1])
+    with tier2_center:
+        # Learning — auto-expand if big satisfaction change
+        has_new_learning = bool(learning_messages) and abs(sat_delta) > 5
+        with st.expander("📚 Learning", expanded=has_new_learning):
+            for msg in learning_messages:
+                st.write(msg)
+            if not learning_messages:
+                st.write("*No learning updates.*")
+            if goal_messages:
+                st.caption("Goals Advanced")
+                for msg in goal_messages:
+                    st.write(msg)
+            if plan_messages:
+                st.caption("Plan Updates")
+                for msg in plan_messages:
+                    st.write(msg)
+
+        # Goals — auto-expand if advanced
+        if person.goal_system is not None:
+            has_goal_updates = bool(goal_messages)
+            with st.expander("🎯 Goals", expanded=has_goal_updates):
+                display_goal_stats(person, iteration)
+
+        # Plans — auto-expand if step completed
+        if person.planning_system is not None:
+            has_plan_updates = bool(plan_messages)
+            with st.expander("📋 Plans", expanded=has_plan_updates):
+                display_planning_stats(person, iteration)
+
+        # Curiosity — auto-expand if exploring
+        if getattr(person, "curiosity_system", None) is not None:
+            should_explore = person.curiosity_system.get_stats().get("should_explore", False)
+            with st.expander("🔎 Curiosity", expanded=should_explore):
+                display_curiosity_stats(person, iteration)
+
+    # ==================================================================
+    # Tier 3 — Debug details (always collapsed)
+    # ==================================================================
+    with st.expander("🔧 Debug Details", expanded=False):
+        st.caption("Needs Analysis")
+        st.json(needs_response if isinstance(needs_response, dict) else {"raw": str(needs_response)})
+        st.caption("World Description")
+        st.json({"raw": str(world_response)[:2000]} if not isinstance(world_response, dict) else world_response)
+        st.caption("Action Decision")
+        st.json(action_response if isinstance(action_response, dict) else {"raw": str(action_response)})
+        # Chain of thought
+        trace = action_response.get("reasoning_trace", []) if isinstance(action_response, dict) else []
+        if trace:
+            st.caption("Chain of Thought")
+            step_labels = {"assess": "Assess", "deliberate": "Deliberate", "decide": "Decide"}
+            for entry in trace:
+                if isinstance(entry, dict):
+                    label = step_labels.get(entry.get("step", ""), entry.get("step", ""))
+                    st.write(f"**{label}:**")
+                    output = entry.get("output", entry)
+                    st.json(output)
+                else:
+                    st.write(str(entry))
+        st.caption("Safety Check")
+        st.json(asimov_response if isinstance(asimov_response, dict) else {"raw": str(asimov_response)})
+        st.caption("State Analysis")
+        st.json(state_response if isinstance(state_response, dict) else {"raw": str(state_response)})
+        if emotion_adjustments:
+            st.caption("Emotion Adjustments")
+            st.json(emotion_adjustments)
+        display_meta_cognitive_insights(meta_cognitive_system, iteration)
+        display_working_memory_stats(person, iteration)
+        display_identity_stats(person, iteration)
+        display_learning_stats(person, iteration)
+        st.caption("Person State")
+        st.json(person_dict)
+        st.caption("World State")
+        st.json(world_summary)
 
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
     print(f"\n{'='*60}")

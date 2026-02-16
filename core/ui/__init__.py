@@ -1,6 +1,7 @@
 """UI components for Jenbina Streamlit app"""
 from .sidebar import render_full_sidebar
 from .simulation import (
+    inject_tamagotchi_css,
     render_simulation_controls,
     run_simulation_loop,
     run_single_iteration,
@@ -12,6 +13,7 @@ from .shared_init import require_auth, init_llm, init_session_state, save_person
 
 __all__ = [
     'render_full_sidebar',
+    'inject_tamagotchi_css',
     'render_simulation_controls',
     'run_simulation_loop',
     'run_single_iteration',
