@@ -17,7 +17,7 @@ install_capture()
 
 nav1, nav2, nav3, nav4 = st.columns(4)
 with nav1:
-    st.page_link("app.py", label="🧠 Simulation", icon="🧠")
+    st.page_link("app.py", label="👧 Simulation", icon="👧")
 with nav2:
     st.page_link("pages/2_💬_Chat.py", label="💬 Chat", icon="💬")
 with nav3:

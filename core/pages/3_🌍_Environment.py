@@ -25,7 +25,7 @@ debug_mode = st.session_state.get("debug_mode", False)
 
 nav1, nav2, nav3 = st.columns(3)
 with nav1:
-    st.page_link("app.py", label="🧠 Simulation", icon="🧠")
+    st.page_link("app.py", label="👧 Simulation", icon="👧")
 with nav2:
     st.page_link("pages/2_💬_Chat.py", label="💬 Chat", icon="💬")
 with nav3:
