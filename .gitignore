@@ -57,12 +57,16 @@ tests/jenbina_memory/
 *.log
 logs/
 
-# Environment variables
+# Environment variables and credentials
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.google_credentials.json
+*credentials*.json
+*.pem
+*.key
 
 # Temporary files
 *.tmp
