@@ -6,6 +6,7 @@ import time
 import json
 import os
 from types import SimpleNamespace
+from concurrent.futures import ThreadPoolExecutor
 
 from core.needs.maslow_needs import create_basic_needs_chain
 from core.needs.maslow_decision_chain import create_maslow_action_executor
@@ -815,19 +816,13 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     # Stage 2 — Perception & Context  (compute, render later)
     # ==================================================================
 
-    # Needs Analysis (LLM call)
+    # ── Local prep for Stage 2 (sequential) ─────────────────────
     print(f"{'─'*40}")
     print(f"  🧠 Stage 2: Perception & Context")
     print(f"{'─'*40}")
-    update_system_stage("Analyzing needs...")
-    print(f"  📊 [2a] Analyzing basic needs...")
-    needs_response = create_basic_needs_chain(llm_json_mode, person.maslow_needs)
-    print(f"  ✅ Needs analysis complete")
-    _print_json("📊 Needs Response", needs_response)
+    update_system_stage("Analyzing needs & building context...")
 
-    # Card 2: Context — world description LLM + working memory update → display
-    update_system_stage("Generating world description...")
-    print(f"  🌐 [2b] Generating world description...")
+    # Prepare recent actions string for world chain
     prev_actions_list = []
     for record in st.session_state.get("simulation_history", [])[-6:]:
         action = (record.get("action_decision", {}) or {}).get("chosen_action")
@@ -835,10 +830,8 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             prev_actions_list.append(action)
     recent_actions_str = "\n".join(f"- {a}" for a in prev_actions_list) or "None yet."
     world_chain = create_world_description_system(llm_json_mode)
-    world_response = world_chain(person, world, recent_actions=recent_actions_str)
-    print(f"  ✅ World description complete")
-    _print_json("🌐 World Description", world_response)
 
+    # Plan, goals, working memory
     active_plan_step = None
     if person.planning_system is not None:
         result = person.planning_system.get_current_step()
@@ -871,10 +864,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         sleep_satisfaction=person.maslow_needs.get_need_satisfaction("sleep"),
     )
 
-    update_system_stage("Updating working memory...")
-    print(f"  🧩 [2c] Updating working memory...")
     wm_text = person.working_memory.format_for_prompt()
-    print(f"  ✅ Working memory updated")
     plan_text = person.planning_system.format_plan_for_prompt() if person.planning_system is not None else "No active plan."
     goals_text = person.goal_system.format_goals_for_prompt() if person.goal_system is not None else "No goals set yet."
     lessons_text = "No lessons learned yet."
@@ -888,29 +878,10 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         action = (record.get("action_decision", {}) or {}).get("chosen_action")
         if action:
             recent_actions.append(action)
-    print(f"  📋 Recent actions for context ({len(recent_actions)}): {recent_actions}")
 
-    curiosity_text = "Curiosity is low; prioritize practical actions."
-    if getattr(person, "curiosity_system", None) is not None:
-        available_actions = []
-        try:
-            world_data = json.loads(world_response) if isinstance(world_response, str) else {}
-            available_actions = world_data.get("list_of_actions", []) if isinstance(world_data, dict) else []
-        except Exception:
-            available_actions = []
-
-        person.curiosity_system.observe_cycle(
-            needs=needs_before,
-            world_context=world_ctx_wm,
-            available_actions=available_actions,
-            recent_actions=recent_actions,
-        )
-        curiosity_text = person.curiosity_system.format_for_prompt()
-
-    inner_voice_text = "No inner thoughts at the moment."
+    # Prepare inner monologue kwargs (local prep only)
+    monologue_kwargs = None
     if person.inner_monologue is not None:
-        update_system_stage("Generating inner monologue...")
-        print(f"  🧠 [2d] Generating inner monologue...")
         recent_exp_list = None
         recent_exp_str = "No notable recent experiences."
         if person.learning_system is not None:
@@ -941,7 +912,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             if isinstance(prev, dict):
                 last_action = prev.get("chosen_action", last_action)
 
-        person.inner_monologue.think(
+        monologue_kwargs = dict(
             needs=needs_before,
             emotions=emotions_before,
             working_memory_str=wm_text,
@@ -954,6 +925,48 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             lessons_learned_str=lessons_text,
             goals_str=goals_text,
         )
+
+    # ── Parallel LLM calls (needs + world + monologue) ───────────
+    print(f"  🚀 [2] Running needs, world, monologue in parallel...")
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        needs_future = executor.submit(create_basic_needs_chain, llm_json_mode, person.maslow_needs)
+        world_future = executor.submit(world_chain, person, world, recent_actions=recent_actions_str)
+        if monologue_kwargs is not None:
+            monologue_future = executor.submit(person.inner_monologue.think, **monologue_kwargs)
+        else:
+            monologue_future = None
+
+        needs_response = needs_future.result()
+        world_response = world_future.result()
+        if monologue_future is not None:
+            monologue_future.result()  # mutates person.inner_monologue in-place
+
+    print(f"  ✅ Needs analysis complete")
+    _print_json("📊 Needs Response", needs_response)
+    print(f"  ✅ World description complete")
+    _print_json("🌐 World Description", world_response)
+    print(f"  📋 Recent actions for context ({len(recent_actions)}): {recent_actions}")
+
+    # Curiosity system observation (depends on world_response)
+    curiosity_text = "Curiosity is low; prioritize practical actions."
+    if getattr(person, "curiosity_system", None) is not None:
+        available_actions = []
+        try:
+            world_data = json.loads(world_response) if isinstance(world_response, str) else {}
+            available_actions = world_data.get("list_of_actions", []) if isinstance(world_data, dict) else []
+        except Exception:
+            available_actions = []
+
+        person.curiosity_system.observe_cycle(
+            needs=needs_before,
+            world_context=world_ctx_wm,
+            available_actions=available_actions,
+            recent_actions=recent_actions,
+        )
+        curiosity_text = person.curiosity_system.format_for_prompt()
+
+    inner_voice_text = "No inner thoughts at the moment."
+    if person.inner_monologue is not None:
         inner_voice_text = person.inner_monologue.format_for_prompt()
         print(f"  ✅ Inner monologue generated")
 
@@ -1088,13 +1101,36 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🛡️  Stage 4: Checks & Analysis")
     print(f"{'─'*40}")
-    update_system_stage("Running safety check...")
-    print(f"  ⚖️  [4a] Running Asimov safety check...")
+    update_system_stage("Running safety & emotion checks...")
     asimov_chain = create_asimov_check_system(llm_json_mode)
-    asimov_response = asimov_chain(action_response)
+    action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
+
+    # ── Parallel: asimov safety check + emotion analysis ─────────
+    print(f"  🚀 [4] Running safety check + emotion analysis in parallel...")
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        asimov_future = executor.submit(asimov_chain, action_response)
+        emotion_future = executor.submit(
+            analyze_emotion_impact,
+            llm=llm_json_mode,
+            situation=action_situation,
+            emotion_system=person.emotion_system,
+            maslow_needs=person.maslow_needs,
+        )
+
+        asimov_response = asimov_future.result()
+        emotion_adjustments = emotion_future.result()
+
     print(f"  ✅ Safety check complete")
     _print_json("⚖️  Asimov Response", asimov_response)
 
+    if emotion_adjustments:
+        person.emotion_system.apply_adjustments(emotion_adjustments)
+        print(f"  ✅ Emotions: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
+        _print_json("💭 Emotion Adjustments", emotion_adjustments)
+    else:
+        print(f"  ✅ No significant emotional changes")
+
+    # ── Sequential: state analysis (depends on asimov_response) ──
     print(f"  🔍 [4b] Analyzing state changes...")
     state_response = create_state_analysis_system(
         llm_json_mode,
@@ -1103,22 +1139,6 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     )
     print(f"  ✅ State analysis complete")
     _print_json("🔍 State Analysis", state_response)
-
-    update_system_stage("Analyzing emotional impact...")
-    print(f"  💭 [4c] Analyzing emotional impact...")
-    action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
-    emotion_adjustments = analyze_emotion_impact(
-        llm=llm_json_mode,
-        situation=action_situation,
-        emotion_system=person.emotion_system,
-        maslow_needs=person.maslow_needs,
-    )
-    if emotion_adjustments:
-        person.emotion_system.apply_adjustments(emotion_adjustments)
-        print(f"  ✅ Emotions: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
-        _print_json("💭 Emotion Adjustments", emotion_adjustments)
-    else:
-        print(f"  ✅ No significant emotional changes")
 
     # ==================================================================
     # Post-processing: needs update, experience recording, goals, plans
