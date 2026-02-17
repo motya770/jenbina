@@ -77,13 +77,18 @@ class HybridMemorySystem:
     - SQLite for chronological/time-series data
     """
     
-    def __init__(self, 
+    def __init__(self,
                  embeddings_model: str = "llama3.2:3b-instruct-fp16",
                  neo4j_uri: str = "bolt://localhost:7687",
                  neo4j_user: str = "neo4j",
                  neo4j_password: str = "password",
-                 vector_store_path: str = "./jenbina_memory",
-                 time_series_path: str = "./jenbina_memory/timeseries.db"):
+                 vector_store_path: str = None,
+                 time_series_path: str = None):
+        _data_dir = os.environ.get("JENBINA_DATA_DIR", "./jenbina_memory")
+        if vector_store_path is None:
+            vector_store_path = _data_dir
+        if time_series_path is None:
+            time_series_path = os.path.join(_data_dir, "timeseries.db")
         
         # Initialize logging first
         logging.basicConfig(level=logging.INFO)

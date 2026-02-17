@@ -88,7 +88,7 @@ class ChromaMemoryManager:
             print("Using simple hash-based embeddings (no API required)")
             self.embeddings = SimpleEmbeddings()
 
-        self.vector_store_path = "./jenbina_memory"
+        self.vector_store_path = os.environ.get("JENBINA_DATA_DIR", "./jenbina_memory")
         self.client = None
         self.collection = None
         self.text_splitter = RecursiveCharacterTextSplitter(
