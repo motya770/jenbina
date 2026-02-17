@@ -1308,44 +1308,27 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                 display_curiosity_stats(person, iteration)
 
     # ==================================================================
-    # Tier 3 — Debug details (always collapsed)
+    # Store debug data in session state for the Debug Info page
     # ==================================================================
-    with st.container(border=True):
-        st.caption("🔧 Debug Details")
-        st.caption("Needs Analysis")
-        st.json(needs_response if isinstance(needs_response, dict) else {"raw": str(needs_response)})
-        st.caption("World Description")
-        st.json({"raw": str(world_response)[:2000]} if not isinstance(world_response, dict) else world_response)
-        st.caption("Action Decision")
-        st.json(action_response if isinstance(action_response, dict) else {"raw": str(action_response)})
-        # Chain of thought
-        trace = action_response.get("reasoning_trace", []) if isinstance(action_response, dict) else []
-        if trace:
-            st.caption("Chain of Thought")
-            step_labels = {"assess": "Assess", "deliberate": "Deliberate", "decide": "Decide"}
-            for entry in trace:
-                if isinstance(entry, dict):
-                    label = step_labels.get(entry.get("step", ""), entry.get("step", ""))
-                    st.write(f"**{label}:**")
-                    output = entry.get("output", entry)
-                    st.json(output)
-                else:
-                    st.write(str(entry))
-        st.caption("Safety Check")
-        st.json(asimov_response if isinstance(asimov_response, dict) else {"raw": str(asimov_response)})
-        st.caption("State Analysis")
-        st.json(state_response if isinstance(state_response, dict) else {"raw": str(state_response)})
-        if emotion_adjustments:
-            st.caption("Emotion Adjustments")
-            st.json(emotion_adjustments)
-        display_meta_cognitive_insights(meta_cognitive_system, iteration)
-        display_working_memory_stats(person, iteration)
-        display_identity_stats(person, iteration)
-        display_learning_stats(person, iteration)
-        st.caption("Person State")
-        st.json(person_dict)
-        st.caption("World State")
-        st.json(world_summary)
+    debug_entry = {
+        "iteration": iter_num,
+        "timestamp": datetime.now().isoformat(),
+        "needs_response": needs_response,
+        "world_response": world_response,
+        "action_response": action_response,
+        "asimov_response": asimov_response,
+        "state_response": state_response,
+        "emotion_adjustments": emotion_adjustments,
+        "meta_cognitive_stats": meta_cognitive_system.get_meta_cognitive_stats(),
+        "working_memory_stats": person.working_memory.get_stats(),
+        "identity_stats": person.self_narrative.get_stats() if getattr(person, "self_narrative", None) else None,
+        "learning_stats": person.learning_system.get_learning_stats() if person.learning_system else None,
+        "person_dict": person_dict,
+        "world_summary": world_summary,
+    }
+    if "debug_iterations" not in st.session_state:
+        st.session_state.debug_iterations = []
+    st.session_state.debug_iterations.append(debug_entry)
 
     # Check if Jenbina wants to say something proactively
     try:

@@ -37,13 +37,15 @@ def main():
     meta_cognitive_system = st.session_state.meta_cognitive_system
 
     # ── Navigation ──────────────────────────────────────────────────────
-    nav1, nav2, nav3 = st.columns(3)
+    nav1, nav2, nav3, nav4 = st.columns(4)
     with nav1:
         st.page_link("app.py", label="Simulation", icon="👧")
     with nav2:
         st.page_link("pages/2_💬_Chat.py", label="Chat", icon="💬")
     with nav3:
         st.page_link("pages/3_🌍_Environment.py", label="Environment", icon="🌍")
+    with nav4:
+        st.page_link("pages/5_🔧_Debug_Info.py", label="Debug Info", icon="🔧")
 
     st.title("👧 Jenbina")
     render_mood_indicator(person)
