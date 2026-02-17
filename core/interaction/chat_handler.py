@@ -52,13 +52,58 @@ def create_metadata_from_person_state(person_state, world_description=None, acti
     
     return metadata
 
-def generate_proactive_message(person, llm, triggers, display_name="User"):
+
+def _build_subsystem_context(person, needs=None, emotions=None):
+    """Extract formatted context from all person subsystems.
+
+    Returns a list of (label, text) tuples, skipping any subsystem that
+    is missing or returns a default/empty output.
+    """
+    parts = []
+
+    _DEFAULTS = {
+        "No inner thoughts at the moment.",
+        "No goals set yet.",
+        "No active plan.",
+        "No lessons learned yet.",
+        "Mind is clear — no particular focus.",
+    }
+
+    def _add(label, text):
+        if text and text not in _DEFAULTS:
+            parts.append((label, text))
+
+    if getattr(person, "inner_monologue", None) is not None:
+        _add("Inner monologue", person.inner_monologue.format_for_prompt())
+
+    if getattr(person, "goal_system", None) is not None:
+        _add("Goals", person.goal_system.format_goals_for_prompt())
+
+    if getattr(person, "planning_system", None) is not None:
+        _add("Current plan", person.planning_system.format_plan_for_prompt())
+
+    if getattr(person, "learning_system", None) is not None:
+        _add("Lessons learned", person.learning_system.format_lessons_for_prompt(
+            needs=needs, emotions=emotions,
+        ))
+
+    if getattr(person, "working_memory", None) is not None:
+        _add("Working memory", person.working_memory.format_for_prompt())
+
+    return parts
+
+
+def generate_proactive_message(person, llm, triggers, display_name="User",
+                               recent_actions=None, world_context=None):
     """Generate a 1-3 sentence natural message Jenbina sends on her own.
 
     Args:
         person: The Person instance.
         llm: LLM instance to generate the message.
         triggers: Dict of trigger contexts from check_proactive_message.
+        display_name: Name shown for the user.
+        recent_actions: Optional list of recent action strings.
+        world_context: Optional string like "home, evening, rainy".
 
     Returns:
         A message string, or None.
@@ -93,6 +138,18 @@ def generate_proactive_message(person, llm, triggers, display_name="User"):
         except Exception:
             pass
 
+    # Subsystem context
+    needs_snapshot = person.get_needs_snapshot() if hasattr(person, "get_needs_snapshot") else {}
+    all_emotions = person.emotion_system.get_emotional_state_summary().get("emotions", {})
+    subsystem_lines = ""
+    for label, text in _build_subsystem_context(person, needs=needs_snapshot, emotions=all_emotions):
+        subsystem_lines += f"- {label}: {text}\n"
+
+    world_line = f"- World: {world_context}\n" if world_context else ""
+    actions_line = ""
+    if recent_actions:
+        actions_line = f"- Recent actions: {' -> '.join(recent_actions)}\n"
+
     prompt = f"""You are Jenbina, a curious and warm person. You want to start a conversation with the user.
 
 Your current state:
@@ -100,7 +157,7 @@ Your current state:
 - Low needs: {needs_str}
 - What's driving you to talk: {triggers_str}
 {social_ctx}
-
+{subsystem_lines}{world_line}{actions_line}
 Write a natural 1-3 sentence message to initiate conversation. Don't explain your emotions or needs directly — just let them color what you say. Be casual and genuine."""
 
     try:
@@ -128,6 +185,7 @@ def handle_chat_interaction(
     user_id=None,
     person=None,
     conversation_partner_name="User",
+    recent_actions=None,
 ):
     """Handle chat interactions with Jenbina using Chroma memory."""
     if user_input:
@@ -238,6 +296,16 @@ def handle_chat_interaction(
             social_context = social.format_for_prompt(conversation_partner_name, user_input)
             chosen_social_strategy = social.choose_social_strategy(conversation_partner_name, user_input)
             context_parts.append(f"Social model / theory-of-mind:\n{social_context}")
+
+        # Subsystem context (inner monologue, goals, plans, lessons, working memory)
+        if person is not None:
+            needs_snap = person.get_needs_snapshot() if hasattr(person, "get_needs_snapshot") else {}
+            all_emo = person.emotion_system.get_emotional_state_summary().get("emotions", {}) if hasattr(person, "emotion_system") else {}
+            for label, text in _build_subsystem_context(person, needs=needs_snap, emotions=all_emo):
+                context_parts.append(f"{label}:\n{text}")
+
+        if recent_actions:
+            context_parts.append(f"Recent action sequence: {' -> '.join(recent_actions)}")
 
         context_parts.append(f"Current needs: {needs_response}")
         context_parts.append(f"World state: {world_description}")
