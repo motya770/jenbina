@@ -15,6 +15,7 @@ from core.environment.world_state import create_world_description_system, create
 from core.environment.location_system import PaloAltoLocationSystem
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
+from core.ui.chat import update_system_stage
 
 
 def inject_tamagotchi_css():
@@ -763,6 +764,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🌍 Stage 1: Environment")
     print(f"{'─'*40}")
+    update_system_stage("Building environment...")
     person_dict = get_person_dict(person)
     # Use tracked location (updated after each action) or default to home
     current_location = st.session_state.get("jenbina_location", "Jenbina's House")
@@ -793,12 +795,14 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🧠 Stage 2: Perception & Context")
     print(f"{'─'*40}")
+    update_system_stage("Analyzing needs...")
     print(f"  📊 [2a] Analyzing basic needs...")
     needs_response = create_basic_needs_chain(llm_json_mode, person.maslow_needs)
     print(f"  ✅ Needs analysis complete")
     _print_json("📊 Needs Response", needs_response)
 
     # Card 2: Context — world description LLM + working memory update → display
+    update_system_stage("Generating world description...")
     print(f"  🌐 [2b] Generating world description...")
     prev_actions_list = []
     for record in st.session_state.get("simulation_history", [])[-6:]:
@@ -843,6 +847,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         sleep_satisfaction=person.maslow_needs.get_need_satisfaction("sleep"),
     )
 
+    update_system_stage("Updating working memory...")
     print(f"  🧩 [2c] Updating working memory...")
     wm_text = person.working_memory.format_for_prompt()
     print(f"  ✅ Working memory updated")
@@ -880,6 +885,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
 
     inner_voice_text = "No inner thoughts at the moment."
     if person.inner_monologue is not None:
+        update_system_stage("Generating inner monologue...")
         print(f"  🧠 [2d] Generating inner monologue...")
         recent_exp_list = None
         recent_exp_str = "No notable recent experiences."
@@ -941,6 +947,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  ⚡ Stage 3: Action Decision")
     print(f"{'─'*40}")
+    update_system_stage("Deciding next action...")
     print(f"  🤔 Running meta-cognitive action chain...")
 
     # Show thinking image while deciding
@@ -1057,6 +1064,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🛡️  Stage 4: Checks & Analysis")
     print(f"{'─'*40}")
+    update_system_stage("Running safety check...")
     print(f"  ⚖️  [4a] Running Asimov safety check...")
     asimov_chain = create_asimov_check_system(llm_json_mode)
     asimov_response = asimov_chain(action_response)
@@ -1072,6 +1080,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"  ✅ State analysis complete")
     _print_json("🔍 State Analysis", state_response)
 
+    update_system_stage("Analyzing emotional impact...")
     print(f"  💭 [4c] Analyzing emotional impact...")
     action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
     emotion_adjustments = analyze_emotion_impact(
@@ -1093,6 +1102,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  📝 Stage 5: Learning & Updates")
     print(f"{'─'*40}")
+    update_system_stage("Learning & updating...")
     print(f"  🔄 Updating needs & decaying emotions...")
     person.update_all_needs()
 
@@ -1317,6 +1327,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'='*60}")
     print(f"  ✅ ITERATION {iter_num} COMPLETE — {iteration_duration:.2f}s")
     print(f"{'='*60}")
+    update_system_stage(f"Iteration {iter_num} complete ({iteration_duration:.1f}s)")
     st.success(f"Iteration {iter_num} completed in {iteration_duration:.2f}s")
 
     return {
