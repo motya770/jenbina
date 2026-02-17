@@ -452,4 +452,119 @@ Keep the response natural and in-character. Consider your current needs and how 
             "curiosity_context": curiosity_context,
         }
     
-    return None 
+    return None
+
+
+def generate_return_greeting(person, llm, gap_hours: float, display_name: str) -> str:
+    """Generate a dynamic return greeting based on Jenbina's state and relationship."""
+    goals_str = ""
+    if getattr(person, "goal_system", None) is not None:
+        goals_str = person.goal_system.format_goals_for_prompt()
+
+    narrative_str = ""
+    if getattr(person, "self_narrative", None) is not None:
+        narrative_str = person.self_narrative.format_for_prompt()
+
+    emotions = person.emotion_system.get_dominant_emotions(2)
+    emotions_str = ", ".join(f"{d['name']} ({d['intensity']})" for d in emotions) if emotions else "calm"
+
+    last_topic = ""
+    conv = person.conversations.get(display_name)
+    if conv and conv.messages:
+        last_msgs = conv.messages[-3:]
+        last_topic = " | ".join(m.content[:80] for m in last_msgs)
+
+    dossier_hint = ""
+    if getattr(person, "social_cognition", None) is not None:
+        model = person.social_cognition.get_or_create_model(display_name)
+        if model.user_dossier:
+            dossier_hint = f"You know this about them: {json.dumps(model.user_dossier)}"
+
+    if gap_hours < 6:
+        time_desc = "a few hours"
+    elif gap_hours < 24:
+        time_desc = "since earlier today"
+    elif gap_hours < 72:
+        d = int(gap_hours / 24)
+        time_desc = f"about {d} {'day' if d == 1 else 'days'}"
+    else:
+        d = int(gap_hours / 24)
+        time_desc = f"{d} {'day' if d == 1 else 'days'}"
+
+    prompt = f"""You're greeting {display_name} who is returning after {time_desc}.
+
+Your current emotional state: {emotions_str}
+What you've been working on (your goals): {goals_str}
+Your self-narrative: {narrative_str}
+Last conversation topics: {last_topic}
+{dossier_hint}
+
+Generate a warm, personal greeting that:
+- References what YOU were doing/thinking while they were away
+- Optionally references something from the last conversation
+- Feels like a real person greeting a friend, not a chatbot
+- Is 1-3 sentences max
+- Shows your personality and current mood
+
+Return ONLY the greeting, nothing else."""
+
+    try:
+        response = llm.invoke([
+            SystemMessage(content=JENBINA_SYSTEM_PROMPT),
+            HumanMessage(content=prompt),
+        ])
+        text = response.content.strip()
+        if text:
+            return text
+    except Exception as e:
+        print(f"Greeting generation failed: {e}")
+
+    # Fallback static greetings
+    if gap_hours < 6:
+        return "You're back!"
+    elif gap_hours < 24:
+        return "I missed you today..."
+    elif gap_hours < 72:
+        return "It's been a while..."
+    else:
+        return f"I was worried you forgot about me... it's been {int(gap_hours / 24)} days."
+
+
+def generate_first_greeting(person, llm, display_name: str) -> str:
+    """Generate a personalized first greeting for a new user."""
+    dossier_str = ""
+    if getattr(person, "social_cognition", None) is not None:
+        model = person.social_cognition.get_or_create_model(display_name)
+        if model.user_dossier:
+            dossier_str = json.dumps(model.user_dossier)
+
+    if not dossier_str:
+        prompt = f"""You're meeting {display_name} for the very first time.
+You're curious about them. Generate a warm, intriguing greeting that shows
+you're genuinely interested in who they are. 1-2 sentences max.
+Don't be generic — be distinctly Jenbina.
+
+Return ONLY the greeting."""
+    else:
+        prompt = f"""You're meeting {display_name} for the very first time.
+You've heard things about them:
+{dossier_str}
+
+Greet them the way someone would who is genuinely curious about them.
+Don't list facts you know. Instead, reference something that intrigued you
+or ask a question that shows you're not starting from zero.
+1-2 sentences max. Be warm but not creepy.
+
+Return ONLY the greeting."""
+
+    try:
+        response = llm.invoke([
+            SystemMessage(content=JENBINA_SYSTEM_PROMPT),
+            HumanMessage(content=prompt),
+        ])
+        text = response.content.strip()
+        if text:
+            return text
+    except Exception as e:
+        print(f"First greeting generation failed: {e}")
+    return "Hey! I'm Jenbina. I've been waiting to meet someone new."
