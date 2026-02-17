@@ -12,11 +12,11 @@ class UserDatabase:
 
     def __init__(self, db_path: str = None):
         if db_path is None:
-            db_path = os.path.join(
+            data_dir = os.environ.get("JENBINA_DATA_DIR", os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
                 "jenbina_memory",
-                "users.db",
-            )
+            ))
+            db_path = os.path.join(data_dir, "users.db")
         self.db_path = db_path
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._create_tables()
