@@ -26,21 +26,20 @@ def build_search_query(display_name: str, email: str) -> str:
 
 
 def search_web(query: str) -> Dict[str, Any]:
-    """Call the SerpAPI/Serper web search API.
+    """Call the SerpAPI web search API (serpapi.com).
 
     Returns raw JSON response from the search API.
-    Requires SERPER_API_KEY env var.
+    Requires SERPAPI_API_KEY env var.
     """
     import requests
 
-    api_key = os.getenv("SERPER_API_KEY")
+    api_key = os.getenv("SERPAPI_API_KEY")
     if not api_key:
-        raise ValueError("SERPER_API_KEY environment variable is not set")
+        raise ValueError("SERPAPI_API_KEY environment variable is not set")
 
-    response = requests.post(
-        "https://google.serper.dev/search",
-        headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
-        json={"q": query, "num": 10},
+    response = requests.get(
+        "https://serpapi.com/search.json",
+        params={"q": query, "engine": "google", "api_key": api_key, "num": 10},
         timeout=15,
     )
     response.raise_for_status()
@@ -50,7 +49,7 @@ def search_web(query: str) -> Dict[str, Any]:
 def parse_research_results(raw_results: Dict[str, Any]) -> List[str]:
     """Extract useful text snippets from search results."""
     snippets = []
-    for result in raw_results.get("organic", []):
+    for result in raw_results.get("organic_results", []):
         title = result.get("title", "")
         snippet = result.get("snippet", "")
         if title or snippet:

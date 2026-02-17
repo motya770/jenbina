@@ -30,7 +30,7 @@ class TestBuildSearchQuery:
 class TestParseResearchResults:
     def test_extracts_snippets(self):
         raw_results = {
-            "organic": [
+            "organic_results": [
                 {"title": "John Smith - LinkedIn", "snippet": "Software Engineer at Google", "link": "https://linkedin.com/in/john"},
                 {"title": "John Smith Blog", "snippet": "Writes about AI and robotics", "link": "https://johnsmith.com"},
             ]
@@ -83,7 +83,7 @@ class TestResearchUser:
     @patch("core.research.user_research.search_web")
     def test_full_pipeline(self, mock_search):
         mock_search.return_value = {
-            "organic": [
+            "organic_results": [
                 {"title": "Test", "snippet": "Test snippet", "link": "https://example.com"},
             ]
         }
