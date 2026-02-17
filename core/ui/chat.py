@@ -4,6 +4,7 @@ from datetime import datetime
 from core.interaction.chat_handler import handle_chat_interaction, generate_proactive_message
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.auth.user_db import UserDatabase
+from core.ui.shared_init import save_person_state
 
 
 def display_person_state_compact(person):
@@ -415,6 +416,13 @@ def render_chat_simple(person, llm, memory_manager, debug_mode):
     if greeting:
         person.send_message(display_name, greeting, "text")
 
+    # Check for proactive message (independent of simulation)
+    if not st.session_state.get("proactive_checked"):
+        st.session_state.proactive_checked = True
+        proactive_msg = send_proactive_message(person, llm)
+        if proactive_msg:
+            save_person_state()
+
     conversation_history = person.get_conversation_history(display_name, count=50)
 
     for msg in conversation_history:
@@ -438,6 +446,13 @@ def render_chat_interface(person, llm, memory_manager, debug_mode):
     greeting = check_return_greeting(person)
     if greeting:
         person.send_message(display_name, greeting, "text")
+
+    # Check for proactive message (independent of simulation)
+    if not st.session_state.get("proactive_checked"):
+        st.session_state.proactive_checked = True
+        proactive_msg = send_proactive_message(person, llm)
+        if proactive_msg:
+            save_person_state()
 
     display_person_state_compact(person)
     handle_user_input(person, llm, memory_manager, debug_mode)
