@@ -45,6 +45,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
 
     if user_input:
         print("User input:", user_input)
+        update_system_stage("Receiving message...")
 
         # Store the user message in person's communication history
         person.receive_message(display_name, user_input, "text")
@@ -55,6 +56,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             user_db.store_message(user_id, display_name, user_input, "user_message")
 
         # Get conversation history for context
+        update_system_stage("Retrieving context...")
         conversation_history = person.get_conversation_history(display_name, count=1000)
         recent_context = "\n".join([
             f"{msg.sender}: {msg.content}"
@@ -62,6 +64,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
         ])
 
         # Handle chat interaction
+        update_system_stage("Generating response...")
         chat_result = handle_chat_interaction(
             st=st,
             llm=llm,
@@ -91,6 +94,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
                 user_db.store_message(user_id, "Jenbina", chat_result["assistant_response"], "jenbina_response")
 
             try:
+                update_system_stage("Analyzing emotions...")
                 chat_situation = f"User said: \"{user_input}\". Jenbina responded: \"{chat_result['assistant_response']}\""
                 emotion_adjustments = analyze_emotion_impact(
                     llm=llm,
@@ -102,6 +106,8 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
                     person.emotion_system.apply_adjustments(emotion_adjustments)
             except Exception as e:
                 print(f"Emotion analysis after chat failed: {e}")
+
+        update_system_stage("Ready")
 
         # Add to action history
         if "user_message" in chat_result:
@@ -225,9 +231,30 @@ def display_social_model(person):
                 st.write(f"- {belief}")
 
 
+def _init_stage_placeholder():
+    """Create or reuse the st.empty() placeholder for system stage."""
+    placeholder = st.empty()
+    st.session_state["_stage_placeholder"] = placeholder
+    stage = st.session_state.get("system_stage", "Idle")
+    placeholder.markdown(f"`⚙️ {stage}`")
+    return placeholder
+
+
+def update_system_stage(stage: str):
+    """Update the system stage one-liner in real time."""
+    st.session_state["system_stage"] = stage
+    placeholder = st.session_state.get("_stage_placeholder")
+    if placeholder is not None:
+        placeholder.markdown(f"`⚙️ {stage}`")
+
+
 def render_chat_simple(person, llm, memory_manager, debug_mode):
     """Render a minimal chat: message history + input only."""
     display_name = _get_user_display_name()
+
+    # Show live-updating system stage one-liner
+    _init_stage_placeholder()
+
     conversation_history = person.get_conversation_history(display_name, count=50)
 
     for msg in conversation_history:
@@ -242,6 +269,9 @@ def render_chat_interface(person, llm, memory_manager, debug_mode):
     """Render the complete chat interface with statistics"""
     st.write("**6. Interaction with User:**")
     st.write("### Chat with Jenbina")
+
+    # Show live-updating system stage one-liner
+    _init_stage_placeholder()
 
     display_person_state_compact(person)
     handle_user_input(person, llm, memory_manager, debug_mode)
