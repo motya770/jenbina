@@ -1,7 +1,12 @@
 """Chat UI components for Jenbina app"""
 import streamlit as st
 from datetime import datetime
-from core.interaction.chat_handler import handle_chat_interaction, generate_proactive_message
+from core.interaction.chat_handler import (
+    handle_chat_interaction,
+    generate_proactive_message,
+    generate_first_greeting,
+    generate_return_greeting,
+)
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.auth.user_db import UserDatabase
 from core.ui.shared_init import save_person_state
@@ -117,7 +122,7 @@ def send_proactive_message(person, llm):
         return None
 
 
-def check_return_greeting(person):
+def check_return_greeting(person, llm=None):
     """Check how long since last visit and return an appropriate greeting, or None."""
     if st.session_state.get("showed_return_greeting"):
         return None
@@ -125,19 +130,29 @@ def check_return_greeting(person):
     now = datetime.now()
     last = person.last_visit_time
     person.last_visit_time = now
+    display_name = _get_user_display_name()
 
     if last is None:
+        # First-time user
         st.session_state.showed_return_greeting = True
+        if llm is not None:
+            return generate_first_greeting(person, llm, display_name)
         return None
 
     gap = now - last
     gap_hours = gap.total_seconds() / 3600
 
-    st.session_state.showed_return_greeting = True
-
     if gap_hours < 1:
         return None
-    elif gap_hours < 6:
+
+    st.session_state.showed_return_greeting = True
+
+    # Use LLM-generated greeting if available
+    if llm is not None:
+        return generate_return_greeting(person, llm, gap_hours, display_name)
+
+    # Fallback static greetings
+    if gap_hours < 6:
         return "You're back!"
     elif gap_hours < 24:
         return "I missed you today..."
@@ -412,7 +427,7 @@ def render_chat_simple(person, llm, memory_manager, debug_mode):
     _init_stage_placeholder()
 
     # Check for return greeting
-    greeting = check_return_greeting(person)
+    greeting = check_return_greeting(person, llm)
     if greeting:
         person.send_message(display_name, greeting, "text")
 
@@ -443,7 +458,7 @@ def render_chat_interface(person, llm, memory_manager, debug_mode):
 
     # Check for return greeting
     display_name = _get_user_display_name()
-    greeting = check_return_greeting(person)
+    greeting = check_return_greeting(person, llm)
     if greeting:
         person.send_message(display_name, greeting, "text")
 

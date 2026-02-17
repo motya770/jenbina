@@ -64,6 +64,7 @@ class PersonModel:
     interests: Dict[str, float] = field(default_factory=dict)  # topic -> score [0,1]
     inferred_emotional_state: str = "neutral"
     relationship: RelationshipState = field(default_factory=RelationshipState)
+    user_dossier: Dict[str, Any] = field(default_factory=dict)
     last_predicted_reaction: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -72,6 +73,7 @@ class PersonModel:
             "interests": dict(self.interests),
             "inferred_emotional_state": self.inferred_emotional_state,
             "relationship": self.relationship.to_dict(),
+            "user_dossier": dict(self.user_dossier),
             "last_predicted_reaction": self.last_predicted_reaction,
         }
 
@@ -82,6 +84,7 @@ class PersonModel:
             interests=dict(data.get("interests", {})),
             inferred_emotional_state=data.get("inferred_emotional_state", "neutral"),
             relationship=RelationshipState.from_dict(data.get("relationship", {})),
+            user_dossier=dict(data.get("user_dossier", {})),
             last_predicted_reaction=data.get("last_predicted_reaction", ""),
         )
 

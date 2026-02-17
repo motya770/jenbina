@@ -21,8 +21,13 @@ from core.ui.auth_page import render_auth_page, render_user_header
 
 
 def init_llm():
-    """Initialize LLM instances."""
-    llm = get_llm(provider="openai", temperature=1, max_tokens=600)
+    """Initialize LLM instances.
+
+    Chat LLM uses GPT-5.2 (openai-advanced) for richer emotional intelligence.
+    JSON-mode LLM stays on GPT-5-nano for cost efficiency.
+    """
+    chat_model = os.getenv("OPENAI_CHAT_MODEL", "openai-advanced")
+    llm = get_llm(provider=chat_model, temperature=1, max_tokens=600)
     llm_json_mode = get_json_llm(provider="openai", temperature=1)
     return llm, llm_json_mode
 
@@ -50,6 +55,11 @@ def _load_or_create_person(user_db: UserDatabase, user_id: int) -> Person:
         person.init_self_narrative()
     if person.curiosity_system is None:
         person.init_curiosity_system()
+    # Always (re)init insight system with a plain LLM — deserialize passes
+    # the JSON-mode LLM which causes 400 errors because InsightSystem's
+    # prompt doesn't mention "json".
+    insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
+    person.init_insight_system(insight_llm)
     return person
 
 
@@ -84,6 +94,8 @@ def init_session_state():
             person.init_social_cognition()
             person.init_self_narrative()
             person.init_curiosity_system()
+            insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
+            person.init_insight_system(insight_llm)
         st.session_state.person = person
         st.session_state.action_history = []
         print(person)
@@ -107,6 +119,32 @@ def init_session_state():
         st.session_state.person.init_self_narrative()
     if st.session_state.person.curiosity_system is None:
         st.session_state.person.init_curiosity_system()
+    if st.session_state.person.insight_system is None:
+        insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
+        st.session_state.person.init_insight_system(insight_llm)
+
+    # Deep Emotional Mirror: background research on first login
+    if "user_research_done" not in st.session_state:
+        st.session_state.user_research_done = True
+        user = st.session_state.get("current_user")
+        if user and st.session_state.person.social_cognition is not None:
+            display_name = user.get("display_name") or user.get("email", "User")
+            email = user.get("email", "")
+            model = st.session_state.person.social_cognition.get_or_create_model(display_name)
+            if not model.user_dossier:
+                import threading
+                def _run_research():
+                    try:
+                        from core.research.user_research import research_user
+                        insight_llm = get_llm(provider="openai-advanced", temperature=0.5, max_tokens=1000)
+                        dossier = research_user(insight_llm, display_name, email)
+                        if dossier:
+                            model.user_dossier = dossier
+                            save_person_state()
+                            print(f"User research complete for {display_name}")
+                    except Exception as e:
+                        print(f"Background user research failed: {e}")
+                threading.Thread(target=_run_research, daemon=True).start()
 
     if 'meta_cognitive_system' not in st.session_state:
         _, llm_json_mode = init_llm()

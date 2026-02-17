@@ -59,6 +59,7 @@ class Person:
     social_cognition: Any = None  # Initialized separately
     self_narrative: Any = None  # Initialized separately
     curiosity_system: Any = None  # Initialized separately
+    insight_system: Any = None  # Initialized separately (needs LLM)
     last_visit_time: Optional[datetime] = None
     conversations: Dict[str, Conversation] = field(default_factory=dict)
 
@@ -106,7 +107,12 @@ class Person:
         """Initialize curiosity / exploration system."""
         from ..cognition.curiosity_system import CuriositySystem
         self.curiosity_system = CuriositySystem()
-    
+
+    def init_insight_system(self, llm):
+        """Initialize the insight system with an LLM instance."""
+        from ..insights.insight_system import InsightSystem
+        self.insight_system = InsightSystem(llm)
+
     def update_all_needs(self):
         """Update all needs, decay emotions, and decay lessons"""
         self.maslow_needs.update_all_needs()
@@ -261,6 +267,8 @@ class Person:
             data["self_narrative"] = self.self_narrative.to_dict()
         if self.curiosity_system is not None:
             data["curiosity_system"] = self.curiosity_system.to_dict()
+        if self.insight_system is not None:
+            data["insight_system"] = self.insight_system.to_dict()
         data["last_visit_time"] = self.last_visit_time.isoformat() if self.last_visit_time else None
         return json.dumps(data)
 
@@ -323,6 +331,12 @@ class Person:
             person.curiosity_system = CuriositySystem.from_dict(data["curiosity_system"])
         else:
             person.curiosity_system = None
+
+        if "insight_system" in data and llm is not None:
+            from ..insights.insight_system import InsightSystem
+            person.insight_system = InsightSystem.from_dict(data["insight_system"], llm)
+        else:
+            person.insight_system = None
 
         lvt = data.get("last_visit_time")
         person.last_visit_time = datetime.fromisoformat(lvt) if lvt else None
