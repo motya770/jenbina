@@ -40,17 +40,6 @@ def main():
     person = st.session_state.person
     meta_cognitive_system = st.session_state.meta_cognitive_system
 
-    # ── Navigation ──────────────────────────────────────────────────────
-    nav1, nav2, nav3, nav4 = st.columns(4)
-    with nav1:
-        st.page_link("app.py", label="Simulation", icon="👧")
-    with nav2:
-        st.page_link("pages/2_💬_Chat.py", label="Chat", icon="💬")
-    with nav3:
-        st.page_link("pages/3_🌍_Environment.py", label="Environment", icon="🌍")
-    with nav4:
-        st.page_link("pages/5_🔧_Debug_Info.py", label="Debug Info", icon="🔧")
-
     st.title("👧 Jenbina")
     render_mood_indicator(person)
 
@@ -80,7 +69,13 @@ def main():
         debug_mode=st.session_state.get("debug_mode", False),
     )
 
-    if controls["run_loop"] or controls["single_run"]:
+    # Auto-start a single simulation iteration on first load after auth
+    auto_start = False
+    if "simulation_auto_started" not in st.session_state:
+        st.session_state.simulation_auto_started = True
+        auto_start = True
+
+    if controls["run_loop"] or controls["single_run"] or auto_start:
         idle_placeholder.empty()
         iterations = controls["num_iterations"] if controls["run_loop"] else 1
 
