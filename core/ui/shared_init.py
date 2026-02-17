@@ -22,7 +22,7 @@ from core.ui.auth_page import render_auth_page, render_user_header
 
 def init_llm():
     """Initialize LLM instances."""
-    llm = get_llm(provider="openai", temperature=1)
+    llm = get_llm(provider="openai", temperature=1, max_tokens=600)
     llm_json_mode = get_json_llm(provider="openai", temperature=1)
     return llm, llm_json_mode
 

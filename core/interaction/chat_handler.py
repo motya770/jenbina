@@ -1,6 +1,12 @@
 import json
-from langchain.schema import HumanMessage
+from langchain.schema import HumanMessage, SystemMessage
 from ..memory.conversation_memory import ChromaMemoryManager
+from .guardrails import (
+    check_injection,
+    build_system_message,
+    make_refusal_response,
+    JENBINA_SYSTEM_PROMPT,
+)
 
 def basic_needs_to_json(basic_needs):
     """Convert BasicNeeds object to JSON-serializable format"""
@@ -161,7 +167,10 @@ Your current state:
 Write a natural 1-3 sentence message to initiate conversation. Don't explain your emotions or needs directly — just let them color what you say. Be casual and genuine."""
 
     try:
-        response = llm.invoke([HumanMessage(content=prompt)])
+        response = llm.invoke([
+            SystemMessage(content=JENBINA_SYSTEM_PROMPT),
+            HumanMessage(content=prompt),
+        ])
         text = response.content.strip()
         return text if text else None
     except Exception as e:
@@ -210,7 +219,29 @@ def handle_chat_interaction(
             print(f"✅ Stored with embedding ID: {embedding_id}")
         else:
             print("❌ No memory manager available for storing user message")
-        
+
+        # --- Prompt-injection guard ---
+        should_block, _ = check_injection(user_input)
+        if should_block:
+            refusal = make_refusal_response()
+            st.chat_message("assistant").write(refusal)
+            # Store refusal in memory for context continuity
+            if memory_manager:
+                metadata = create_metadata_from_person_state(person_state, world_description, action_decision)
+                memory_manager.store_conversation(
+                    person_name=chroma_person,
+                    message_content=refusal,
+                    message_type="jenbina_response",
+                    metadata=metadata,
+                )
+            return {
+                "user_message": user_input,
+                "assistant_response": refusal,
+                "social_strategy": "deflect",
+                "social_context": None,
+                "curiosity_context": None,
+            }
+
         # Get relevant context from Chroma
         relevant_context = ""
         if memory_manager:
@@ -325,8 +356,10 @@ def handle_chat_interaction(
         full_context = "\n".join(context_parts)
         
         # Generate and display Jenbina's response
+        system_msg = build_system_message(user_input)
         response = llm.invoke([
-            HumanMessage(content=f"""As Jenbina, respond to the following user message: "{user_input}"
+            SystemMessage(content=system_msg),
+            HumanMessage(content=f"""Respond to the following user message: "{user_input}"
 
 Consider your current state and context:
 {full_context}
