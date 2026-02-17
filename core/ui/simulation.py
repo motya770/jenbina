@@ -12,6 +12,7 @@ from core.needs.maslow_decision_chain import create_maslow_action_executor
 from core.cognition.asimov_check_chain import create_asimov_check_system
 from core.cognition.state_analysis_chain import create_state_analysis_system
 from core.environment.world_state import create_world_description_system, create_comprehensive_world_state, get_world_state_summary
+from core.environment.location_system import PaloAltoLocationSystem
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 
@@ -694,6 +695,50 @@ def _card(title: str):
         yield
 
 
+def _detect_location_from_action(chosen_action: str) -> str | None:
+    """Detect if the chosen action moves Jenbina to a known location.
+
+    Returns the location name if a match is found, otherwise None.
+    """
+    if not chosen_action:
+        return None
+
+    action_lower = chosen_action.lower()
+
+    # All known locations — order matters: check longer/more specific names first
+    location_system = PaloAltoLocationSystem()
+    location_names = sorted(location_system.locations.keys(), key=len, reverse=True)
+
+    for name in location_names:
+        if name.lower() in action_lower:
+            return name
+
+    # Keyword aliases for common references
+    _aliases = {
+        "home": "Jenbina's House",
+        "go back home": "Jenbina's House",
+        "return home": "Jenbina's House",
+        "head home": "Jenbina's House",
+        "coupa": "Coupa Cafe",
+        "baylands": "Baylands Nature Preserve",
+        "stanford campus": "Stanford University",
+        "shopping center": "Stanford Shopping Center",
+        "shopping mall": "Stanford Shopping Center",
+        "computer museum": "Computer History Museum",
+        "history museum": "Computer History Museum",
+        "filoli": "Filoli Gardens",
+        "half moon": "Half Moon Bay",
+        "santana": "Santana Row",
+        "university ave": "University Avenue",
+        "downtown": "University Avenue",
+    }
+    for alias, loc_name in _aliases.items():
+        if alias in action_lower:
+            return loc_name
+
+    return None
+
+
 def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration):
     """Run a single simulation iteration with live-updating card grid.
 
@@ -719,7 +764,9 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"  🌍 Stage 1: Environment")
     print(f"{'─'*40}")
     person_dict = get_person_dict(person)
-    world = create_comprehensive_world_state(person_location="Jenbina's House")
+    # Use tracked location (updated after each action) or default to home
+    current_location = st.session_state.get("jenbina_location", "Jenbina's House")
+    world = create_comprehensive_world_state(person_location=current_location)
     world_summary = get_world_state_summary(world)
     print(f"  👤 Person: {person.name} | Satisfaction: {satisfaction_before:.1f}%")
     print(f"  📍 Location: {world_summary['location']['name']}")
@@ -984,6 +1031,14 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         print(f"  🎯 Action effect applied: {matched_action} → satisfied {effect_result.get('satisfied_needs', {})}")
     else:
         print(f"  ⚠️  No need-satisfaction mapping for action: {chosen}")
+
+    # Detect if the action moves Jenbina to a new location
+    new_location = _detect_location_from_action(chosen)
+    if new_location:
+        old_location = st.session_state.get("jenbina_location", "Jenbina's House")
+        if new_location != old_location:
+            st.session_state["jenbina_location"] = new_location
+            print(f"  📍 Location changed: {old_location} → {new_location}")
 
     # Action narrative placeholder — updated after post-processing with satisfaction delta
     _, action_center, _ = st.columns([1, 2, 1])
