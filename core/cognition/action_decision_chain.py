@@ -55,7 +55,7 @@ Lessons Learned from Past Experiences:
 Current Goals:
 {current_goals}
 
-Recent Actions Taken (do NOT repeat these unless the need is still critical):
+Recent Actions Taken (IMPORTANT — you MUST choose a DIFFERENT action from these):
 {recent_actions}
 
 Analyze the situation and respond in JSON with:
@@ -63,6 +63,7 @@ Analyze the situation and respond in JSON with:
 - conflicts: list of any conflicts between needs, goals, plan, and emotions
 - emotional_direction: what the current emotional state suggests the person should do
 - relevant_lessons: list of past lessons that are relevant right now (empty list if none)
+- action_variety_note: explain why you must pick something different from recent actions
 """,
 )
 

@@ -812,6 +812,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         action = (record.get("action_decision", {}) or {}).get("chosen_action")
         if action:
             recent_actions.append(action)
+    print(f"  📋 Recent actions for context ({len(recent_actions)}): {recent_actions}")
 
     curiosity_text = "Curiosity is low; prioritize practical actions."
     if getattr(person, "curiosity_system", None) is not None:
@@ -924,29 +925,44 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     # Apply action effects to needs via fuzzy matching
     action_executor = create_maslow_action_executor(person.maslow_needs)
     _action_key_map = {
-        "eat": "eat", "food": "eat", "cook": "eat", "meal": "eat", "breakfast": "eat", "lunch": "eat", "dinner": "eat",
+        # Physiological
+        "eat": "eat", "food": "eat", "cook": "eat", "meal": "eat",
+        "breakfast": "eat", "lunch": "eat", "dinner": "eat", "kitchen": "eat", "snack": "eat",
         "drink": "drink", "water": "drink", "coffee": "drink", "tea": "drink",
         "sleep": "sleep", "nap": "sleep", "bed": "sleep",
-        "rest": "rest", "relax": "rest",
-        "shelter": "find_shelter", "home": "find_shelter",
+        "rest": "rest", "relax": "rest", "sit": "rest", "lounge": "rest",
+        "shelter": "find_shelter", "home": "find_shelter", "house": "find_shelter", "inside": "find_shelter",
         "health": "maintain_health", "exercise": "maintain_health", "walk": "maintain_health",
-        "safe": "find_safety", "security": "find_safety",
-        "routine": "establish_routine",
-        "order": "create_order", "clean": "create_order", "organize": "create_order",
-        "protect": "seek_protection",
-        "socialize": "socialize", "talk": "socialize", "chat": "socialize", "conversation": "socialize",
+        "outside": "maintain_health", "courtyard": "maintain_health", "stroll": "maintain_health",
+        "fresh air": "maintain_health", "stretch": "maintain_health", "garden": "maintain_health",
+        "step out": "maintain_health",
+        # Safety
+        "safe": "find_safety", "security": "find_safety", "lock": "find_safety",
+        "routine": "establish_routine", "plan": "establish_routine", "schedule": "establish_routine",
+        "order": "create_order", "clean": "create_order", "organize": "create_order", "tidy": "create_order",
+        "protect": "seek_protection", "check": "seek_protection",
+        # Social
+        "socialize": "socialize", "talk": "socialize", "chat": "socialize",
+        "conversation": "socialize", "greet": "socialize", "visit": "socialize",
+        "neighbor": "socialize", "call": "socialize",
         "friend": "make_friends",
         "love": "seek_love",
-        "community": "join_community",
+        "community": "join_community", "gather": "join_community", "market": "join_community",
         "relationship": "build_relationships",
-        "goal": "work_on_goals", "work": "work_on_goals",
+        # Esteem
+        "goal": "work_on_goals", "work": "work_on_goals", "task": "work_on_goals", "chore": "work_on_goals",
         "confidence": "build_confidence",
         "recognition": "seek_recognition",
-        "skill": "develop_skills", "practice": "develop_skills", "study": "develop_skills",
+        "skill": "develop_skills", "practice": "develop_skills", "study": "develop_skills", "train": "develop_skills",
+        # Self-actualization
         "learn": "learn_new_things", "read": "learn_new_things", "book": "learn_new_things",
+        "explor": "learn_new_things", "observ": "learn_new_things", "discover": "learn_new_things",
+        "investigat": "learn_new_things", "inspect": "learn_new_things", "surround": "learn_new_things",
         "creative": "be_creative", "paint": "be_creative", "write": "be_creative", "art": "be_creative",
-        "purpose": "find_purpose",
+        "sing": "be_creative", "music": "be_creative", "draw": "be_creative",
+        "purpose": "find_purpose", "pray": "find_purpose",
         "meaning": "explore_meaning", "reflect": "explore_meaning", "meditat": "explore_meaning",
+        "think": "explore_meaning", "contemplate": "explore_meaning",
         "philosoph": "philosophical_exploration",
     }
     import re
@@ -1281,8 +1297,10 @@ def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations
             # Create expander for each iteration
             with st.expander(f"📍 Iteration {iteration + 1} of {iterations}", expanded=(iteration == iterations - 1)):
                 result = run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration)
-                
-                # Store iteration record
+
+                # Store iteration record and immediately update session
+                # history so the NEXT iteration sees this action in
+                # recent_actions / last_action prompts.
                 iteration_record = {
                     "iteration": iteration + 1,
                     "timestamp": datetime.now().isoformat(),
@@ -1293,7 +1311,12 @@ def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations
                     "world_summary": result["world_summary"]
                 }
                 results.append(iteration_record)
-        
+                # Push to session history immediately so next iteration
+                # can read recent actions from it.
+                if "simulation_history" not in st.session_state:
+                    st.session_state.simulation_history = []
+                st.session_state.simulation_history.append(iteration_record)
+
         # Wait before next iteration (except for the last one)
         if iteration < iterations - 1:
             status_text.text(f"⏳ Waiting {delay_seconds} seconds before next iteration...")

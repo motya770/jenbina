@@ -84,7 +84,8 @@ def main():
             delay_seconds=controls["delay_seconds"],
         )
 
-        st.session_state.simulation_history.extend(results)
+        # History is already updated inside run_simulation_loop per iteration
+        # so that each iteration can see the previous one's action.
 
         if results:
             last = results[-1]
