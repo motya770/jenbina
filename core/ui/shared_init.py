@@ -116,6 +116,9 @@ def init_session_state():
     if 'environment_simulator' not in st.session_state:
         st.session_state.environment_simulator = EnvironmentSimulator("Palo Alto, CA")
 
+    if 'showed_return_greeting' not in st.session_state:
+        st.session_state.showed_return_greeting = False
+
     if 'simulation_completed' not in st.session_state:
         st.session_state.simulation_completed = False
         st.session_state.needs_response = None

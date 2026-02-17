@@ -18,6 +18,7 @@ from core.ui.simulation import (
     render_environment_ribbon,
     render_needs_bars,
     render_emotion_chips,
+    render_mood_indicator,
     display_jenbina_image,
     get_jenbina_image_for_emotion,
 )
@@ -45,6 +46,7 @@ def main():
         st.page_link("pages/3_🌍_Environment.py", label="Environment", icon="🌍")
 
     st.title("👧 Jenbina")
+    render_mood_indicator(person)
 
     # ── Sidebar: Simulation Controls & Debug ─────────────────────────────
     with st.sidebar:

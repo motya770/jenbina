@@ -15,7 +15,7 @@ from core.environment.world_state import create_world_description_system, create
 from core.environment.location_system import PaloAltoLocationSystem
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
-from core.ui.chat import update_system_stage
+from core.ui.chat import update_system_stage, send_proactive_message
 
 
 def inject_tamagotchi_css():
@@ -412,6 +412,30 @@ def render_emotion_chips(person):
     chips_html += "</div>"
 
     st.markdown(chips_html, unsafe_allow_html=True)
+
+
+def render_mood_indicator(person):
+    """Render a small colored pill badge showing Jenbina's dominant mood."""
+    dominant = person.emotion_system.get_dominant_emotions(1)
+    if not dominant:
+        return
+
+    emotion_name = dominant[0]["name"].lower()
+    intensity = int(dominant[0]["intensity"])
+
+    emoji_map = {
+        "joy": "😊", "sadness": "😢", "anger": "😠", "fear": "😨",
+        "surprise": "😲", "disgust": "🤢", "trust": "🤗", "anticipation": "✨",
+    }
+    positive_emotions = {"joy", "trust", "anticipation", "surprise"}
+    emoji = emoji_map.get(emotion_name, "💭")
+    color = "#4CAF50" if emotion_name in positive_emotions else "#E53935"
+
+    st.markdown(
+        f'<span style="background:{color};color:white;padding:4px 12px;border-radius:12px;'
+        f'font-size:0.9em;font-weight:600;">{emoji} {emotion_name.capitalize()} ({intensity})</span>',
+        unsafe_allow_html=True,
+    )
 
 
 def render_action_narrative(action_response, satisfaction_before, satisfaction_after):
@@ -1322,6 +1346,17 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         st.json(person_dict)
         st.caption("World State")
         st.json(world_summary)
+
+    # Check if Jenbina wants to say something proactively
+    try:
+        llm = st.session_state.get("_proactive_llm")
+        if llm is None:
+            from core.connect import get_llm
+            llm = get_llm(provider="openai", temperature=1)
+            st.session_state._proactive_llm = llm
+        send_proactive_message(person, llm)
+    except Exception as e:
+        print(f"  Proactive message check failed: {e}")
 
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
     print(f"{'='*60}")
