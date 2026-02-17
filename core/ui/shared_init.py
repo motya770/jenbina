@@ -121,6 +121,29 @@ def init_session_state():
         insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
         st.session_state.person.init_insight_system(insight_llm)
 
+    # Deep Emotional Mirror: background research on first login
+    if "user_research_done" not in st.session_state:
+        st.session_state.user_research_done = True
+        user = st.session_state.get("current_user")
+        if user and st.session_state.person.social_cognition is not None:
+            display_name = user.get("display_name") or user.get("email", "User")
+            email = user.get("email", "")
+            model = st.session_state.person.social_cognition.get_or_create_model(display_name)
+            if not model.user_dossier:
+                import threading
+                def _run_research():
+                    try:
+                        from core.research.user_research import research_user
+                        insight_llm = get_llm(provider="openai-advanced", temperature=0.5, max_tokens=1000)
+                        dossier = research_user(insight_llm, display_name, email)
+                        if dossier:
+                            model.user_dossier = dossier
+                            save_person_state()
+                            print(f"User research complete for {display_name}")
+                    except Exception as e:
+                        print(f"Background user research failed: {e}")
+                threading.Thread(target=_run_research, daemon=True).start()
+
     if 'meta_cognitive_system' not in st.session_state:
         _, llm_json_mode = init_llm()
         st.session_state.meta_cognitive_system = MetaCognitiveSystem(llm_json_mode)
