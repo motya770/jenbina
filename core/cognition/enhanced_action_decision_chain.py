@@ -4,12 +4,12 @@ from typing import Dict, Any, Optional
 import json
 from ..environment.world_state import WorldState
 
-def create_meta_cognitive_action_chain(llm, person, world_description, meta_cognitive_system: MetaCognitiveSystem, world_state: Optional[WorldState] = None):
+def create_meta_cognitive_action_chain(llm, person, world_description, meta_cognitive_system: MetaCognitiveSystem, world_state: Optional[WorldState] = None, recent_actions=None):
     """Enhanced action decision with meta-cognitive monitoring"""
     
     # Get original decision with world state information
     action_chain = create_action_decision_chain(llm)
-    original_decision = action_chain(person, world_description, llm, world_state)
+    original_decision = action_chain(person, world_description, llm, world_state, recent_actions=recent_actions)
     
     # Use the real chain-of-thought reasoning trace produced by the 3-step
     # action decision chain (assess -> deliberate -> decide).

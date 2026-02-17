@@ -16,7 +16,7 @@ ASSESS_PROMPT = PromptTemplate(
         "overall_satisfaction", "emotional_state", "world_state_info",
         "current_plan_step", "learned_lessons", "current_goals",
         "working_memory", "inner_monologue", "self_narrative",
-        "curiosity_context",
+        "curiosity_context", "recent_actions",
     ],
     template="""You are the internal reasoning system of a simulated person.
 Your job in this step is ONLY to assess the current situation — do NOT choose
@@ -55,11 +55,15 @@ Lessons Learned from Past Experiences:
 Current Goals:
 {current_goals}
 
+Recent Actions Taken (IMPORTANT — you MUST choose a DIFFERENT action from these):
+{recent_actions}
+
 Analyze the situation and respond in JSON with:
 - pressing_needs: list of the top 2-3 most urgent needs and a short reason each
 - conflicts: list of any conflicts between needs, goals, plan, and emotions
 - emotional_direction: what the current emotional state suggests the person should do
 - relevant_lessons: list of past lessons that are relevant right now (empty list if none)
+- action_variety_note: explain why you must pick something different from recent actions
 """,
 )
 
@@ -148,6 +152,7 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
         world_description: str,
         llm: BaseLLM,
         world_state: Optional[WorldState] = None,
+        recent_actions: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         # ==============================================================
         # Gather context (unchanged from original)
@@ -235,6 +240,7 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
                 inner_monologue=inner_monologue,
                 self_narrative=self_narrative,
                 curiosity_context=curiosity_context,
+                recent_actions="\n".join(f"- {a}" for a in (recent_actions or [])) or "None yet.",
             ),
         )
         print(f"    [CoT 1/3] Assessment complete: {len(assessment.get('pressing_needs', []))} pressing needs identified")

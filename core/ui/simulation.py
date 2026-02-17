@@ -6,13 +6,17 @@ import time
 import json
 import os
 from types import SimpleNamespace
+from concurrent.futures import ThreadPoolExecutor
 
 from core.needs.maslow_needs import create_basic_needs_chain
+from core.needs.maslow_decision_chain import create_maslow_action_executor
 from core.cognition.asimov_check_chain import create_asimov_check_system
 from core.cognition.state_analysis_chain import create_state_analysis_system
 from core.environment.world_state import create_world_description_system, create_comprehensive_world_state, get_world_state_summary
+from core.environment.location_system import PaloAltoLocationSystem
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
+from core.ui.chat import update_system_stage, send_proactive_message
 
 
 def inject_tamagotchi_css():
@@ -411,6 +415,30 @@ def render_emotion_chips(person):
     st.markdown(chips_html, unsafe_allow_html=True)
 
 
+def render_mood_indicator(person):
+    """Render a small colored pill badge showing Jenbina's dominant mood."""
+    dominant = person.emotion_system.get_dominant_emotions(1)
+    if not dominant:
+        return
+
+    emotion_name = dominant[0]["name"].lower()
+    intensity = int(dominant[0]["intensity"])
+
+    emoji_map = {
+        "joy": "😊", "sadness": "😢", "anger": "😠", "fear": "😨",
+        "surprise": "😲", "disgust": "🤢", "trust": "🤗", "anticipation": "✨",
+    }
+    positive_emotions = {"joy", "trust", "anticipation", "surprise"}
+    emoji = emoji_map.get(emotion_name, "💭")
+    color = "#4CAF50" if emotion_name in positive_emotions else "#E53935"
+
+    st.markdown(
+        f'<span style="background:{color};color:white;padding:4px 12px;border-radius:12px;'
+        f'font-size:0.9em;font-weight:600;">{emoji} {emotion_name.capitalize()} ({intensity})</span>',
+        unsafe_allow_html=True,
+    )
+
+
 def render_action_narrative(action_response, satisfaction_before, satisfaction_after):
     """Render the action decision as a narrative story card."""
     if not isinstance(action_response, dict):
@@ -693,6 +721,50 @@ def _card(title: str):
         yield
 
 
+def _detect_location_from_action(chosen_action: str) -> str | None:
+    """Detect if the chosen action moves Jenbina to a known location.
+
+    Returns the location name if a match is found, otherwise None.
+    """
+    if not chosen_action:
+        return None
+
+    action_lower = chosen_action.lower()
+
+    # All known locations — order matters: check longer/more specific names first
+    location_system = PaloAltoLocationSystem()
+    location_names = sorted(location_system.locations.keys(), key=len, reverse=True)
+
+    for name in location_names:
+        if name.lower() in action_lower:
+            return name
+
+    # Keyword aliases for common references
+    _aliases = {
+        "home": "Jenbina's House",
+        "go back home": "Jenbina's House",
+        "return home": "Jenbina's House",
+        "head home": "Jenbina's House",
+        "coupa": "Coupa Cafe",
+        "baylands": "Baylands Nature Preserve",
+        "stanford campus": "Stanford University",
+        "shopping center": "Stanford Shopping Center",
+        "shopping mall": "Stanford Shopping Center",
+        "computer museum": "Computer History Museum",
+        "history museum": "Computer History Museum",
+        "filoli": "Filoli Gardens",
+        "half moon": "Half Moon Bay",
+        "santana": "Santana Row",
+        "university ave": "University Avenue",
+        "downtown": "University Avenue",
+    }
+    for alias, loc_name in _aliases.items():
+        if alias in action_lower:
+            return loc_name
+
+    return None
+
+
 def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration):
     """Run a single simulation iteration with live-updating card grid.
 
@@ -717,8 +789,11 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🌍 Stage 1: Environment")
     print(f"{'─'*40}")
+    update_system_stage("Building environment...")
     person_dict = get_person_dict(person)
-    world = create_comprehensive_world_state(person_location="Jenbina's House")
+    # Use tracked location (updated after each action) or default to home
+    current_location = st.session_state.get("jenbina_location", "Jenbina's House")
+    world = create_comprehensive_world_state(person_location=current_location)
     world_summary = get_world_state_summary(world)
     print(f"  👤 Person: {person.name} | Satisfaction: {satisfaction_before:.1f}%")
     print(f"  📍 Location: {world_summary['location']['name']}")
@@ -741,22 +816,22 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     # Stage 2 — Perception & Context  (compute, render later)
     # ==================================================================
 
-    # Needs Analysis (LLM call)
+    # ── Local prep for Stage 2 (sequential) ─────────────────────
     print(f"{'─'*40}")
     print(f"  🧠 Stage 2: Perception & Context")
     print(f"{'─'*40}")
-    print(f"  📊 [2a] Analyzing basic needs...")
-    needs_response = create_basic_needs_chain(llm_json_mode, person.maslow_needs)
-    print(f"  ✅ Needs analysis complete")
-    _print_json("📊 Needs Response", needs_response)
+    update_system_stage("Analyzing needs & building context...")
 
-    # Card 2: Context — world description LLM + working memory update → display
-    print(f"  🌐 [2b] Generating world description...")
+    # Prepare recent actions string for world chain
+    prev_actions_list = []
+    for record in st.session_state.get("simulation_history", [])[-6:]:
+        action = (record.get("action_decision", {}) or {}).get("chosen_action")
+        if action:
+            prev_actions_list.append(action)
+    recent_actions_str = "\n".join(f"- {a}" for a in prev_actions_list) or "None yet."
     world_chain = create_world_description_system(llm_json_mode)
-    world_response = world_chain(person, world)
-    print(f"  ✅ World description complete")
-    _print_json("🌐 World Description", world_response)
 
+    # Plan, goals, working memory
     active_plan_step = None
     if person.planning_system is not None:
         result = person.planning_system.get_current_step()
@@ -789,9 +864,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         sleep_satisfaction=person.maslow_needs.get_need_satisfaction("sleep"),
     )
 
-    print(f"  🧩 [2c] Updating working memory...")
     wm_text = person.working_memory.format_for_prompt()
-    print(f"  ✅ Working memory updated")
     plan_text = person.planning_system.format_plan_for_prompt() if person.planning_system is not None else "No active plan."
     goals_text = person.goal_system.format_goals_for_prompt() if person.goal_system is not None else "No goals set yet."
     lessons_text = "No lessons learned yet."
@@ -800,32 +873,15 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             needs=needs_before, emotions=emotions_before
         )
 
-    curiosity_text = "Curiosity is low; prioritize practical actions."
-    if getattr(person, "curiosity_system", None) is not None:
-        available_actions = []
-        try:
-            world_data = json.loads(world_response) if isinstance(world_response, str) else {}
-            available_actions = world_data.get("list_of_actions", []) if isinstance(world_data, dict) else []
-        except Exception:
-            available_actions = []
+    recent_actions = []
+    for record in st.session_state.get("simulation_history", [])[-6:]:
+        action = (record.get("action_decision", {}) or {}).get("chosen_action")
+        if action:
+            recent_actions.append(action)
 
-        recent_actions = []
-        for record in st.session_state.get("simulation_history", [])[-6:]:
-            action = (record.get("action_decision", {}) or {}).get("chosen_action")
-            if action:
-                recent_actions.append(action)
-
-        person.curiosity_system.observe_cycle(
-            needs=needs_before,
-            world_context=world_ctx_wm,
-            available_actions=available_actions,
-            recent_actions=recent_actions,
-        )
-        curiosity_text = person.curiosity_system.format_for_prompt()
-
-    inner_voice_text = "No inner thoughts at the moment."
+    # Prepare inner monologue kwargs (local prep only)
+    monologue_kwargs = None
     if person.inner_monologue is not None:
-        print(f"  🧠 [2d] Generating inner monologue...")
         recent_exp_list = None
         recent_exp_str = "No notable recent experiences."
         if person.learning_system is not None:
@@ -856,7 +912,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             if isinstance(prev, dict):
                 last_action = prev.get("chosen_action", last_action)
 
-        person.inner_monologue.think(
+        monologue_kwargs = dict(
             needs=needs_before,
             emotions=emotions_before,
             working_memory_str=wm_text,
@@ -869,6 +925,48 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             lessons_learned_str=lessons_text,
             goals_str=goals_text,
         )
+
+    # ── Parallel LLM calls (needs + world + monologue) ───────────
+    print(f"  🚀 [2] Running needs, world, monologue in parallel...")
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        needs_future = executor.submit(create_basic_needs_chain, llm_json_mode, person.maslow_needs)
+        world_future = executor.submit(world_chain, person, world, recent_actions=recent_actions_str)
+        if monologue_kwargs is not None:
+            monologue_future = executor.submit(person.inner_monologue.think, **monologue_kwargs)
+        else:
+            monologue_future = None
+
+        needs_response = needs_future.result()
+        world_response = world_future.result()
+        if monologue_future is not None:
+            monologue_future.result()  # mutates person.inner_monologue in-place
+
+    print(f"  ✅ Needs analysis complete")
+    _print_json("📊 Needs Response", needs_response)
+    print(f"  ✅ World description complete")
+    _print_json("🌐 World Description", world_response)
+    print(f"  📋 Recent actions for context ({len(recent_actions)}): {recent_actions}")
+
+    # Curiosity system observation (depends on world_response)
+    curiosity_text = "Curiosity is low; prioritize practical actions."
+    if getattr(person, "curiosity_system", None) is not None:
+        available_actions = []
+        try:
+            world_data = json.loads(world_response) if isinstance(world_response, str) else {}
+            available_actions = world_data.get("list_of_actions", []) if isinstance(world_data, dict) else []
+        except Exception:
+            available_actions = []
+
+        person.curiosity_system.observe_cycle(
+            needs=needs_before,
+            world_context=world_ctx_wm,
+            available_actions=available_actions,
+            recent_actions=recent_actions,
+        )
+        curiosity_text = person.curiosity_system.format_for_prompt()
+
+    inner_voice_text = "No inner thoughts at the moment."
+    if person.inner_monologue is not None:
         inner_voice_text = person.inner_monologue.format_for_prompt()
         print(f"  ✅ Inner monologue generated")
 
@@ -886,6 +984,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  ⚡ Stage 3: Action Decision")
     print(f"{'─'*40}")
+    update_system_stage("Deciding next action...")
     print(f"  🤔 Running meta-cognitive action chain...")
 
     # Show thinking image while deciding
@@ -897,7 +996,8 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         person=person,
         world_description=world_response,
         meta_cognitive_system=meta_cognitive_system,
-        world_state=world
+        world_state=world,
+        recent_actions=recent_actions,
     )
     chosen = action_response.get('chosen_action', '?') if isinstance(action_response, dict) else str(action_response)[:50]
     print(f"  ✅ Action chosen: {chosen}")
@@ -912,6 +1012,77 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     if getattr(person, "curiosity_system", None) is not None and isinstance(action_response, dict):
         person.curiosity_system.update_after_action(action_response.get("chosen_action", ""))
     _print_json("⚡ Action Response", action_response)
+
+    # Apply action effects to needs via fuzzy matching
+    action_executor = create_maslow_action_executor(person.maslow_needs)
+    _action_key_map = {
+        # Physiological
+        "eat": "eat", "food": "eat", "cook": "eat", "meal": "eat",
+        "breakfast": "eat", "lunch": "eat", "dinner": "eat", "kitchen": "eat", "snack": "eat",
+        "drink": "drink", "water": "drink", "coffee": "drink", "tea": "drink",
+        "sleep": "sleep", "nap": "sleep", "bed": "sleep",
+        "rest": "rest", "relax": "rest", "sit": "rest", "lounge": "rest",
+        "shelter": "find_shelter", "home": "find_shelter", "house": "find_shelter", "inside": "find_shelter",
+        "health": "maintain_health", "exercise": "maintain_health", "walk": "maintain_health",
+        "outside": "maintain_health", "courtyard": "maintain_health", "stroll": "maintain_health",
+        "fresh air": "maintain_health", "stretch": "maintain_health", "garden": "maintain_health",
+        "step out": "maintain_health",
+        # Safety
+        "safe": "find_safety", "security": "find_safety", "lock": "find_safety",
+        "routine": "establish_routine", "plan": "establish_routine", "schedule": "establish_routine",
+        "order": "create_order", "clean": "create_order", "organize": "create_order", "tidy": "create_order",
+        "protect": "seek_protection", "check": "seek_protection",
+        # Social
+        "socialize": "socialize", "talk": "socialize", "chat": "socialize",
+        "conversation": "socialize", "greet": "socialize", "visit": "socialize",
+        "neighbor": "socialize", "call": "socialize",
+        "friend": "make_friends",
+        "love": "seek_love",
+        "community": "join_community", "gather": "join_community", "market": "join_community",
+        "relationship": "build_relationships",
+        # Esteem
+        "goal": "work_on_goals", "work": "work_on_goals", "task": "work_on_goals", "chore": "work_on_goals",
+        "confidence": "build_confidence",
+        "recognition": "seek_recognition",
+        "skill": "develop_skills", "practice": "develop_skills", "study": "develop_skills", "train": "develop_skills",
+        # Self-actualization
+        "learn": "learn_new_things", "read": "learn_new_things", "book": "learn_new_things",
+        "explor": "learn_new_things", "observ": "learn_new_things", "discover": "learn_new_things",
+        "investigat": "learn_new_things", "inspect": "learn_new_things", "surround": "learn_new_things",
+        "creative": "be_creative", "paint": "be_creative", "write": "be_creative", "art": "be_creative",
+        "sing": "be_creative", "music": "be_creative", "draw": "be_creative",
+        "purpose": "find_purpose", "pray": "find_purpose",
+        "meaning": "explore_meaning", "reflect": "explore_meaning", "meditat": "explore_meaning",
+        "think": "explore_meaning", "contemplate": "explore_meaning",
+        "philosoph": "philosophical_exploration",
+    }
+    import re
+    chosen_lower = chosen.lower()
+    matched_action = None
+    # Try word-boundary match first to avoid false positives (e.g. "rest" in "restaurant")
+    for keyword, action_key in _action_key_map.items():
+        if re.search(r'\b' + re.escape(keyword), chosen_lower):
+            matched_action = action_key
+            break
+    if matched_action is None:
+        # Fall back to substring match
+        for keyword, action_key in _action_key_map.items():
+            if keyword in chosen_lower:
+                matched_action = action_key
+                break
+    if matched_action:
+        effect_result = action_executor(matched_action)
+        print(f"  🎯 Action effect applied: {matched_action} → satisfied {effect_result.get('satisfied_needs', {})}")
+    else:
+        print(f"  ⚠️  No need-satisfaction mapping for action: {chosen}")
+
+    # Detect if the action moves Jenbina to a new location
+    new_location = _detect_location_from_action(chosen)
+    if new_location:
+        old_location = st.session_state.get("jenbina_location", "Jenbina's House")
+        if new_location != old_location:
+            st.session_state["jenbina_location"] = new_location
+            print(f"  📍 Location changed: {old_location} → {new_location}")
 
     # Action narrative placeholder — updated after post-processing with satisfaction delta
     _, action_center, _ = st.columns([1, 2, 1])
@@ -930,12 +1101,36 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🛡️  Stage 4: Checks & Analysis")
     print(f"{'─'*40}")
-    print(f"  ⚖️  [4a] Running Asimov safety check...")
+    update_system_stage("Running safety & emotion checks...")
     asimov_chain = create_asimov_check_system(llm_json_mode)
-    asimov_response = asimov_chain(action_response)
+    action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
+
+    # ── Parallel: asimov safety check + emotion analysis ─────────
+    print(f"  🚀 [4] Running safety check + emotion analysis in parallel...")
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        asimov_future = executor.submit(asimov_chain, action_response)
+        emotion_future = executor.submit(
+            analyze_emotion_impact,
+            llm=llm_json_mode,
+            situation=action_situation,
+            emotion_system=person.emotion_system,
+            maslow_needs=person.maslow_needs,
+        )
+
+        asimov_response = asimov_future.result()
+        emotion_adjustments = emotion_future.result()
+
     print(f"  ✅ Safety check complete")
     _print_json("⚖️  Asimov Response", asimov_response)
 
+    if emotion_adjustments:
+        person.emotion_system.apply_adjustments(emotion_adjustments)
+        print(f"  ✅ Emotions: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
+        _print_json("💭 Emotion Adjustments", emotion_adjustments)
+    else:
+        print(f"  ✅ No significant emotional changes")
+
+    # ── Sequential: state analysis (depends on asimov_response) ──
     print(f"  🔍 [4b] Analyzing state changes...")
     state_response = create_state_analysis_system(
         llm_json_mode,
@@ -945,27 +1140,13 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"  ✅ State analysis complete")
     _print_json("🔍 State Analysis", state_response)
 
-    print(f"  💭 [4c] Analyzing emotional impact...")
-    action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
-    emotion_adjustments = analyze_emotion_impact(
-        llm=llm_json_mode,
-        situation=action_situation,
-        emotion_system=person.emotion_system,
-        maslow_needs=person.maslow_needs,
-    )
-    if emotion_adjustments:
-        person.emotion_system.apply_adjustments(emotion_adjustments)
-        print(f"  ✅ Emotions: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
-        _print_json("💭 Emotion Adjustments", emotion_adjustments)
-    else:
-        print(f"  ✅ No significant emotional changes")
-
     # ==================================================================
     # Post-processing: needs update, experience recording, goals, plans
     # ==================================================================
     print(f"{'─'*40}")
     print(f"  📝 Stage 5: Learning & Updates")
     print(f"{'─'*40}")
+    update_system_stage("Learning & updating...")
     print(f"  🔄 Updating needs & decaying emotions...")
     person.update_all_needs()
 
@@ -1147,49 +1328,44 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                 display_curiosity_stats(person, iteration)
 
     # ==================================================================
-    # Tier 3 — Debug details (always collapsed)
+    # Store debug data in session state for the Debug Info page
     # ==================================================================
-    with st.container(border=True):
-        st.caption("🔧 Debug Details")
-        st.caption("Needs Analysis")
-        st.json(needs_response if isinstance(needs_response, dict) else {"raw": str(needs_response)})
-        st.caption("World Description")
-        st.json({"raw": str(world_response)[:2000]} if not isinstance(world_response, dict) else world_response)
-        st.caption("Action Decision")
-        st.json(action_response if isinstance(action_response, dict) else {"raw": str(action_response)})
-        # Chain of thought
-        trace = action_response.get("reasoning_trace", []) if isinstance(action_response, dict) else []
-        if trace:
-            st.caption("Chain of Thought")
-            step_labels = {"assess": "Assess", "deliberate": "Deliberate", "decide": "Decide"}
-            for entry in trace:
-                if isinstance(entry, dict):
-                    label = step_labels.get(entry.get("step", ""), entry.get("step", ""))
-                    st.write(f"**{label}:**")
-                    output = entry.get("output", entry)
-                    st.json(output)
-                else:
-                    st.write(str(entry))
-        st.caption("Safety Check")
-        st.json(asimov_response if isinstance(asimov_response, dict) else {"raw": str(asimov_response)})
-        st.caption("State Analysis")
-        st.json(state_response if isinstance(state_response, dict) else {"raw": str(state_response)})
-        if emotion_adjustments:
-            st.caption("Emotion Adjustments")
-            st.json(emotion_adjustments)
-        display_meta_cognitive_insights(meta_cognitive_system, iteration)
-        display_working_memory_stats(person, iteration)
-        display_identity_stats(person, iteration)
-        display_learning_stats(person, iteration)
-        st.caption("Person State")
-        st.json(person_dict)
-        st.caption("World State")
-        st.json(world_summary)
+    debug_entry = {
+        "iteration": iter_num,
+        "timestamp": datetime.now().isoformat(),
+        "needs_response": needs_response,
+        "world_response": world_response,
+        "action_response": action_response,
+        "asimov_response": asimov_response,
+        "state_response": state_response,
+        "emotion_adjustments": emotion_adjustments,
+        "meta_cognitive_stats": meta_cognitive_system.get_meta_cognitive_stats(),
+        "working_memory_stats": person.working_memory.get_stats(),
+        "identity_stats": person.self_narrative.get_stats() if getattr(person, "self_narrative", None) else None,
+        "learning_stats": person.learning_system.get_learning_stats() if person.learning_system else None,
+        "person_dict": person_dict,
+        "world_summary": world_summary,
+    }
+    if "debug_iterations" not in st.session_state:
+        st.session_state.debug_iterations = []
+    st.session_state.debug_iterations.append(debug_entry)
+
+    # Check if Jenbina wants to say something proactively
+    try:
+        llm = st.session_state.get("_proactive_llm")
+        if llm is None:
+            from core.connect import get_llm
+            llm = get_llm(provider="openai", temperature=1)
+            st.session_state._proactive_llm = llm
+        send_proactive_message(person, llm)
+    except Exception as e:
+        print(f"  Proactive message check failed: {e}")
 
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
     print(f"{'='*60}")
     print(f"  ✅ ITERATION {iter_num} COMPLETE — {iteration_duration:.2f}s")
     print(f"{'='*60}")
+    update_system_stage(f"Iteration {iter_num} complete ({iteration_duration:.1f}s)")
     st.success(f"Iteration {iter_num} completed in {iteration_duration:.2f}s")
 
     return {
@@ -1225,8 +1401,10 @@ def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations
             # Create expander for each iteration
             with st.expander(f"📍 Iteration {iteration + 1} of {iterations}", expanded=(iteration == iterations - 1)):
                 result = run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration)
-                
-                # Store iteration record
+
+                # Store iteration record and immediately update session
+                # history so the NEXT iteration sees this action in
+                # recent_actions / last_action prompts.
                 iteration_record = {
                     "iteration": iteration + 1,
                     "timestamp": datetime.now().isoformat(),
@@ -1237,7 +1415,12 @@ def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations
                     "world_summary": result["world_summary"]
                 }
                 results.append(iteration_record)
-        
+                # Push to session history immediately so next iteration
+                # can read recent actions from it.
+                if "simulation_history" not in st.session_state:
+                    st.session_state.simulation_history = []
+                st.session_state.simulation_history.append(iteration_record)
+
         # Wait before next iteration (except for the last one)
         if iteration < iterations - 1:
             status_text.text(f"⏳ Waiting {delay_seconds} seconds before next iteration...")

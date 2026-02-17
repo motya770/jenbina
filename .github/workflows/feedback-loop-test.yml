@@ -1,0 +1,57 @@
+name: Feedback Loop E2E Test (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      iterations_per_test:
+        description: "Max iterations per test case (higher = more LLM calls)"
+        required: false
+        default: "3"
+
+jobs:
+  feedback-loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: test
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-e2e-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-e2e-
+          ${{ runner.os }}-pip-
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest-playwright playwright
+
+    - name: Install Playwright browsers
+      run: playwright install --with-deps chromium
+
+    - name: Run feedback loop E2E tests
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        JENBINA_SKIP_AUTH: "1"
+      run: |
+        python -m pytest tests/e2e/test_feedback_loop.py -v --tb=short --timeout=1200
+
+    - name: Upload test artifacts on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: feedback-loop-traces
+        path: test-results/
+        retention-days: 7

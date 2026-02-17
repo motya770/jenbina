@@ -139,41 +139,43 @@ def create_maslow_action_executor(person_needs: MaslowNeedsSystem):
             action_details: Additional details about the action
         """
         
-        # Default satisfaction amounts for different actions
+        # Satisfaction amounts for actions — primary effects are strong,
+        # secondary effects give broader need coverage so overall satisfaction
+        # moves noticeably after each action.
         action_satisfactions = {
             # Physiological actions
-            'eat': {'hunger': 30.0, 'health': 5.0},
-            'drink': {'thirst': 25.0, 'health': 3.0},
-            'sleep': {'sleep': 40.0, 'health': 10.0},
-            'rest': {'sleep': 15.0, 'health': 5.0},
-            'find_shelter': {'shelter': 20.0, 'security': 15.0},
-            'maintain_health': {'health': 20.0},
-            
+            'eat': {'hunger': 60.0, 'health': 15.0, 'security': 5.0, 'stability': 5.0},
+            'drink': {'thirst': 50.0, 'health': 10.0, 'hunger': 5.0},
+            'sleep': {'sleep': 70.0, 'health': 20.0, 'stability': 10.0, 'self_esteem': 5.0},
+            'rest': {'sleep': 30.0, 'health': 15.0, 'stability': 5.0},
+            'find_shelter': {'shelter': 40.0, 'security': 30.0, 'protection': 15.0},
+            'maintain_health': {'health': 40.0, 'sleep': 10.0, 'confidence': 10.0},
+
             # Safety actions
-            'find_safety': {'security': 25.0, 'protection': 20.0},
-            'establish_routine': {'stability': 20.0, 'order': 15.0},
-            'create_order': {'order': 25.0, 'stability': 10.0},
-            'seek_protection': {'protection': 30.0, 'security': 15.0},
-            
+            'find_safety': {'security': 50.0, 'protection': 40.0, 'stability': 15.0},
+            'establish_routine': {'stability': 40.0, 'order': 30.0, 'security': 15.0},
+            'create_order': {'order': 50.0, 'stability': 20.0, 'confidence': 10.0},
+            'seek_protection': {'protection': 50.0, 'security': 30.0, 'shelter': 10.0},
+
             # Social actions
-            'socialize': {'social_connection': 20.0, 'friendship': 15.0},
-            'make_friends': {'friendship': 25.0, 'belonging': 15.0},
-            'seek_love': {'love': 30.0, 'intimacy': 20.0},
-            'join_community': {'belonging': 25.0, 'social_connection': 15.0},
-            'build_relationships': {'friendship': 20.0, 'love': 15.0, 'belonging': 10.0},
-            
+            'socialize': {'social_connection': 40.0, 'friendship': 30.0, 'belonging': 15.0, 'self_esteem': 10.0},
+            'make_friends': {'friendship': 50.0, 'belonging': 30.0, 'social_connection': 20.0},
+            'seek_love': {'love': 50.0, 'belonging': 25.0, 'social_connection': 15.0},
+            'join_community': {'belonging': 50.0, 'social_connection': 30.0, 'friendship': 15.0},
+            'build_relationships': {'friendship': 40.0, 'love': 30.0, 'belonging': 20.0, 'social_connection': 15.0},
+
             # Esteem actions
-            'work_on_goals': {'achievement': 25.0, 'confidence': 15.0},
-            'build_confidence': {'confidence': 30.0, 'self_esteem': 20.0},
-            'seek_recognition': {'respect': 25.0, 'achievement': 15.0},
-            'develop_skills': {'achievement': 20.0, 'confidence': 15.0, 'self_esteem': 10.0},
-            
+            'work_on_goals': {'achievement': 50.0, 'confidence': 30.0, 'self_esteem': 15.0, 'purpose': 10.0},
+            'build_confidence': {'confidence': 50.0, 'self_esteem': 40.0, 'achievement': 15.0},
+            'seek_recognition': {'respect': 50.0, 'achievement': 30.0, 'self_esteem': 15.0},
+            'develop_skills': {'achievement': 40.0, 'confidence': 30.0, 'self_esteem': 20.0, 'personal_growth': 15.0},
+
             # Self-actualization actions
-            'learn_new_things': {'personal_growth': 30.0, 'achievement': 15.0},
-            'be_creative': {'creativity': 35.0, 'personal_growth': 20.0},
-            'find_purpose': {'purpose': 25.0, 'meaning': 20.0},
-            'explore_meaning': {'meaning': 30.0, 'purpose': 15.0},
-            'philosophical_exploration': {'meaning': 25.0, 'purpose': 20.0, 'personal_growth': 15.0},
+            'learn_new_things': {'personal_growth': 50.0, 'achievement': 25.0, 'confidence': 15.0, 'meaning': 10.0},
+            'be_creative': {'creativity': 60.0, 'personal_growth': 30.0, 'self_esteem': 15.0, 'meaning': 10.0},
+            'find_purpose': {'purpose': 50.0, 'meaning': 35.0, 'personal_growth': 15.0},
+            'explore_meaning': {'meaning': 50.0, 'purpose': 30.0, 'personal_growth': 20.0},
+            'philosophical_exploration': {'meaning': 45.0, 'purpose': 35.0, 'personal_growth': 25.0, 'creativity': 10.0},
         }
         
         # Get satisfaction amounts for this action

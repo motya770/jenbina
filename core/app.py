@@ -18,6 +18,7 @@ from core.ui.simulation import (
     render_environment_ribbon,
     render_needs_bars,
     render_emotion_chips,
+    render_mood_indicator,
     display_jenbina_image,
     get_jenbina_image_for_emotion,
 )
@@ -36,15 +37,18 @@ def main():
     meta_cognitive_system = st.session_state.meta_cognitive_system
 
     # ── Navigation ──────────────────────────────────────────────────────
-    nav1, nav2, nav3 = st.columns(3)
+    nav1, nav2, nav3, nav4 = st.columns(4)
     with nav1:
         st.page_link("app.py", label="Simulation", icon="👧")
     with nav2:
         st.page_link("pages/2_💬_Chat.py", label="Chat", icon="💬")
     with nav3:
         st.page_link("pages/3_🌍_Environment.py", label="Environment", icon="🌍")
+    with nav4:
+        st.page_link("pages/5_🔧_Debug_Info.py", label="Debug Info", icon="🔧")
 
     st.title("👧 Jenbina")
+    render_mood_indicator(person)
 
     # ── Sidebar: Simulation Controls & Debug ─────────────────────────────
     with st.sidebar:
@@ -84,7 +88,8 @@ def main():
             delay_seconds=controls["delay_seconds"],
         )
 
-        st.session_state.simulation_history.extend(results)
+        # History is already updated inside run_simulation_loop per iteration
+        # so that each iteration can see the previous one's action.
 
         if results:
             last = results[-1]

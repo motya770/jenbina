@@ -5,6 +5,8 @@ import tempfile
 
 import streamlit as st
 from streamlit_google_auth import Authenticate
+from oauthlib.oauth2.rfc6749.errors import InvalidGrantError
+
 from core.auth.user_db import UserDatabase
 
 
@@ -35,8 +37,15 @@ def _get_credentials_path() -> str:
 def _get_redirect_uri() -> str:
     """Return the OAuth redirect URI.
 
-    Uses the ``REDIRECT_URI`` env var if set (for production), otherwise
-    defaults to localhost for local development.
+    Uses the ``REDIRECT_URI`` env var if set (required in production).
+    Defaults to localhost only for local development.
+
+    In production you must:
+    1. Set REDIRECT_URI to your app's public URL (e.g. https://your-app.up.railway.app)
+       with no trailing slash.
+    2. Add that exact URL to Google Cloud Console → APIs & Services → Credentials
+       → your OAuth 2.0 Client → Authorized redirect URIs.
+    Otherwise you will get InvalidGrantError (invalid_grant) when signing in.
     """
     return os.environ.get("REDIRECT_URI", "http://localhost:8501")
 
@@ -62,7 +71,18 @@ def render_auth_page():
         cookie_key="jenbina_secret_key",
         redirect_uri=_get_redirect_uri(),
     )
-    authenticator.check_authentification()
+    try:
+        authenticator.check_authentification()
+    except InvalidGrantError:
+        redirect_uri = _get_redirect_uri()
+        st.error(
+            "**Sign-in failed (invalid_grant).** In production, set the **REDIRECT_URI** "
+            "environment variable to this app's full URL (e.g. `https://your-app.up.railway.app`) "
+            "and add that exact URL under **Authorized redirect URIs** in Google Cloud Console "
+            "→ APIs & Services → Credentials → your OAuth 2.0 Client."
+        )
+        st.code(f"REDIRECT_URI={redirect_uri}", language="text")
+        st.stop()
 
     if st.session_state.get("connected"):
         user_info = st.session_state.get("user_info", {})
