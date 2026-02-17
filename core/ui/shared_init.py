@@ -55,9 +55,11 @@ def _load_or_create_person(user_db: UserDatabase, user_id: int) -> Person:
         person.init_self_narrative()
     if person.curiosity_system is None:
         person.init_curiosity_system()
-    if person.insight_system is None:
-        insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
-        person.init_insight_system(insight_llm)
+    # Always (re)init insight system with a plain LLM — deserialize passes
+    # the JSON-mode LLM which causes 400 errors because InsightSystem's
+    # prompt doesn't mention "json".
+    insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
+    person.init_insight_system(insight_llm)
     return person
 
 
