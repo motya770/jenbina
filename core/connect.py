@@ -7,10 +7,10 @@ from langchain_ollama import ChatOllama
 
 LLMProvider = Literal["openai", "openai-advanced", "ollama", "sambanova"]
 
-def get_llm(provider: LLMProvider = "openai", temperature: float = 1):
+def get_llm(provider: LLMProvider = "openai", temperature: float = 1, max_tokens: int = None):
     """
     Get LLM instance based on provider preference.
-    
+
     Args:
         provider: Which LLM service to use
             - "openai": GPT-4o-mini (default, cost-effective and powerful)
@@ -18,26 +18,33 @@ def get_llm(provider: LLMProvider = "openai", temperature: float = 1):
             - "ollama": Local Llama 3.2 (offline/privacy mode)
             - "sambanova": SambaNova cloud LLM
         temperature: Creativity level (0 = deterministic, 1 = creative)
-    
+        max_tokens: Optional cap on response length (OpenAI providers only)
+
     Returns:
         LLM instance ready to use
     """
-    
+
     if provider == "openai":
         # Default: Cost-effective and reliable
-        return ChatOpenAI(
+        kwargs = dict(
             model="gpt-5-nano",
             temperature=temperature,
-            api_key=os.getenv('OPENAI_API_KEY')
+            api_key=os.getenv('OPENAI_API_KEY'),
         )
-    
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        return ChatOpenAI(**kwargs)
+
     elif provider == "openai-advanced":
         # For complex reasoning and meta-cognition
-        return ChatOpenAI(
+        kwargs = dict(
             model="gpt-5.2",
             temperature=temperature,
-            api_key=os.getenv('OPENAI_API_KEY')
+            api_key=os.getenv('OPENAI_API_KEY'),
         )
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        return ChatOpenAI(**kwargs)
     
     elif provider == "ollama":
         # Local fallback for offline/privacy needs

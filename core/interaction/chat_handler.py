@@ -1,6 +1,12 @@
 import json
-from langchain.schema import HumanMessage
+from langchain.schema import HumanMessage, SystemMessage
 from ..memory.conversation_memory import ChromaMemoryManager
+from .guardrails import (
+    check_injection,
+    build_system_message,
+    make_refusal_response,
+    JENBINA_SYSTEM_PROMPT,
+)
 
 def basic_needs_to_json(basic_needs):
     """Convert BasicNeeds object to JSON-serializable format"""
@@ -52,13 +58,58 @@ def create_metadata_from_person_state(person_state, world_description=None, acti
     
     return metadata
 
-def generate_proactive_message(person, llm, triggers, display_name="User"):
+
+def _build_subsystem_context(person, needs=None, emotions=None):
+    """Extract formatted context from all person subsystems.
+
+    Returns a list of (label, text) tuples, skipping any subsystem that
+    is missing or returns a default/empty output.
+    """
+    parts = []
+
+    _DEFAULTS = {
+        "No inner thoughts at the moment.",
+        "No goals set yet.",
+        "No active plan.",
+        "No lessons learned yet.",
+        "Mind is clear — no particular focus.",
+    }
+
+    def _add(label, text):
+        if text and text not in _DEFAULTS:
+            parts.append((label, text))
+
+    if getattr(person, "inner_monologue", None) is not None:
+        _add("Inner monologue", person.inner_monologue.format_for_prompt())
+
+    if getattr(person, "goal_system", None) is not None:
+        _add("Goals", person.goal_system.format_goals_for_prompt())
+
+    if getattr(person, "planning_system", None) is not None:
+        _add("Current plan", person.planning_system.format_plan_for_prompt())
+
+    if getattr(person, "learning_system", None) is not None:
+        _add("Lessons learned", person.learning_system.format_lessons_for_prompt(
+            needs=needs, emotions=emotions,
+        ))
+
+    if getattr(person, "working_memory", None) is not None:
+        _add("Working memory", person.working_memory.format_for_prompt())
+
+    return parts
+
+
+def generate_proactive_message(person, llm, triggers, display_name="User",
+                               recent_actions=None, world_context=None):
     """Generate a 1-3 sentence natural message Jenbina sends on her own.
 
     Args:
         person: The Person instance.
         llm: LLM instance to generate the message.
         triggers: Dict of trigger contexts from check_proactive_message.
+        display_name: Name shown for the user.
+        recent_actions: Optional list of recent action strings.
+        world_context: Optional string like "home, evening, rainy".
 
     Returns:
         A message string, or None.
@@ -93,6 +144,18 @@ def generate_proactive_message(person, llm, triggers, display_name="User"):
         except Exception:
             pass
 
+    # Subsystem context
+    needs_snapshot = person.get_needs_snapshot() if hasattr(person, "get_needs_snapshot") else {}
+    all_emotions = person.emotion_system.get_emotional_state_summary().get("emotions", {})
+    subsystem_lines = ""
+    for label, text in _build_subsystem_context(person, needs=needs_snapshot, emotions=all_emotions):
+        subsystem_lines += f"- {label}: {text}\n"
+
+    world_line = f"- World: {world_context}\n" if world_context else ""
+    actions_line = ""
+    if recent_actions:
+        actions_line = f"- Recent actions: {' -> '.join(recent_actions)}\n"
+
     prompt = f"""You are Jenbina, a curious and warm person. You want to start a conversation with the user.
 
 Your current state:
@@ -100,11 +163,14 @@ Your current state:
 - Low needs: {needs_str}
 - What's driving you to talk: {triggers_str}
 {social_ctx}
-
+{subsystem_lines}{world_line}{actions_line}
 Write a natural 1-3 sentence message to initiate conversation. Don't explain your emotions or needs directly — just let them color what you say. Be casual and genuine."""
 
     try:
-        response = llm.invoke([HumanMessage(content=prompt)])
+        response = llm.invoke([
+            SystemMessage(content=JENBINA_SYSTEM_PROMPT),
+            HumanMessage(content=prompt),
+        ])
         text = response.content.strip()
         return text if text else None
     except Exception as e:
@@ -128,6 +194,7 @@ def handle_chat_interaction(
     user_id=None,
     person=None,
     conversation_partner_name="User",
+    recent_actions=None,
 ):
     """Handle chat interactions with Jenbina using Chroma memory."""
     if user_input:
@@ -152,7 +219,29 @@ def handle_chat_interaction(
             print(f"✅ Stored with embedding ID: {embedding_id}")
         else:
             print("❌ No memory manager available for storing user message")
-        
+
+        # --- Prompt-injection guard ---
+        should_block, _ = check_injection(user_input)
+        if should_block:
+            refusal = make_refusal_response()
+            st.chat_message("assistant").write(refusal)
+            # Store refusal in memory for context continuity
+            if memory_manager:
+                metadata = create_metadata_from_person_state(person_state, world_description, action_decision)
+                memory_manager.store_conversation(
+                    person_name=chroma_person,
+                    message_content=refusal,
+                    message_type="jenbina_response",
+                    metadata=metadata,
+                )
+            return {
+                "user_message": user_input,
+                "assistant_response": refusal,
+                "social_strategy": "deflect",
+                "social_context": None,
+                "curiosity_context": None,
+            }
+
         # Get relevant context from Chroma
         relevant_context = ""
         if memory_manager:
@@ -239,6 +328,16 @@ def handle_chat_interaction(
             chosen_social_strategy = social.choose_social_strategy(conversation_partner_name, user_input)
             context_parts.append(f"Social model / theory-of-mind:\n{social_context}")
 
+        # Subsystem context (inner monologue, goals, plans, lessons, working memory)
+        if person is not None:
+            needs_snap = person.get_needs_snapshot() if hasattr(person, "get_needs_snapshot") else {}
+            all_emo = person.emotion_system.get_emotional_state_summary().get("emotions", {}) if hasattr(person, "emotion_system") else {}
+            for label, text in _build_subsystem_context(person, needs=needs_snap, emotions=all_emo):
+                context_parts.append(f"{label}:\n{text}")
+
+        if recent_actions:
+            context_parts.append(f"Recent action sequence: {' -> '.join(recent_actions)}")
+
         context_parts.append(f"Current needs: {needs_response}")
         context_parts.append(f"World state: {world_description}")
         context_parts.append(f"Chosen action: {action_decision}")
@@ -257,8 +356,10 @@ def handle_chat_interaction(
         full_context = "\n".join(context_parts)
         
         # Generate and display Jenbina's response
+        system_msg = build_system_message(user_input)
         response = llm.invoke([
-            HumanMessage(content=f"""As Jenbina, respond to the following user message: "{user_input}"
+            SystemMessage(content=system_msg),
+            HumanMessage(content=f"""Respond to the following user message: "{user_input}"
 
 Consider your current state and context:
 {full_context}

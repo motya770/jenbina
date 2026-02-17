@@ -73,7 +73,31 @@ def send_proactive_message(person, llm):
         return None
 
     try:
-        message = generate_proactive_message(person, llm, triggers, display_name=_get_user_display_name())
+        # Extract recent actions and world context from simulation history
+        recent_actions = None
+        world_context = None
+        sim_history = st.session_state.get("simulation_history", [])
+        if sim_history:
+            recent_actions = [
+                r.get("chosen_action", "")
+                for r in sim_history[-6:]
+                if r.get("chosen_action")
+            ]
+            latest = sim_history[-1]
+            ws = latest.get("world_summary", {})
+            if isinstance(ws, dict):
+                loc = ws.get("location", "")
+                tod = ws.get("time_of_day", "")
+                weather = ws.get("weather", "")
+                parts = [p for p in (loc, tod, weather) if p]
+                world_context = ", ".join(parts) if parts else None
+
+        message = generate_proactive_message(
+            person, llm, triggers,
+            display_name=_get_user_display_name(),
+            recent_actions=recent_actions,
+            world_context=world_context,
+        )
         if not message:
             return None
 
@@ -168,6 +192,16 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             for msg in conversation_history
         ])
 
+        # Extract recent actions from simulation history
+        recent_actions = None
+        sim_history = st.session_state.get("simulation_history", [])
+        if sim_history:
+            recent_actions = [
+                r.get("chosen_action", "")
+                for r in sim_history[-6:]
+                if r.get("chosen_action")
+            ]
+
         # Handle chat interaction
         update_system_stage("Generating response...")
         chat_result = handle_chat_interaction(
@@ -186,6 +220,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             user_id=st.session_state.get("current_user", {}).get("id"),
             person=person,
             conversation_partner_name=display_name,
+            recent_actions=recent_actions,
         )
 
         print(chat_result)
