@@ -83,9 +83,9 @@ Jenbina is an open-source AGI simulation that creates a self-sustaining virtual 
 │  │                        EXTERNAL INTEGRATIONS                               │  │
 │  │                                                                             │  │
 │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐            │  │
-│  │  │   OLLAMA LLM    │  │   WEATHER API   │  │   EVENTS API    │            │  │
+│  │  │   OPENAI LLM    │  │   WEATHER API   │  │   EVENTS API    │            │  │
 │  │  │                 │  │                 │  │                 │            │  │
-│  │  │ • llama3.2:3b   │  │ • OpenWeatherMap│  │ • Event Discovery│            │  │
+│  │  │ • GPT-5-nano    │  │ • OpenWeatherMap│  │ • Event Discovery│            │  │
 │  │  │ • JSON Mode     │  │ • Temperature   │  │ • Venue Data    │            │  │
 │  │  │ • Reasoning     │  │ • Conditions    │  │ • Recommendations│            │  │
 │  │  │ • Decision      │  │ • Forecast      │  │ • Dynamic Events│            │  │
@@ -282,12 +282,12 @@ Jenbina is an open-source AGI simulation that creates a self-sustaining virtual 
 ## Technology Stack
 
 - **Language**: Python 3.x
-- **LLM**: Ollama with llama3.2:3b-instruct-fp16
+- **LLM**: OpenAI GPT-5-nano / GPT-5.2
 - **Web Framework**: Streamlit
 - **Vector Database**: ChromaDB
 - **Graph Database**: Neo4j
 - **Time-Series**: SQLite
-- **Embeddings**: Ollama Embeddings
+- **Embeddings**: OpenAI text-embedding-3-small
 - **APIs**: OpenWeatherMap, Event Discovery APIs
 
 ## Scalability Considerations

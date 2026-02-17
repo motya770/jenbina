@@ -260,12 +260,7 @@ def create_memory_integration() -> MemoryIntegration:
     Returns:
         MemoryIntegration instance
     """
-    memory_system = HybridMemorySystem(
-        embeddings_model="llama3.2:3b-instruct-fp16",
-        neo4j_uri="bolt://localhost:7687",
-        neo4j_user="neo4j",
-        neo4j_password="password"
-    )
+    memory_system = HybridMemorySystem()
     
     return MemoryIntegration(memory_system)
 

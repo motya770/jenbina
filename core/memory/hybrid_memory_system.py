@@ -6,7 +6,7 @@ import hashlib
 import os
 import chromadb
 from chromadb.config import Settings
-from langchain_ollama import OllamaEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import logging
@@ -77,34 +77,38 @@ class HybridMemorySystem:
     - SQLite for chronological/time-series data
     """
     
-    def __init__(self, 
-                 embeddings_model: str = "llama3.2:3b-instruct-fp16",
-                 neo4j_uri: str = "bolt://localhost:7687",
-                 neo4j_user: str = "neo4j",
-                 neo4j_password: str = "password",
+    def __init__(self,
+                 embeddings_model: str = "text-embedding-3-small",
+                 neo4j_uri: str = None,
+                 neo4j_user: str = None,
+                 neo4j_password: str = None,
                  vector_store_path: str = "./jenbina_memory",
                  time_series_path: str = "./jenbina_memory/timeseries.db"):
-        
+
         # Initialize logging first
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
-        
-        self.embeddings = OllamaEmbeddings(model=embeddings_model)
+
+        self.embeddings = OpenAIEmbeddings(model=embeddings_model)
         self.vector_store_path = vector_store_path
         self.time_series_path = time_series_path
-        
+
         # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
             separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]
         )
-        
+
         # Initialize vector store (ChromaDB)
         self._initialize_vector_store()
-        
-        # Initialize graph database (Neo4j)
-        self._initialize_graph_database(neo4j_uri, neo4j_user, neo4j_password)
+
+        # Initialize graph database (Neo4j) — read credentials from env if not passed
+        self._initialize_graph_database(
+            uri=neo4j_uri or os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+            user=neo4j_user or os.getenv("NEO4J_USER", "neo4j"),
+            password=neo4j_password or os.getenv("NEO4J_PASSWORD", ""),
+        )
         
         # Initialize time-series database (SQLite)
         self._initialize_time_series_db()

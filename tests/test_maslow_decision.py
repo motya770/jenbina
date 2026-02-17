@@ -17,7 +17,7 @@ from core.needs.maslow_decision_chain import (
     create_maslow_goal_setter,
     analyze_maslow_progress
 )
-from langchain_ollama import ChatOllama
+from core.connect import get_json_llm
 import json
 
 def test_maslow_decision_system():
@@ -26,7 +26,7 @@ def test_maslow_decision_system():
     print("🧠 Initializing Enhanced Maslow Decision System...")
     
     # Initialize LLM
-    llm_json_mode = ChatOllama(model="llama3.2:3b-instruct-fp16", temperature=0, format='json')
+    llm_json_mode = get_json_llm(provider="openai", temperature=0)
     
     # Create needs system with some needs already low
     needs_system = MaslowNeedsSystem()
@@ -116,7 +116,7 @@ def demonstrate_growth_progression():
     
     # Create a fresh needs system
     needs_system = MaslowNeedsSystem()
-    llm_json_mode = ChatOllama(model="llama3.2:3b-instruct-fp16", temperature=0, format='json')
+    llm_json_mode = get_json_llm(provider="openai", temperature=0)
     action_executor = create_maslow_action_executor(needs_system)
     goal_setter = create_maslow_goal_setter(needs_system)
     

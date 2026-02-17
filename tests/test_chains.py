@@ -11,7 +11,7 @@ from core.needs.maslow_needs import MaslowNeedsSystem, BasicNeeds
 from core.person.person import Person
 from core.environment.world_state import WorldState
 from core.cognition.meta_cognition import MetaCognitiveSystem
-from langchain_ollama import ChatOllama
+from core.connect import get_llm
 
 
 class TestChains(unittest.TestCase):
@@ -203,7 +203,7 @@ class TestChains(unittest.TestCase):
         """Test chains with a real LLM (if available)"""
         try:
             # Try to create a real LLM
-            real_llm = ChatOllama(model='llama3.2:3b-instruct-fp16', temperature=0)
+            real_llm = get_llm(provider="openai", temperature=0)
             
             from core.needs.maslow_needs import create_basic_needs_chain
             
