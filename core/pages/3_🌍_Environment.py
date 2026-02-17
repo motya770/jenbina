@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import streamlit as st
 from core.ui.shared_init import require_auth
+from core.ui.simulation import render_mood_indicator
 from core.ui.sidebar import (
     render_environment_sidebar,
     render_location_exploration,
@@ -23,15 +24,20 @@ environment_simulator = st.session_state.environment_simulator
 memory_manager = st.session_state.memory_manager
 debug_mode = st.session_state.get("debug_mode", False)
 
-nav1, nav2, nav3 = st.columns(3)
+nav1, nav2, nav3, nav4 = st.columns(4)
 with nav1:
     st.page_link("app.py", label="👧 Simulation", icon="👧")
 with nav2:
     st.page_link("pages/2_💬_Chat.py", label="💬 Chat", icon="💬")
 with nav3:
     st.page_link("pages/3_🌍_Environment.py", label="🌍 Environment", icon="🌍")
+with nav4:
+    st.page_link("pages/5_🔧_Debug_Info.py", label="🔧 Debug Info", icon="🔧")
 
 st.title("🌍 Environment & Debug")
+
+if "person" in st.session_state:
+    render_mood_indicator(st.session_state.person)
 
 env_col, loc_col = st.columns(2)
 with env_col:

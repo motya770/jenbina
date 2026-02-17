@@ -6,7 +6,7 @@ import os
 # Add the project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-os.environ['LANGSMITH_TRACING'] = 'true'
+os.environ['LANGSMITH_TRACING'] = 'false'
 os.environ['LANGSMITH_ENDPOINT'] = "https://api.smith.langchain.com"
 os.environ['LANGSMITH_API_KEY'] = "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"
 os.environ['LANGSMITH_PROJECT'] = "jenbina"
@@ -115,6 +115,9 @@ def init_session_state():
         st.session_state.memory_manager = ChromaMemoryManager()
     if 'environment_simulator' not in st.session_state:
         st.session_state.environment_simulator = EnvironmentSimulator("Palo Alto, CA")
+
+    if 'showed_return_greeting' not in st.session_state:
+        st.session_state.showed_return_greeting = False
 
     if 'simulation_completed' not in st.session_state:
         st.session_state.simulation_completed = False

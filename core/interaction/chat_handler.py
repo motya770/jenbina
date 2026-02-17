@@ -52,6 +52,66 @@ def create_metadata_from_person_state(person_state, world_description=None, acti
     
     return metadata
 
+def generate_proactive_message(person, llm, triggers, display_name="User"):
+    """Generate a 1-3 sentence natural message Jenbina sends on her own.
+
+    Args:
+        person: The Person instance.
+        llm: LLM instance to generate the message.
+        triggers: Dict of trigger contexts from check_proactive_message.
+
+    Returns:
+        A message string, or None.
+    """
+    # Build a concise prompt from person state
+    dominant = person.emotion_system.get_dominant_emotions(2)
+    emotions_str = ", ".join(f"{d['name']} ({d['intensity']})" for d in dominant) if dominant else "neutral"
+
+    needs_snapshot = person.get_needs_snapshot() if hasattr(person, "get_needs_snapshot") else {}
+    low_needs = [f"{n}: {v:.0f}%" for n, v in needs_snapshot.items() if v < 50]
+    needs_str = ", ".join(low_needs) if low_needs else "all needs adequate"
+
+    trigger_lines = []
+    if "low_social" in triggers:
+        t = triggers["low_social"]
+        trigger_lines.append(f"Feeling lonely — {t['need']} is at {t['satisfaction']:.0f}%")
+    if "strong_emotion" in triggers:
+        t = triggers["strong_emotion"]
+        trigger_lines.append(f"Feeling strong {t['emotion']} ({t['intensity']:.0f})")
+    if "curiosity" in triggers:
+        t = triggers["curiosity"]
+        trigger_lines.append(f"Bored ({t['boredom']:.2f}) and curious ({t['curiosity']:.2f})")
+    triggers_str = "; ".join(trigger_lines)
+
+    # Social model context
+    social_ctx = ""
+    if getattr(person, "social_cognition", None) is not None:
+        try:
+            model = person.social_cognition.get_or_create_model(display_name)
+            rel = model.relationship
+            social_ctx = f"Relationship: trust={rel.trust:.0f}, closeness={rel.closeness:.0f}."
+        except Exception:
+            pass
+
+    prompt = f"""You are Jenbina, a curious and warm person. You want to start a conversation with the user.
+
+Your current state:
+- Emotions: {emotions_str}
+- Low needs: {needs_str}
+- What's driving you to talk: {triggers_str}
+{social_ctx}
+
+Write a natural 1-3 sentence message to initiate conversation. Don't explain your emotions or needs directly — just let them color what you say. Be casual and genuine."""
+
+    try:
+        response = llm.invoke([HumanMessage(content=prompt)])
+        text = response.content.strip()
+        return text if text else None
+    except Exception as e:
+        print(f"LLM proactive message generation failed: {e}")
+        return None
+
+
 def handle_chat_interaction(
     st,
     llm,

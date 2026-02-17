@@ -59,6 +59,7 @@ class Person:
     social_cognition: Any = None  # Initialized separately
     self_narrative: Any = None  # Initialized separately
     curiosity_system: Any = None  # Initialized separately
+    last_visit_time: Optional[datetime] = None
     conversations: Dict[str, Conversation] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -260,6 +261,7 @@ class Person:
             data["self_narrative"] = self.self_narrative.to_dict()
         if self.curiosity_system is not None:
             data["curiosity_system"] = self.curiosity_system.to_dict()
+        data["last_visit_time"] = self.last_visit_time.isoformat() if self.last_visit_time else None
         return json.dumps(data)
 
     @classmethod
@@ -321,6 +323,9 @@ class Person:
             person.curiosity_system = CuriositySystem.from_dict(data["curiosity_system"])
         else:
             person.curiosity_system = None
+
+        lvt = data.get("last_visit_time")
+        person.last_visit_time = datetime.fromisoformat(lvt) if lvt else None
 
         return person
 
