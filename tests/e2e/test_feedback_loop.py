@@ -81,6 +81,7 @@ def _run_one_iteration(page: Page, streamlit_url: str) -> dict:
     }
 
 
+@pytest.mark.skip(reason="Disabled — too slow for regular CI (15-45 min). Run manually via workflow_dispatch.")
 class TestFeedbackLoop:
     """Run multiple iterations and verify the simulation feedback loop
     produces meaningful changes in needs and varied actions."""
