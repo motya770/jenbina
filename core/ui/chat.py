@@ -1,6 +1,7 @@
 """Chat UI components for Jenbina app"""
 import streamlit as st
-from core.interaction.chat_handler import handle_chat_interaction
+from datetime import datetime
+from core.interaction.chat_handler import handle_chat_interaction, generate_proactive_message
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.auth.user_db import UserDatabase
 
@@ -16,6 +17,110 @@ def display_person_state_compact(person):
     dominant = person.emotion_system.get_dominant_emotions(3)
     emotions_str = ", ".join(f"{d['name']}: {d['intensity']}" for d in dominant)
     st.write(f"- Emotions: {emotions_str}")
+
+
+def check_proactive_message(person):
+    """Check if Jenbina should initiate a message based on her current state.
+
+    Returns a trigger context dict or None.
+    """
+    display_name = _get_user_display_name()
+
+    # Cooldown: skip if last interaction was < 5 minutes ago
+    conv = person.conversations.get(display_name)
+    if conv and conv.messages:
+        last_msg_time = conv.messages[-1].timestamp
+        if (datetime.now() - last_msg_time).total_seconds() < 300:
+            return None
+
+    triggers = {}
+
+    # Trigger 1: Low social needs (< 40%)
+    social_needs = ["social_connection", "friendship", "belonging"]
+    for need_name in social_needs:
+        sat = person.maslow_needs.get_need_satisfaction(need_name)
+        if sat < 40:
+            triggers["low_social"] = {
+                "need": need_name,
+                "satisfaction": sat,
+            }
+            break
+
+    # Trigger 2: Dominant emotion intensity > 60
+    dominant = person.emotion_system.get_dominant_emotions(1)
+    if dominant and dominant[0]["intensity"] > 60:
+        triggers["strong_emotion"] = {
+            "emotion": dominant[0]["name"],
+            "intensity": dominant[0]["intensity"],
+        }
+
+    # Trigger 3: High curiosity/boredom
+    if getattr(person, "curiosity_system", None) is not None:
+        stats = person.curiosity_system.get_stats()
+        if stats.get("boredom_level", 0) > 0.6 or stats.get("curiosity_level", 0) > 0.7:
+            triggers["curiosity"] = {
+                "boredom": stats.get("boredom_level", 0),
+                "curiosity": stats.get("curiosity_level", 0),
+            }
+
+    return triggers if triggers else None
+
+
+def send_proactive_message(person, llm):
+    """Orchestrator: check triggers, generate message, store in history."""
+    triggers = check_proactive_message(person)
+    if not triggers:
+        return None
+
+    try:
+        message = generate_proactive_message(person, llm, triggers, display_name=_get_user_display_name())
+        if not message:
+            return None
+
+        display_name = _get_user_display_name()
+        person.send_message(display_name, message, "text")
+
+        # Store in SQLite
+        user_db, user_id = _get_user_db_and_id()
+        if user_db and user_id:
+            user_db.store_message(user_id, "Jenbina", message, "proactive_message")
+
+        print(f"Proactive message sent: {message[:80]}...")
+        return message
+    except Exception as e:
+        print(f"Proactive message failed: {e}")
+        return None
+
+
+def check_return_greeting(person):
+    """Check how long since last visit and return an appropriate greeting, or None."""
+    if st.session_state.get("showed_return_greeting"):
+        return None
+
+    now = datetime.now()
+    last = person.last_visit_time
+    person.last_visit_time = now
+
+    if last is None:
+        st.session_state.showed_return_greeting = True
+        return None
+
+    gap = now - last
+    gap_hours = gap.total_seconds() / 3600
+
+    st.session_state.showed_return_greeting = True
+
+    if gap_hours < 1:
+        return None
+    elif gap_hours < 6:
+        return "You're back!"
+    elif gap_hours < 24:
+        return "I missed you today..."
+    elif gap_hours < 72:
+        return "It's been a while..."
+    else:
+        days = int(gap.total_seconds() / 86400)
+        return f"I was worried you forgot about me... it's been {days} days."
 
 
 def _get_user_display_name() -> str:
@@ -106,6 +211,21 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
                     person.emotion_system.apply_adjustments(emotion_adjustments)
             except Exception as e:
                 print(f"Emotion analysis after chat failed: {e}")
+
+            # Satisfy social needs based on relationship closeness
+            try:
+                if getattr(person, "social_cognition", None) is not None:
+                    model = person.social_cognition.get_or_create_model(display_name)
+                    trust = model.relationship.trust
+                    closeness = model.relationship.closeness
+                    avg_factor = max(0.3, (trust + closeness) / 200)
+                    person.maslow_needs.satisfy_need("social_connection", 15 * avg_factor, source="chat")
+                    person.maslow_needs.satisfy_need("friendship", 10 * avg_factor, source="chat")
+                    person.maslow_needs.satisfy_need("belonging", 8 * avg_factor, source="chat")
+                    person.maslow_needs.satisfy_need("self_esteem", 5, source="chat")
+                    print(f"Chat need satisfaction: factor={avg_factor:.2f} (trust={trust:.1f}, closeness={closeness:.1f})")
+            except Exception as e:
+                print(f"Chat need satisfaction failed: {e}")
 
         update_system_stage("Ready")
 
@@ -255,6 +375,11 @@ def render_chat_simple(person, llm, memory_manager, debug_mode):
     # Show live-updating system stage one-liner
     _init_stage_placeholder()
 
+    # Check for return greeting
+    greeting = check_return_greeting(person)
+    if greeting:
+        person.send_message(display_name, greeting, "text")
+
     conversation_history = person.get_conversation_history(display_name, count=50)
 
     for msg in conversation_history:
@@ -272,6 +397,12 @@ def render_chat_interface(person, llm, memory_manager, debug_mode):
 
     # Show live-updating system stage one-liner
     _init_stage_placeholder()
+
+    # Check for return greeting
+    display_name = _get_user_display_name()
+    greeting = check_return_greeting(person)
+    if greeting:
+        person.send_message(display_name, greeting, "text")
 
     display_person_state_compact(person)
     handle_user_input(person, llm, memory_manager, debug_mode)
