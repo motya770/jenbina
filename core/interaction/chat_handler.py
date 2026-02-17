@@ -272,9 +272,7 @@ def handle_chat_interaction(
         
         if relevant_context:
             context_parts.append(f"Recent Conversation History:\n{relevant_context}")
-            # Show context being used in Streamlit
-            st.info(f"📚 Using {len(relevant_context_docs)} recent context documents from memory")
-            
+
             # Show the actual context being used (for debugging)
             if debug_mode:
                 with st.expander("🔍 Context Being Used", expanded=False):
