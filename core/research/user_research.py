@@ -112,11 +112,19 @@ def research_user(llm, display_name: str, email: str) -> Dict[str, Any]:
     """
     try:
         query = build_search_query(display_name, email)
+        print(f"[research] Search query: {query}")
+
         raw_results = search_web(query)
+        print(f"[research] Raw API response:\n{json.dumps(raw_results, indent=2, default=str)}")
+
         snippets = parse_research_results(raw_results)
+        print(f"[research] Parsed {len(snippets)} snippets: {snippets}")
+
         if not snippets:
             return {}
-        return generate_user_dossier(llm, display_name, snippets)
+        dossier = generate_user_dossier(llm, display_name, snippets)
+        print(f"[research] Generated dossier:\n{json.dumps(dossier, indent=2, default=str)}")
+        return dossier
     except Exception as e:
-        print(f"User research failed: {e}")
+        print(f"[research] User research failed: {e}")
         return {}
