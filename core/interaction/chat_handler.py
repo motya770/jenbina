@@ -328,6 +328,18 @@ def handle_chat_interaction(
             chosen_social_strategy = social.choose_social_strategy(conversation_partner_name, user_input)
             context_parts.append(f"Social model / theory-of-mind:\n{social_context}")
 
+        # Deep Emotional Mirror: inject user dossier context
+        if person is not None and getattr(person, "social_cognition", None) is not None:
+            model = person.social_cognition.get_or_create_model(conversation_partner_name)
+            if model.user_dossier:
+                dossier_lines = "\n".join(
+                    f"- {k}: {v}" for k, v in model.user_dossier.items()
+                )
+                context_parts.append(
+                    f"Background understanding of {conversation_partner_name}:\n{dossier_lines}\n"
+                    f"Use this to inform your responses subtly — never list facts directly."
+                )
+
         # Subsystem context (inner monologue, goals, plans, lessons, working memory)
         if person is not None:
             needs_snap = person.get_needs_snapshot() if hasattr(person, "get_needs_snapshot") else {}
@@ -354,7 +366,44 @@ def handle_chat_interaction(
             context_parts.append(f"State analysis: {state_response}")
         
         full_context = "\n".join(context_parts)
-        
+
+        # Deep Emotional Mirror: generate insight if conditions are met
+        insight_injection = ""
+        if person is not None and getattr(person, "insight_system", None) is not None:
+            conv = person.conversations.get(conversation_partner_name)
+            message_count = len(conv.messages) if conv else 0
+            if person.insight_system.should_generate_insight(message_count):
+                dossier = {}
+                if getattr(person, "social_cognition", None) is not None:
+                    model = person.social_cognition.get_or_create_model(conversation_partner_name)
+                    dossier = model.user_dossier
+
+                recent = []
+                if conv:
+                    for msg in conv.messages[-10:]:
+                        recent.append({
+                            "sender": "user" if msg.sender != "person" else "Jenbina",
+                            "content": msg.content,
+                        })
+
+                emotions_snap = person.emotion_system.get_emotional_state_summary().get("emotions", {})
+                narrative = ""
+                if getattr(person, "self_narrative", None) is not None:
+                    narrative = person.self_narrative.format_for_prompt()
+
+                insight = person.insight_system.generate_insight(
+                    dossier=dossier,
+                    recent_messages=recent,
+                    emotional_state=emotions_snap,
+                    self_narrative=narrative,
+                )
+                if insight:
+                    insight_injection = (
+                        f"\n\nYou have noticed something about this person. "
+                        f"If it fits naturally, weave this observation into your response: "
+                        f"\"{insight}\""
+                    )
+
         # Generate and display Jenbina's response
         system_msg = build_system_message(user_input)
         response = llm.invoke([
@@ -366,7 +415,7 @@ Consider your current state and context:
 
 Use this social strategy: {chosen_social_strategy}
 
-Keep the response natural and in-character. Consider your current needs and how they might influence your response. If you have conversation history, reference it appropriately to maintain continuity.""")
+Keep the response natural and in-character. Consider your current needs and how they might influence your response. If you have conversation history, reference it appropriately to maintain continuity.{insight_injection}""")
         ])
         
         st.chat_message("assistant").write(response.content)
