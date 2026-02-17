@@ -186,9 +186,9 @@ META_COGNITIVE_SYSTEM  ──(influences)──►  ACTION_DECISION
     │   App Start  │
     └──────┬───────┘
            │
-           ├─────────► Initialize LLM (Ollama llama3.2:3b)
+           ├─────────► Initialize LLM (OpenAI GPT-5-nano)
            │           ├─► llm (temperature=0)
-           │           └─► llm_json_mode (temperature=0, format='json')
+           │           └─► llm_json_mode (temperature=0, JSON mode)
            │
            ├─────────► Create Person()
            │           ├─► name = "Jenbina"
@@ -201,7 +201,7 @@ META_COGNITIVE_SYSTEM  ──(influences)──►  ACTION_DECISION
            │           └─► cognitive_biases = {...}
            │
            ├─────────► Initialize ChromaMemoryManager()
-           │           ├─► embeddings = OllamaEmbeddings()
+           │           ├─► embeddings = OpenAIEmbeddings()
            │           ├─► client = ChromaDB PersistentClient
            │           └─► collection = "jenbina_conversations"
            │
@@ -601,8 +601,8 @@ META_COGNITIVE_SYSTEM  ──(influences)──►  ACTION_DECISION
         │                     │                     │
         ▼                     ▼                     ▼
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Ollama LLM  │     │  Weather API │     │  Events API  │
-│  (llama3.2)  │     │              │     │              │
+│  OpenAI LLM  │     │  Weather API │     │  Events API  │
+│ (GPT-5-nano) │     │              │     │              │
 └──────────────┘     └──────────────┘     └──────────────┘
         │                     │                     │
         ├─► Reasoning        ├─► Current Weather  ├─► Local Events
@@ -702,7 +702,7 @@ META_COGNITIVE_SYSTEM  ──(influences)──►  ACTION_DECISION
 
 Collection: "jenbina_conversations"
 ├─► Documents: Text content of messages
-├─► Embeddings: Vector representations (384-dim from Ollama)
+├─► Embeddings: Vector representations (OpenAI text-embedding-3-small)
 ├─► IDs: MD5 hash of (person_name + content + timestamp)
 └─► Metadata:
     ├─► sender_name: str
