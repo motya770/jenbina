@@ -200,13 +200,15 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
         if user_db and user_id:
             user_db.store_message(user_id, display_name, user_input, "user_message")
 
-        # Get conversation history for context
+        # Get conversation history for context (last 200 messages from SQLite)
         update_system_stage("Retrieving context...")
-        conversation_history = person.get_conversation_history(display_name, count=1000)
-        recent_context = "\n".join([
-            f"{msg.sender}: {msg.content}"
-            for msg in conversation_history
-        ])
+        recent_context = ""
+        if user_db and user_id:
+            db_messages = user_db.get_messages(user_id, limit=200)
+            recent_context = "\n".join([
+                f"{msg['sender']}: {msg['content']}"
+                for msg in db_messages
+            ])
 
         # Extract recent actions from simulation history
         recent_actions = None
