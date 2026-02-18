@@ -252,9 +252,10 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             semantic_count = chat_result.get("semantic_docs_count", 0)
             st.toast(f"Context: {recent_count} recent messages + {semantic_count} semantically relevant", icon="📚")
 
-            # Display insight if one was generated
+            # Display insight as a chat message if one was generated
             if chat_result.get("insight"):
-                st.toast(chat_result["insight"], icon="💡")
+                with st.chat_message("assistant"):
+                    st.write(f"💡 *{chat_result['insight']}*")
 
             # Store Jenbina's reply in SQLite
             if user_db and user_id:
