@@ -276,7 +276,8 @@ def handle_chat_interaction(
 
             # Show the actual context being used (for debugging)
             if debug_mode:
-                with st.expander("🔍 Context Being Used", expanded=False):
+                recent_msg_count = len(conversation_context.split("\n")) if conversation_context else 0
+                with st.expander(f"🔍 Context Being Used — {recent_msg_count} recent messages + {len(relevant_context_docs)} semantically relevant", expanded=False):
                     for i, doc in enumerate(relevant_context_docs):
                         st.write(f"**Context {i+1}** (Relevance: {doc['relevance_score']:.2f}):")
                         st.write(f"*{doc['metadata']['message_type']}* - {doc['content']}")
