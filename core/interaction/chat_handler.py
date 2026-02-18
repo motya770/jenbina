@@ -244,6 +244,7 @@ def handle_chat_interaction(
 
         # Get relevant context from Chroma
         relevant_context = ""
+        relevant_context_docs = []
         if memory_manager:
             print(f"Retrieving relevant context for message: {user_input[:50]}...")
             relevant_context_docs = memory_manager.retrieve_relevant_context(
@@ -272,12 +273,11 @@ def handle_chat_interaction(
         
         if relevant_context:
             context_parts.append(f"Recent Conversation History:\n{relevant_context}")
-            # Show context being used in Streamlit
-            st.info(f"📚 Using {len(relevant_context_docs)} recent context documents from memory")
-            
+
             # Show the actual context being used (for debugging)
             if debug_mode:
-                with st.expander("🔍 Context Being Used", expanded=False):
+                recent_msg_count = len(conversation_context.split("\n")) if conversation_context else 0
+                with st.expander(f"🔍 Context Being Used — {recent_msg_count} recent messages + {len(relevant_context_docs)} semantically relevant", expanded=False):
                     for i, doc in enumerate(relevant_context_docs):
                         st.write(f"**Context {i+1}** (Relevance: {doc['relevance_score']:.2f}):")
                         st.write(f"*{doc['metadata']['message_type']}* - {doc['content']}")
@@ -469,6 +469,8 @@ Keep the response natural and in-character. Consider your current needs and how 
             "social_context": social_context,
             "curiosity_context": curiosity_context,
             "insight": insight_injection if insight_injection else None,
+            "recent_messages_count": len(conversation_context.split("\n")) if conversation_context else 0,
+            "semantic_docs_count": len(relevant_context_docs) if relevant_context_docs else 0,
         }
     
     return None
