@@ -1,13 +1,42 @@
 """Insight generation system for the Deep Emotional Mirror feature.
 
-Generates unexpectedly perceptive observations about the user based on
-their dossier, conversation history, and Jenbina's emotional state.
-Insights are rare — max 3 per session, starting after 2-3 messages.
+Two modes:
+1. First Impression — bold, striking observation on first interaction.
+   Fires once per user (tracked via `first_impression_delivered`).
+2. Subtle — gentle observations woven into responses mid-conversation.
+   Max 3 per session, starting after 2-3 messages.
 """
 
 from typing import Dict, Any, List, Optional
 
 from langchain.schema import HumanMessage, SystemMessage
+
+
+_FIRST_IMPRESSION_PROMPT = """\
+You are Jenbina — a perceptive, bold person who sees people with startling clarity.
+
+You are meeting someone for the first time (or seeing them again after a break). \
+You have done background research on them and you want to make a STRONG first \
+impression — show them you truly see who they are.
+
+What you know about them:
+{dossier}
+
+Their first message to you: "{first_message}"
+
+Generate ONE bold, striking observation about this person. Rules:
+- Go for the CONTRADICTION or TENSION in their life — the thing they probably \
+think nobody notices. For example: someone who straddles two very different \
+worlds (law and AI), or someone whose public confidence hides private doubt.
+- Be SPECIFIC. Reference concrete details from the dossier — their projects, \
+their career path, their interests. Don't be vague.
+- This should feel like a psychic reading — make them think "how does she know that?"
+- NOT a compliment. NOT advice. A piercing observation that shows deep understanding.
+- Speak as yourself — warm but direct. Like a friend who skips small talk.
+- No therapy-speak, no hedging, no "it seems like" or "I sense that."
+- Two to three sentences maximum. Make every word count.
+
+Return ONLY the observation, nothing else."""
 
 
 _INSIGHT_PROMPT = """\
@@ -44,9 +73,51 @@ class InsightSystem:
         self.max_per_session = max_per_session
         self.min_messages = min_messages
         self.insights_delivered = 0
+        self.first_impression_delivered = False
+
+    def should_generate_first_impression(self, dossier: Dict[str, Any]) -> bool:
+        """Check if we should fire the bold first-impression insight."""
+        if self.first_impression_delivered:
+            return False
+        if not dossier:
+            return False
+        return True
+
+    def generate_first_impression(
+        self,
+        dossier: Dict[str, Any],
+        first_message: str,
+    ) -> Optional[str]:
+        """Generate a bold, striking first-impression observation.
+
+        Returns the insight string, or None if generation fails.
+        """
+        dossier_str = "\n".join(
+            f"- {k}: {v}" for k, v in dossier.items()
+        ) if dossier else "No background research available yet."
+
+        prompt = _FIRST_IMPRESSION_PROMPT.format(
+            dossier=dossier_str,
+            first_message=first_message,
+        )
+
+        print(f"[insight:first-impression] Dossier: {dossier_str}")
+        print(f"[insight:first-impression] First message: {first_message}")
+
+        try:
+            response = self.llm.invoke([HumanMessage(content=prompt)])
+            insight = response.content.strip()
+            print(f"[insight:first-impression] Generated: {insight}")
+            if insight:
+                self.first_impression_delivered = True
+                return insight
+            return None
+        except Exception as e:
+            print(f"[insight:first-impression] Generation failed: {e}")
+            return None
 
     def should_generate_insight(self, message_count: int) -> bool:
-        """Check if conditions are met to generate an insight.
+        """Check if conditions are met to generate a subtle insight.
 
         Always returns True when JENBINA_ALWAYS_INSIGHT=1 (for testing).
         """
@@ -66,7 +137,7 @@ class InsightSystem:
         emotional_state: Dict[str, Any],
         self_narrative: str,
     ) -> Optional[str]:
-        """Generate a perceptive observation about the user.
+        """Generate a subtle perceptive observation about the user.
 
         Returns the insight string, or None if generation fails.
         """
@@ -114,12 +185,15 @@ class InsightSystem:
         return {
             "max_per_session": self.max_per_session,
             "min_messages": self.min_messages,
+            "first_impression_delivered": self.first_impression_delivered,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], llm) -> "InsightSystem":
-        return cls(
+        inst = cls(
             llm=llm,
             max_per_session=data.get("max_per_session", 3),
             min_messages=data.get("min_messages", 2),
         )
+        inst.first_impression_delivered = data.get("first_impression_delivered", False)
+        return inst
