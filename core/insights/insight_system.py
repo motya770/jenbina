@@ -46,7 +46,13 @@ class InsightSystem:
         self.insights_delivered = 0
 
     def should_generate_insight(self, message_count: int) -> bool:
-        """Check if conditions are met to generate an insight."""
+        """Check if conditions are met to generate an insight.
+
+        Always returns True when JENBINA_ALWAYS_INSIGHT=1 (for testing).
+        """
+        import os
+        if os.environ.get("JENBINA_ALWAYS_INSIGHT") == "1":
+            return True
         if self.insights_delivered >= self.max_per_session:
             return False
         if message_count < self.min_messages:
@@ -84,15 +90,20 @@ class InsightSystem:
             self_narrative=self_narrative or "I am Jenbina, still discovering who I am.",
         )
 
+        print(f"[insight] Dossier: {dossier_str}")
+        print(f"[insight] Conversation: {conversation_str}")
+        print(f"[insight] Emotions: {emotions_str}")
+
         try:
             response = self.llm.invoke([HumanMessage(content=prompt)])
             insight = response.content.strip()
+            print(f"[insight] Generated: {insight}")
             if insight:
                 self.insights_delivered += 1
                 return insight
             return None
         except Exception as e:
-            print(f"Insight generation failed: {e}")
+            print(f"[insight] Generation failed: {e}")
             return None
 
     def reset_session(self):
