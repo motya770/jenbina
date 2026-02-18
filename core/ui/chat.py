@@ -247,6 +247,11 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
         if chat_result and "assistant_response" in chat_result:
             person.send_message(display_name, chat_result["assistant_response"], "text")
 
+            # Display context stats banner
+            recent_count = chat_result.get("recent_messages_count", 0)
+            semantic_count = chat_result.get("semantic_docs_count", 0)
+            st.toast(f"Context: {recent_count} recent messages + {semantic_count} semantically relevant", icon="📚")
+
             # Display insight if one was generated
             if chat_result.get("insight"):
                 st.toast(chat_result["insight"], icon="💡")
