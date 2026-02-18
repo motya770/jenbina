@@ -390,7 +390,6 @@ def handle_chat_interaction(
                         f"then naturally continue into your response: "
                         f"\"{insight}\""
                     )
-                    st.info(f"💡 First impression: {insight}")
             else:
                 # Mode 2: Subtle insight (after 2+ messages)
                 conv = person.conversations.get(conversation_partner_name)
@@ -421,7 +420,7 @@ def handle_chat_interaction(
                             f"If it fits naturally, weave this observation into your response: "
                             f"\"{insight}\""
                         )
-                        st.info(f"💡 Insight: {insight}")
+                        pass  # insight injected into LLM prompt
 
         # Generate and display Jenbina's response
         system_msg = build_system_message(user_input)
@@ -469,6 +468,7 @@ Keep the response natural and in-character. Consider your current needs and how 
             "social_strategy": chosen_social_strategy,
             "social_context": social_context,
             "curiosity_context": curiosity_context,
+            "insight": insight_injection if insight_injection else None,
         }
     
     return None
