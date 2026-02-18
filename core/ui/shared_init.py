@@ -57,9 +57,12 @@ def _load_or_create_person(user_db: UserDatabase, user_id: int) -> Person:
         person.init_curiosity_system()
     # Always (re)init insight system with a plain LLM — deserialize passes
     # the JSON-mode LLM which causes 400 errors because InsightSystem's
-    # prompt doesn't mention "json".
+    # prompt doesn't mention "json".  Preserve the first_impression_delivered
+    # flag so the bold insight only fires once per user.
+    old_fi = getattr(person.insight_system, "first_impression_delivered", False) if person.insight_system else False
     insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
     person.init_insight_system(insight_llm)
+    person.insight_system.first_impression_delivered = old_fi
     return person
 
 
