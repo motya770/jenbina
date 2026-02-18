@@ -244,6 +244,7 @@ def handle_chat_interaction(
 
         # Get relevant context from Chroma
         relevant_context = ""
+        relevant_context_docs = []
         if memory_manager:
             print(f"Retrieving relevant context for message: {user_input[:50]}...")
             relevant_context_docs = memory_manager.retrieve_relevant_context(
@@ -467,6 +468,8 @@ Keep the response natural and in-character. Consider your current needs and how 
             "social_context": social_context,
             "curiosity_context": curiosity_context,
             "insight": insight_injection if insight_injection else None,
+            "recent_messages_count": len(conversation_context.split("\n")) if conversation_context else 0,
+            "semantic_docs_count": len(relevant_context_docs) if relevant_context_docs else 0,
         }
     
     return None
