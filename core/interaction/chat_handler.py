@@ -370,40 +370,57 @@ def handle_chat_interaction(
         # Deep Emotional Mirror: generate insight if conditions are met
         insight_injection = ""
         if person is not None and getattr(person, "insight_system", None) is not None:
-            conv = person.conversations.get(conversation_partner_name)
-            message_count = len(conv.messages) if conv else 0
-            if person.insight_system.should_generate_insight(message_count):
-                dossier = {}
-                if getattr(person, "social_cognition", None) is not None:
-                    model = person.social_cognition.get_or_create_model(conversation_partner_name)
-                    dossier = model.user_dossier
+            dossier = {}
+            if getattr(person, "social_cognition", None) is not None:
+                model = person.social_cognition.get_or_create_model(conversation_partner_name)
+                dossier = model.user_dossier
 
-                recent = []
-                if conv:
-                    for msg in conv.messages[-10:]:
-                        recent.append({
-                            "sender": "user" if msg.sender != "person" else "Jenbina",
-                            "content": msg.content,
-                        })
+            print(f"[insight] first_impression_delivered={person.insight_system.first_impression_delivered}, dossier_present={bool(dossier)}")
 
-                emotions_snap = person.emotion_system.get_emotional_state_summary().get("emotions", {})
-                narrative = ""
-                if getattr(person, "self_narrative", None) is not None:
-                    narrative = person.self_narrative.format_for_prompt()
-
-                insight = person.insight_system.generate_insight(
+            # Mode 1: Bold first impression (fires once per user)
+            if person.insight_system.should_generate_first_impression(dossier):
+                insight = person.insight_system.generate_first_impression(
                     dossier=dossier,
-                    recent_messages=recent,
-                    emotional_state=emotions_snap,
-                    self_narrative=narrative,
+                    first_message=user_input,
                 )
                 if insight:
                     insight_injection = (
-                        f"\n\nYou have noticed something about this person. "
-                        f"If it fits naturally, weave this observation into your response: "
+                        f"\n\nYou have just noticed something striking about this person. "
+                        f"Lead with this observation — say it directly and boldly, "
+                        f"then naturally continue into your response: "
                         f"\"{insight}\""
                     )
-                    st.info(f"💡 Insight generated: {insight}")
+            else:
+                # Mode 2: Subtle insight (after 2+ messages)
+                conv = person.conversations.get(conversation_partner_name)
+                message_count = len(conv.messages) if conv else 0
+                if person.insight_system.should_generate_insight(message_count):
+                    recent = []
+                    if conv:
+                        for msg in conv.messages[-10:]:
+                            recent.append({
+                                "sender": "user" if msg.sender != "person" else "Jenbina",
+                                "content": msg.content,
+                            })
+
+                    emotions_snap = person.emotion_system.get_emotional_state_summary().get("emotions", {})
+                    narrative = ""
+                    if getattr(person, "self_narrative", None) is not None:
+                        narrative = person.self_narrative.format_for_prompt()
+
+                    insight = person.insight_system.generate_insight(
+                        dossier=dossier,
+                        recent_messages=recent,
+                        emotional_state=emotions_snap,
+                        self_narrative=narrative,
+                    )
+                    if insight:
+                        insight_injection = (
+                            f"\n\nYou have noticed something about this person. "
+                            f"If it fits naturally, weave this observation into your response: "
+                            f"\"{insight}\""
+                        )
+                        pass  # insight injected into LLM prompt
 
         # Generate and display Jenbina's response
         system_msg = build_system_message(user_input)
@@ -451,6 +468,7 @@ Keep the response natural and in-character. Consider your current needs and how 
             "social_strategy": chosen_social_strategy,
             "social_context": social_context,
             "curiosity_context": curiosity_context,
+            "insight": insight_injection if insight_injection else None,
         }
     
     return None

@@ -247,6 +247,10 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
         if chat_result and "assistant_response" in chat_result:
             person.send_message(display_name, chat_result["assistant_response"], "text")
 
+            # Display insight if one was generated
+            if chat_result.get("insight"):
+                st.toast(chat_result["insight"], icon="💡")
+
             # Store Jenbina's reply in SQLite
             if user_db and user_id:
                 user_db.store_message(user_id, "Jenbina", chat_result["assistant_response"], "jenbina_response")
