@@ -1,83 +1,216 @@
-A small minimal entity simulating AGI named Jenbina. 
+# Jenbina
 
-"What do you mean?"
+**Open-source AGI simulation with personality, motivation, and memory.**
 
-Community Discord: 
-https://discord.gg/e6sRPpyc
+Jenbina is a self-sustaining virtual persona that simulates human-like cognition using LLMs, a hybrid memory system, and Maslow's Hierarchy of Needs. Unlike standard chatbots, Jenbina has her own personality, internal drives, emotions, and long-term memory of people and events.
 
-Jenbina: open source non-profit AGI simulation (patented). 
+Community Discord: https://discord.gg/e6sRPpyc
 
-How to install: https://github.com/motya770/jenbina/blob/main/INSTALL.md
+## How It Works
 
-Title: 
+Jenbina addresses three fundamental limitations of LLMs:
 
-Artificial Intelligence System with the Ability to Act According to Personal Interests and Needs based on combination on LLMs, Graph Databases and Memory 
+1. **No persona** — LLMs are text generators without personality. Jenbina has character traits, emotions, and a self-narrative that evolve over time.
+2. **No motivation** — LLMs lack internal drives. Jenbina's behavior is driven by Maslow's Hierarchy of Needs, from physiological survival to self-actualization.
+3. **No memory** — LLMs forget between sessions. Jenbina remembers people, places, events, and conversations across a hybrid database system.
 
-Abstract: 
+The result is something between a Tamagotchi and HAL — a virtual being with its own needs, goals, and the reasoning power of an LLM.
 
-This application describes an artificial intelligence system that simulates a human persona. According to the persona’s desires, goals, and needs, the system performs actions aligned with these objectives. It also retains memories of past events and simulates a person’s character, influencing its actions and goals.
+## Architecture
 
-Description:
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                         PRESENTATION LAYER                          │
+│                                                                      │
+│   Streamlit Web UI — Chat, Simulation View, Debug Pages              │
+│   Firebase Authentication + Google OAuth                             │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │
+┌──────────────────────────────┼───────────────────────────────────────┐
+│                        COGNITION LAYER                               │
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
+│  │ Meta-Cognition│  │Inner Monologue│  │  Curiosity   │              │
+│  │ Self-reflect  │  │ Stream of    │  │  System      │              │
+│  │ Bias detect   │  │ consciousness│  │              │              │
+│  └──────────────┘  └──────────────┘  └──────────────┘               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
+│  │Action Decision│  │State Analysis│  │ Asimov Check │              │
+│  │ Need-based    │  │ Growth stage │  │ Safety guard │              │
+│  │ prioritization│  │ assessment   │  │ rails        │              │
+│  └──────────────┘  └──────────────┘  └──────────────┘               │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │
+┌──────────────────────────────┼───────────────────────────────────────┐
+│                          CORE SYSTEMS                                │
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
+│  │    Person     │  │  Emotions    │  │   Goals &    │              │
+│  │ Needs, state, │  │ Mood, affect │  │   Learning   │              │
+│  │ conversations │  │ on behavior  │  │              │              │
+│  └──────────────┘  └──────────────┘  └──────────────┘               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
+│  │  Environment  │  │   Social     │  │  Identity &  │              │
+│  │ Locations,    │  │  Cognition   │  │  Self-       │              │
+│  │ weather, events│  │ Relationships│  │  Narrative   │              │
+│  └──────────────┘  └──────────────┘  └──────────────┘               │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │
+┌──────────────────────────────┼───────────────────────────────────────┐
+│                     HYBRID MEMORY SYSTEM                             │
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
+│  │   ChromaDB   │  │    Neo4j     │  │    SQLite    │               │
+│  │              │  │              │  │              │               │
+│  │ Semantic     │  │ Relationship │  │ Time-series  │               │
+│  │ memory via   │  │ graph between│  │ events,      │               │
+│  │ vector       │  │ people,      │  │ needs history,│               │
+│  │ embeddings   │  │ places,      │  │ user accounts,│               │
+│  │ & similarity │  │ events       │  │ conversations │               │
+│  │ search       │  │              │  │              │               │
+│  └──────────────┘  └──────────────┘  └──────────────┘               │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │
+┌──────────────────────────────┼───────────────────────────────────────┐
+│                       LLM PROVIDERS                                  │
+│                                                                      │
+│  OpenAI (gpt-5.2 / gpt-5-nano)  ·  Ollama (llama3.2:3b local)      │
+└──────────────────────────────────────────────────────────────────────┘
+```
 
-Currently, large language models (LLMs) are an attempt to create artificial intelligence. However, as many users note, they have several shortcomings:
+## Key Systems
 
- 1) Lack of persona: LLMs are essentially text generators without individual personality or character.
+### Maslow's Hierarchy of Needs
+The core motivation engine. Jenbina progresses through five levels of needs, each with satisfaction tracking, decay rates, and growth stage progression:
 
- 2) Lack of motivation and goals: LLMs do not have internal drives or aspirations, which limits the predictability of their actions.
+| Level | Needs | Examples |
+|-------|-------|----------|
+| 1. Physiological | Survival basics | Hunger, thirst, sleep, health, shelter |
+| 2. Safety | Security | Stability, protection, order |
+| 3. Social | Belonging | Friendship, love, connection |
+| 4. Esteem | Recognition | Self-esteem, confidence, achievement |
+| 5. Self-Actualization | Growth | Creativity, purpose, meaning |
 
- 3) Limited memory: LLMs cannot retain memories of days, people, or events, hindering the formation of long-term connections and context.
+Needs decay over time and drive action selection — Jenbina prioritizes what she needs most.
 
-On the other hand, LLMs have a powerful logical apparatus that allows them to reason, draw conclusions, and generalise information when given the appropriate input data.
+### Hybrid Memory System
+Three databases working together to mirror how human memory works:
 
-In this paper, I propose a solution to these problems (1, 2, 3) by creating a special version of Tamagotchi. Tamagotchi is an electronic toy popular in the early 1990s where users had to take care of a virtual being (e.g., feeding it at specific times). I suggest creating a self-sustaining version of such a toy that integrates the logical apparatus of an LLM. It could be compared to the HAL robot from the movie "Interstellar" or even a real person.
+- **ChromaDB** — Vector database for semantic/contextual memory. Stores conversations as embeddings and retrieves relevant context via similarity search.
+- **Neo4j** — Graph database tracking relationships between people, locations, and events. Knows who Jenbina has met, where she's been, and how interactions connect.
+- **SQLite** — Time-series storage for chronological events, needs history, user accounts, and conversation persistence.
 
-To determine the needs of the virtual being, we will use Maslow's Hierarchy of Needs (Fig. 1). The system implements all five levels of human motivation:
+### Cognition Layer
+- **Meta-Cognition** — Self-reflection, cognitive bias detection, strategy optimization
+- **Inner Monologue** — Stream-of-consciousness thinking before decisions
+- **Action Decision Chain** — Selects actions based on need priority and world state
+- **Asimov Safety Check** — Validates actions against ethical guardrails
+- **Curiosity System** — Drives exploration and learning behavior
 
-1. **Physiological Needs**: Food, water, sleep, shelter, health
-2. **Safety Needs**: Security, stability, protection, order
-3. **Social Needs**: Friendship, love, belonging, social connection
-4. **Esteem Needs**: Self-esteem, confidence, achievement, respect
-5. **Self-Actualization Needs**: Personal growth, creativity, purpose, meaning
+### Environment Simulation
+Jenbina exists in a simulated world (based on Palo Alto, CA) with:
+- Real location data (parks, cafes, libraries, venues)
+- Weather simulation and day/night cycles
+- Dynamic event generation
+- Mood factors influenced by environment
 
-The system automatically progresses through these stages based on need satisfaction, with self-actualization needs allowing unlimited growth beyond 100% satisfaction.
+### Emotion & Social Systems
+- Emotional state tracking that influences behavior and responses
+- Social cognition with relationship strength tracking
+- Identity and self-narrative that evolve with experiences
+- Insight generation for personal growth recommendations
 
-To create memory, I propose a hybrid memory system combining:
+## Tech Stack
 
-1. **Vector Database (ChromaDB)**: For semantic/contextual memory and similarity search
-2. **Graph Database (Neo4j)**: For relationship tracking between people, places, and events
-3. **Time-Series Database (SQLite)**: For chronological tracking of events and needs changes
+| Component | Technology |
+|-----------|------------|
+| Language | Python 3.10+ |
+| Web UI | Streamlit |
+| LLM Orchestration | LangChain |
+| LLM (Cloud) | OpenAI (gpt-5.2, gpt-5-nano) |
+| LLM (Local) | Ollama + Llama 3.2 3B |
+| Vector Memory | ChromaDB |
+| Graph Memory | Neo4j |
+| Relational DB | SQLite |
+| Auth | Firebase + Google OAuth |
+| Web Search | SerpAPI |
+| Testing | pytest, pytest-playwright |
+| CI/CD | GitHub Actions |
 
-This hybrid approach mirrors how human memory works - different types of information are stored and retrieved using different mechanisms.
+## Project Structure
 
-Access to the external environment will be provided through an external LLM that will simulate the external environment and sensor data.
+```
+jenbina/
+├── core/                     # Main application
+│   ├── app.py                # Streamlit entry point
+│   ├── connect.py            # LLM provider connections
+│   ├── person/               # Persona representation & state
+│   ├── needs/                # Maslow's hierarchy implementation
+│   ├── memory/               # Hybrid memory (Chroma + Neo4j + SQLite)
+│   ├── cognition/            # Meta-cognition, decisions, safety checks
+│   ├── environment/          # World simulation, locations, weather
+│   ├── emotions/             # Emotional state tracking
+│   ├── social/               # Social cognition & relationships
+│   ├── identity/             # Self-narrative & personal identity
+│   ├── goals/                # Goal setting & prioritization
+│   ├── learning/             # Experience tracking & lesson extraction
+│   ├── insights/             # Growth insights & recommendations
+│   ├── interaction/          # Chat handler & guardrails
+│   ├── auth/                 # Firebase auth & user database
+│   ├── ui/                   # Streamlit UI components
+│   └── pages/                # Multi-page app (Chat, Environment, Debug)
+├── tests/                    # Unit, integration, and E2E tests
+├── assets/                   # Images and static files
+├── docs/                     # Documentation
+├── jenbina_memory/           # Persistent data directory (gitignored)
+├── requirements.txt
+├── INSTALL.md                # Detailed installation guide
+└── system_design_schema.md   # System design documentation
+```
 
-The simulation of our TinyAgi can be divided into two modules: (Fig. 3)
+## Quick Start
 
- 1. Reptile Brain:
+```bash
+git clone https://github.com/motya770/jenbina
+cd jenbina
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run core/app.py
+```
 
-   A) A comprehensive needs monitoring system based on Maslow's hierarchy (physiological, safety, social, esteem, self-actualization).
-   
-   B) An intelligent action selection module that prioritizes needs based on current growth stage and urgency.
-   
-   C) An action execution module that updates need satisfaction and tracks growth progression.
-   
-   D) A character development module that evolves based on experiences and need satisfaction patterns.
-   
-   E) A goal-setting system that generates immediate, short-term, and long-term objectives based on current state.
+For detailed setup instructions (Ollama, Neo4j, environment variables, API keys), see **[INSTALL.md](INSTALL.md)**.
 
- 2. Neocortex:
+## The Two-Brain Architecture
 
-   A logical apparatus based on LLM, interpreting commands from the Reptile Brain and interacting with the external LLM environment, considering the being’s personal preferences and past experiences. There should also be a mechanism for adding new actions and goals/parameters to the Reptile Brain (requires further discussion and research).
+Jenbina's cognition is split into two modules inspired by neuroscience:
 
-Process of Use:
+**Reptile Brain** — The motivational core:
+- Needs monitoring based on Maslow's hierarchy
+- Action selection prioritized by urgency and growth stage
+- Character development that evolves from experiences
+- Goal-setting (immediate, short-term, long-term)
 
-Users will be presented with an interface where they can introduce themselves and define a worldview for the virtual persona. The persona will be able to remember communications and take actions according to its internal needs, character, and previous experiences.
+**Neocortex** — The reasoning layer:
+- LLM-powered logical reasoning and language
+- Interprets commands from the Reptile Brain
+- Considers personal preferences and past experiences
+- Interacts with the simulated environment
 
-Variations and Future Modifications:
+## Background
 
-Possible modifications to the system include:
-- Integrating various LLMs into a single system with different configurations.
-- Adding a learning system that will add new possible actions to the action list.
-- Dynamically adding needs to the list during learning.
-- Shifting focus and personal needs to another object or person, such as a rescue robot.
-- Creating this simulation within a mobile robot capable of movement.
+This project implements an artificial intelligence system that simulates a human persona. According to the persona's desires, goals, and needs, the system performs actions aligned with these objectives. It retains memories of past events and simulates a person's character, influencing its actions and goals.
+
+The concept draws from electronic Tamagotchi toys of the 1990s — but instead of a user caring for the virtual being, Jenbina is self-sustaining, integrating the logical apparatus of an LLM to reason about her own needs and make decisions autonomously.
+
+## Future Directions
+
+- Integrating multiple LLMs with different specializations into a unified system
+- Dynamic learning system that adds new actions and needs over time
+- Shifting persona focus to other roles (e.g., rescue robot, companion)
+- Embodiment in a mobile robot capable of physical interaction
+
+## Creator
+
+Created by **Matthew Kudelin** (Matvei Kudelin)
+
+Open source, non-profit AGI simulation (patented).
