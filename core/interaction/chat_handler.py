@@ -403,6 +403,7 @@ def handle_chat_interaction(
                         f"If it fits naturally, weave this observation into your response: "
                         f"\"{insight}\""
                     )
+                    st.info(f"💡 Insight generated: {insight}")
 
         # Generate and display Jenbina's response
         system_msg = build_system_message(user_input)
