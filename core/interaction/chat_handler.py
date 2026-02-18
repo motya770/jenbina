@@ -375,6 +375,8 @@ def handle_chat_interaction(
                 model = person.social_cognition.get_or_create_model(conversation_partner_name)
                 dossier = model.user_dossier
 
+            print(f"[insight] first_impression_delivered={person.insight_system.first_impression_delivered}, dossier_present={bool(dossier)}")
+
             # Mode 1: Bold first impression (fires once per user)
             if person.insight_system.should_generate_first_impression(dossier):
                 insight = person.insight_system.generate_first_impression(
