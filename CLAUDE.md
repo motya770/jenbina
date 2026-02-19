@@ -204,3 +204,66 @@ The primary CI gate is `run-tests.yml` which runs `python -m pytest tests/test_*
 - **Memory Databases:** The hybrid memory system uses three databases simultaneously. Changes to memory schemas affect ChromaDB collections, Neo4j nodes/relationships, and SQLite tables.
 - **Streamlit State:** The UI relies on `st.session_state` for persisting simulation state across reruns. Be careful with session state keys in `core/ui/shared_init.py`.
 - **No `.env` in VCS:** The `.env` file contains secrets and must never be committed. Use `.env.example` as the template.
+
+## Superpowers Plugin
+
+This project uses the **superpowers** Claude Code plugin for structured plan execution.
+
+### Usage
+
+Implementation plans in `docs/plans/` are designed to be executed with the `superpowers:executing-plans` sub-skill. Each plan document includes the directive:
+
+```
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+```
+
+When Claude encounters this directive, it should use the superpowers plugin to execute the plan systematically — one task at a time, following each step within the task, running tests, and committing after each task.
+
+### Plan Document Format
+
+Plans in `docs/plans/` follow a consistent structure:
+
+```
+# Plan Title
+
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+
+**Goal:** <what the plan achieves>
+**Architecture:** <high-level approach>
+**Tech Stack:** <technologies involved>
+
+---
+
+### Task N: <task title>
+
+**Files:**
+- Modify: `path/to/file.py:line_range`
+- Create: `path/to/new_file.py`
+
+**Step 1: <step description>**
+<code or instructions>
+
+**Step 2: Run tests**
+Run: `python -m pytest tests/test_xyz.py -v`
+Expected: All PASS
+
+**Step 3: Commit**
+git add <files>
+git commit -m "<conventional commit message>"
+```
+
+### Key Conventions
+
+- **Task-by-task execution:** Complete and commit each task before moving to the next.
+- **Test-driven:** Each task includes test verification steps. Run tests after each change.
+- **Atomic commits:** Each task ends with a focused `git commit` using conventional commit messages (`feat:`, `fix:`, `docs:`, etc.).
+- **File locations specified:** Tasks list exact files and line ranges to modify.
+- **Backward compatibility:** New fields and features use defaults to avoid breaking existing tests.
+
+### Existing Plans
+
+| Plan | Description |
+|------|-------------|
+| `2026-02-15-tamagotchi-ui-implementation.md` | Tamagotchi UI redesign — CSS injection, rendering helpers, single-column layout |
+| `2026-02-17-wow-effect-implementation.md` | Deep Emotional Mirror — user research, insight system, GPT-5.2 chat, dynamic greetings |
+| `2026-02-18-llm-knowledge-enriched-dossier.md` | LLM knowledge-enriched dossiers — parallel web search + GPT knowledge query |
