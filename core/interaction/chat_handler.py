@@ -451,9 +451,11 @@ Keep the response natural and in-character. Consider your current needs and how 
                 conversation_partner_name, chosen_social_strategy
             )
         if person is not None and getattr(person, "social_interaction_tracker", None) is not None:
+            from ..social.social_interaction_tracker import infer_emotional_tone
+            tone = infer_emotional_tone(user_input)
             person.social_interaction_tracker.record_chat(
                 person_name=conversation_partner_name,
-                message_text=user_input,
+                emotional_tone=tone,
             )
         if person is not None and getattr(person, "curiosity_system", None) is not None:
             person.curiosity_system.update_after_action("chat_with_user")

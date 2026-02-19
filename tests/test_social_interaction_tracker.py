@@ -56,19 +56,32 @@ class TestSocialInteractionTracker(unittest.TestCase):
     def setUp(self):
         self.tracker = SocialInteractionTracker()
 
-    def test_record_chat(self):
-        interaction = self.tracker.record_chat("Alice", "Thank you for your help!")
+    def test_record_chat_warm(self):
+        interaction = self.tracker.record_chat("Alice", emotional_tone="warm")
         self.assertEqual(interaction.person_name, "Alice")
         self.assertEqual(interaction.interaction_type, "chat")
         self.assertEqual(interaction.emotional_tone, "warm")
         self.assertEqual(len(self.tracker.interactions), 1)
 
-    def test_record_chat_explicit_tone(self):
+    def test_record_chat_default_neutral(self):
+        interaction = self.tracker.record_chat("Alice")
+        self.assertEqual(interaction.emotional_tone, "neutral")
+
+    def test_record_chat_explicit_sentiment(self):
         interaction = self.tracker.record_chat(
-            "Bob", "Hello", emotional_tone="tense", sentiment="Felt uneasy"
+            "Bob", emotional_tone="tense", sentiment="Felt uneasy"
         )
         self.assertEqual(interaction.emotional_tone, "tense")
         self.assertEqual(interaction.sentiment, "Felt uneasy")
+
+    def test_record_chat_no_message_content_stored(self):
+        """Ensure no message text leaks into the stored interaction."""
+        interaction = self.tracker.record_chat("Alice", emotional_tone="warm")
+        data = interaction.to_dict()
+        all_values = " ".join(str(v) for v in data.values())
+        # Sentiment may mention the person name, but should not contain
+        # any raw user message text — only tone-derived feelings.
+        self.assertNotIn("raw message", all_values)
 
     def test_record_social_action(self):
         interaction = self.tracker.record_social_action(
@@ -87,15 +100,15 @@ class TestSocialInteractionTracker(unittest.TestCase):
         self.assertEqual(interaction.person_name, "someone")
 
     def test_people_met_count(self):
-        self.tracker.record_chat("Alice", "Hi")
-        self.tracker.record_chat("Bob", "Hey")
-        self.tracker.record_chat("Alice", "How are you?")
+        self.tracker.record_chat("Alice", emotional_tone="warm")
+        self.tracker.record_chat("Bob", emotional_tone="neutral")
+        self.tracker.record_chat("Alice", emotional_tone="warm")
         self.assertEqual(self.tracker.people_met_count(), 2)
 
     def test_get_unique_people_today(self):
-        self.tracker.record_chat("Alice", "Hi")
-        self.tracker.record_chat("Bob", "Hey")
-        self.tracker.record_chat("Charlie", "Hello")
+        self.tracker.record_chat("Alice")
+        self.tracker.record_chat("Bob")
+        self.tracker.record_chat("Charlie")
         people = self.tracker.get_unique_people_today()
         self.assertEqual(people, ["Alice", "Bob", "Charlie"])
 
@@ -104,15 +117,15 @@ class TestSocialInteractionTracker(unittest.TestCase):
         self.assertEqual(result, "I didn't really talk to anyone today.")
 
     def test_describe_day_one_person(self):
-        self.tracker.record_chat("Alice", "Thank you for being so kind!")
+        self.tracker.record_chat("Alice", emotional_tone="warm")
         result = self.tracker.describe_day()
         self.assertIn("1 person", result)
         self.assertIn("Alice", result)
 
     def test_describe_day_multiple_people(self):
-        self.tracker.record_chat("Alice", "Hi there!")
-        self.tracker.record_chat("Bob", "Hey Bob, I'm feeling angry")
-        self.tracker.record_chat("Charlie", "Hello")
+        self.tracker.record_chat("Alice", emotional_tone="neutral")
+        self.tracker.record_chat("Bob", emotional_tone="tense")
+        self.tracker.record_chat("Charlie", emotional_tone="neutral")
         result = self.tracker.describe_day()
         self.assertIn("3 people", result)
         self.assertIn("Alice", result)
@@ -121,7 +134,7 @@ class TestSocialInteractionTracker(unittest.TestCase):
 
     def test_describe_day_long_conversation(self):
         for i in range(5):
-            self.tracker.record_chat("Alice", f"Message {i}")
+            self.tracker.record_chat("Alice")
         result = self.tracker.describe_day()
         self.assertIn("long conversation", result)
 
@@ -130,16 +143,16 @@ class TestSocialInteractionTracker(unittest.TestCase):
         self.assertIn("none so far", result)
 
     def test_format_for_prompt_with_interactions(self):
-        self.tracker.record_chat("Alice", "Thanks!")
-        self.tracker.record_chat("Bob", "Hello")
+        self.tracker.record_chat("Alice", emotional_tone="warm")
+        self.tracker.record_chat("Bob")
         result = self.tracker.format_for_prompt()
         self.assertIn("met 2 people", result)
         self.assertIn("Alice", result)
         self.assertIn("Bob", result)
 
     def test_get_stats(self):
-        self.tracker.record_chat("Alice", "Hi")
-        self.tracker.record_chat("Bob", "Hey")
+        self.tracker.record_chat("Alice")
+        self.tracker.record_chat("Bob")
         stats = self.tracker.get_stats()
         self.assertEqual(stats["total_interactions"], 2)
         self.assertEqual(stats["people_met_today"], 2)
@@ -147,7 +160,7 @@ class TestSocialInteractionTracker(unittest.TestCase):
         self.assertEqual(len(stats["recent_interactions"]), 2)
 
     def test_serialization_round_trip(self):
-        self.tracker.record_chat("Alice", "Thank you!")
+        self.tracker.record_chat("Alice", emotional_tone="warm")
         self.tracker.record_social_action("Talk to neighbor")
         data = self.tracker.to_dict()
         restored = SocialInteractionTracker.from_dict(data)
@@ -165,7 +178,7 @@ class TestSocialInteractionTracker(unittest.TestCase):
 
     def test_max_history_limit(self):
         for i in range(250):
-            self.tracker.record_chat(f"Person{i}", f"Message {i}")
+            self.tracker.record_chat(f"Person{i}")
         self.assertLessEqual(len(self.tracker.interactions), SocialInteractionTracker.MAX_HISTORY)
 
     def test_get_today_interactions_filters_old(self):
@@ -178,12 +191,22 @@ class TestSocialInteractionTracker(unittest.TestCase):
             timestamp=1000.0,  # very old
         )
         self.tracker.interactions.append(old_interaction)
-        self.tracker.record_chat("NewFriend", "Hi!")
+        self.tracker.record_chat("NewFriend")
         # Today's interactions should only include NewFriend
         today = self.tracker.get_today_interactions()
         names = [i.person_name for i in today]
         self.assertNotIn("OldFriend", names)
         self.assertIn("NewFriend", names)
+
+    def test_infer_then_record_pattern(self):
+        """Test the intended usage: infer tone separately, pass only tone."""
+        tone = infer_emotional_tone("Thank you for your help!")
+        interaction = self.tracker.record_chat("Alice", emotional_tone=tone)
+        self.assertEqual(interaction.emotional_tone, "warm")
+        self.assertEqual(interaction.person_name, "Alice")
+        # Verify no message text is stored
+        self.assertNotIn("Thank you", interaction.sentiment)
+        self.assertNotIn("help", interaction.sentiment)
 
 
 class TestPersonSocialInteractionTracker(unittest.TestCase):
@@ -200,7 +223,7 @@ class TestPersonSocialInteractionTracker(unittest.TestCase):
     def test_person_describe_day_with_tracker(self):
         person = Person("Jenbina")
         person.init_social_interaction_tracker()
-        person.social_interaction_tracker.record_chat("Alice", "Hey!")
+        person.social_interaction_tracker.record_chat("Alice", emotional_tone="warm")
         result = person.describe_day()
         self.assertIn("1 person", result)
         self.assertIn("Alice", result)
@@ -208,7 +231,7 @@ class TestPersonSocialInteractionTracker(unittest.TestCase):
     def test_person_serialize_with_tracker(self):
         person = Person("Jenbina")
         person.init_social_interaction_tracker()
-        person.social_interaction_tracker.record_chat("Alice", "Thank you!")
+        person.social_interaction_tracker.record_chat("Alice", emotional_tone="warm")
 
         raw = person.serialize()
         restored = Person.deserialize(raw, llm=None)
@@ -227,7 +250,7 @@ class TestPersonSocialInteractionTracker(unittest.TestCase):
     def test_get_current_state_includes_tracker(self):
         person = Person("Jenbina")
         person.init_social_interaction_tracker()
-        person.social_interaction_tracker.record_chat("Alice", "Hi")
+        person.social_interaction_tracker.record_chat("Alice")
         state = person.get_current_state()
         self.assertIn("social_interactions", state)
         self.assertEqual(state["social_interactions"]["people_met_today"], 1)
