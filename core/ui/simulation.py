@@ -667,6 +667,28 @@ def display_curiosity_stats(person, iteration):
                 st.write(f"- {a}")
 
 
+def display_social_interaction_stats(person, iteration):
+    """Display social interaction tracking stats."""
+    if getattr(person, "social_interaction_tracker", None) is None:
+        return
+
+    tracker = person.social_interaction_tracker
+    stats = tracker.get_stats()
+    with st.container(border=True):
+        st.caption("👥 Social Interactions")
+        people_today = stats.get("people_met_today", 0)
+        total = stats.get("total_interactions", 0)
+        st.write(f"**People met today:** {people_today} | **Total interactions:** {total}")
+        unique = stats.get("unique_people_today", [])
+        if unique:
+            st.write(f"**Met:** {', '.join(unique)}")
+        day_summary = tracker.describe_day()
+        if day_summary and day_summary != "I didn't really talk to anyone today.":
+            st.write(f"*{day_summary}*")
+        elif people_today == 0:
+            st.write("*No social interactions yet today.*")
+
+
 def display_planning_stats(person, iteration):
     """Display planning system stats"""
     if person.planning_system is None:
@@ -900,10 +922,14 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         needs_summary_str = ", ".join(
             f"{name}: {sat:.0f}%" for name, sat in needs_before.items()
         )
+        social_day_str = ""
+        if getattr(person, "social_interaction_tracker", None) is not None:
+            social_day_str = "\n" + person.social_interaction_tracker.format_for_prompt()
         world_context_str = (
             f"Location: {world_summary.get('location', {}).get('name', 'Unknown')}, "
             f"Time: {world_summary.get('time', {}).get('time_of_day', 'unknown')}, "
             f"Weather: {world_summary.get('weather', {}).get('description', 'unknown')}"
+            f"{social_day_str}"
         )
 
         last_action = "Nothing in particular."
@@ -1075,6 +1101,21 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         print(f"  🎯 Action effect applied: {matched_action} → satisfied {effect_result.get('satisfied_needs', {})}")
     else:
         print(f"  ⚠️  No need-satisfaction mapping for action: {chosen}")
+
+    # Track social interactions from simulated actions
+    _SOCIAL_ACTION_KEYS = {"socialize", "make_friends", "seek_love", "join_community", "build_relationships"}
+    if matched_action in _SOCIAL_ACTION_KEYS and getattr(person, "social_interaction_tracker", None) is not None:
+        dominant = person.emotion_system.get_dominant_emotions(1)
+        tone = dominant[0]["name"].lower() if dominant else "neutral"
+        # Map emotion names to simpler tone labels
+        _tone_map = {"joy": "warm", "sadness": "melancholic", "anger": "tense",
+                      "fear": "tense", "trust": "warm", "anticipation": "warm"}
+        tone = _tone_map.get(tone, "neutral")
+        person.social_interaction_tracker.record_social_action(
+            action_description=chosen,
+            emotional_tone=tone,
+        )
+        print(f"  👥 Social interaction recorded: {chosen} (tone: {tone})")
 
     # Detect if the action moves Jenbina to a new location
     new_location = _detect_location_from_action(chosen)
@@ -1321,6 +1362,10 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                 st.caption("📋 Plans")
                 display_planning_stats(person, iteration)
 
+        # Social interactions
+        if getattr(person, "social_interaction_tracker", None) is not None:
+            display_social_interaction_stats(person, iteration)
+
         # Curiosity
         if getattr(person, "curiosity_system", None) is not None:
             with st.container(border=True):
@@ -1501,6 +1546,16 @@ def display_simulation_summary(simulation_history, iterations, person=None):
                         steps = p.get('steps', [])
                         done = len([s for s in steps if s['status'] == 'completed'])
                         st.write(f"- **{p['goal_description']}** ({done}/{len(steps)} steps done, replanned {p.get('times_replanned', 0)}x)")
+
+            if person is not None and getattr(person, "social_interaction_tracker", None) is not None:
+                tracker = person.social_interaction_tracker
+                people_count = tracker.people_met_count()
+                st.write("---")
+                st.write(f"**👥 Social Interactions Summary:**")
+                st.write(f"- People met today: {people_count}")
+                day_description = tracker.describe_day()
+                if day_description:
+                    st.write(f"- *Jenbina says: \"{day_description}\"*")
 
 
 def render_simulation_controls():
