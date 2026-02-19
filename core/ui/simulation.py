@@ -1511,9 +1511,23 @@ def render_simulation_controls():
     run_loop = st.button("🔄 Run Simulation Loop", type="primary", use_container_width=True)
     single_run = st.button("▶️ Run Single Iteration", use_container_width=True)
 
+    st.divider()
+    st.markdown("### Auto-Run")
+    auto_run_enabled = st.checkbox(
+        "⏰ Auto-run every N hours",
+        value=st.session_state.get("auto_run_enabled", False),
+        help="Automatically run one simulation cycle at a fixed interval",
+    )
+    auto_run_hours = st.number_input(
+        "Interval (hours)", min_value=1, max_value=24, value=5, step=1,
+    )
+    st.session_state.auto_run_enabled = auto_run_enabled
+
     return {
         "num_iterations": num_iterations,
         "delay_seconds": delay_seconds,
         "run_loop": run_loop,
-        "single_run": single_run
+        "single_run": single_run,
+        "auto_run_enabled": auto_run_enabled,
+        "auto_run_hours": auto_run_hours,
     }

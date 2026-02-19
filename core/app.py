@@ -6,9 +6,11 @@ Main entry point — Simulation page.
 import streamlit as st
 import sys
 import os
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from streamlit_autorefresh import st_autorefresh
 from core.ui.shared_init import require_auth, init_llm, save_person_state
 from core.ui.simulation import (
     inject_tamagotchi_css,
@@ -69,13 +71,32 @@ def main():
         debug_mode=st.session_state.get("debug_mode", False),
     )
 
+    # ── Auto-refresh: periodically reload the page so time checks fire ──
+    auto_run_enabled = controls.get("auto_run_enabled", False)
+    auto_run_hours = controls.get("auto_run_hours", 5)
+    if auto_run_enabled:
+        # Refresh every interval so the time-check below can trigger a run.
+        # The interval is in milliseconds.
+        st_autorefresh(
+            interval=auto_run_hours * 60 * 60 * 1000,
+            key="auto_rub_cycle",
+        )
+
     # Auto-start a single simulation iteration on first load after auth
     auto_start = False
     if "simulation_auto_started" not in st.session_state:
         st.session_state.simulation_auto_started = True
         auto_start = True
 
-    if controls["run_loop"] or controls["single_run"] or auto_start:
+    # Scheduled auto-run: trigger one cycle when the interval has elapsed
+    auto_run_due = False
+    if auto_run_enabled:
+        now = datetime.now()
+        last_run = st.session_state.get("last_simulation_time")
+        if last_run is None or (now - last_run).total_seconds() >= auto_run_hours * 3600:
+            auto_run_due = True
+
+    if controls["run_loop"] or controls["single_run"] or auto_start or auto_run_due:
         idle_placeholder.empty()
         iterations = controls["num_iterations"] if controls["run_loop"] else 1
 
@@ -94,6 +115,9 @@ def main():
             last = results[-1]
             st.session_state.action_decision = last.get("action_decision")
             st.session_state.needs_response = last.get("needs_state")
+
+        # Record the time so the auto-run scheduler knows when to fire next
+        st.session_state.last_simulation_time = datetime.now()
 
         display_simulation_summary(
             st.session_state.simulation_history, iterations, person=person
