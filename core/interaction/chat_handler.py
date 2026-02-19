@@ -96,6 +96,9 @@ def _build_subsystem_context(person, needs=None, emotions=None):
     if getattr(person, "working_memory", None) is not None:
         _add("Working memory", person.working_memory.format_for_prompt())
 
+    if getattr(person, "social_interaction_tracker", None) is not None:
+        _add("Social day", person.social_interaction_tracker.format_for_prompt())
+
     return parts
 
 
@@ -347,6 +350,11 @@ def handle_chat_interaction(
             for label, text in _build_subsystem_context(person, needs=needs_snap, emotions=all_emo):
                 context_parts.append(f"{label}:\n{text}")
 
+        # Social interaction tracker context (how many people met today, feelings)
+        if person is not None and getattr(person, "social_interaction_tracker", None) is not None:
+            social_day_ctx = person.social_interaction_tracker.format_for_prompt()
+            context_parts.append(f"Social interactions today:\n{social_day_ctx}")
+
         if recent_actions:
             context_parts.append(f"Recent action sequence: {' -> '.join(recent_actions)}")
 
@@ -441,6 +449,13 @@ Keep the response natural and in-character. Consider your current needs and how 
         if person is not None and getattr(person, "social_cognition", None) is not None:
             person.social_cognition.observe_response_effect(
                 conversation_partner_name, chosen_social_strategy
+            )
+        if person is not None and getattr(person, "social_interaction_tracker", None) is not None:
+            from ..social.social_interaction_tracker import infer_emotional_tone
+            tone = infer_emotional_tone(user_input)
+            person.social_interaction_tracker.record_chat(
+                person_name=conversation_partner_name,
+                emotional_tone=tone,
             )
         if person is not None and getattr(person, "curiosity_system", None) is not None:
             person.curiosity_system.update_after_action("chat_with_user")
