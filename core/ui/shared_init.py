@@ -55,6 +55,8 @@ def _load_or_create_person(user_db: UserDatabase, user_id: int) -> Person:
         person.init_self_narrative()
     if person.curiosity_system is None:
         person.init_curiosity_system()
+    if person.social_interaction_tracker is None:
+        person.init_social_interaction_tracker()
     # Always (re)init insight system with a plain LLM — deserialize passes
     # the JSON-mode LLM which causes 400 errors because InsightSystem's
     # prompt doesn't mention "json".  Preserve the first_impression_delivered
@@ -97,6 +99,7 @@ def init_session_state():
             person.init_social_cognition()
             person.init_self_narrative()
             person.init_curiosity_system()
+            person.init_social_interaction_tracker()
             insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
             person.init_insight_system(insight_llm)
         st.session_state.person = person
@@ -122,6 +125,8 @@ def init_session_state():
         st.session_state.person.init_self_narrative()
     if st.session_state.person.curiosity_system is None:
         st.session_state.person.init_curiosity_system()
+    if st.session_state.person.social_interaction_tracker is None:
+        st.session_state.person.init_social_interaction_tracker()
     if st.session_state.person.insight_system is None:
         insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
         st.session_state.person.init_insight_system(insight_llm)
