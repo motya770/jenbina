@@ -1,9 +1,13 @@
 """Social interaction tracker for Jenbina.
 
 Records each social interaction (chat, simulated social action) with metadata
-about who was involved, the emotional tone of the exchange, and a short
-sentiment summary.  Provides a ``describe_day`` helper that produces a
-first-person narrative Jenbina can use when reflecting on her day.
+about who was involved and the general emotional tone of the exchange.
+
+IMPORTANT: This module never stores message content. Only the tone/sentiment
+of the interaction is persisted.
+
+Provides a ``describe_day`` helper that produces a first-person narrative
+Jenbina can use when reflecting on her day.
 """
 
 import time
@@ -17,12 +21,16 @@ from typing import Dict, Any, List, Optional
 
 @dataclass
 class SocialInteraction:
-    """A single recorded social interaction."""
+    """A single recorded social interaction.
+
+    Only stores *who* Jenbina talked to, *how* it felt, and *when*.
+    No message content is ever persisted here.
+    """
 
     person_name: str  # who Jenbina interacted with
     interaction_type: str  # "chat", "simulated_social", "greeting", etc.
     emotional_tone: str  # e.g. "warm", "tense", "joyful", "neutral"
-    sentiment: str  # short free-text feeling summary
+    sentiment: str  # short generated feeling summary (never raw message text)
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -61,7 +69,11 @@ _NEGATIVE_CUES = [
 
 
 def infer_emotional_tone(text: str) -> str:
-    """Return a simple emotional-tone label from message text."""
+    """Return a simple emotional-tone label from message text.
+
+    This is a *stateless* helper — it reads the text, returns a label,
+    and the text is never stored anywhere.
+    """
     lower = text.lower()
     pos = sum(1 for w in _POSITIVE_CUES if w in lower)
     neg = sum(1 for w in _NEGATIVE_CUES if w in lower)
@@ -77,7 +89,10 @@ def infer_emotional_tone(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 class SocialInteractionTracker:
-    """Tracks all of Jenbina's social interactions during the session."""
+    """Tracks all of Jenbina's social interactions during the session.
+
+    Only the general tone is stored — message content is never saved.
+    """
 
     MAX_HISTORY = 200  # keep last N interactions
 
@@ -89,17 +104,21 @@ class SocialInteractionTracker:
     def record_chat(
         self,
         person_name: str,
-        message_text: str,
-        emotional_tone: Optional[str] = None,
+        emotional_tone: str = "neutral",
         sentiment: Optional[str] = None,
     ) -> SocialInteraction:
-        """Record a chat-based interaction (user talking to Jenbina)."""
-        tone = emotional_tone or infer_emotional_tone(message_text)
-        feel = sentiment or self._auto_sentiment(person_name, tone)
+        """Record a chat-based interaction.
+
+        Only the tone is stored — no message content is saved.
+        Callers should use ``infer_emotional_tone(text)`` beforehand
+        if they want the tone derived from a message, then pass the
+        resulting label here.
+        """
+        feel = sentiment or self._auto_sentiment(person_name, emotional_tone)
         interaction = SocialInteraction(
             person_name=person_name,
             interaction_type="chat",
-            emotional_tone=tone,
+            emotional_tone=emotional_tone,
             sentiment=feel,
         )
         self._store(interaction)
@@ -111,7 +130,11 @@ class SocialInteractionTracker:
         emotional_tone: str = "neutral",
         sentiment: Optional[str] = None,
     ) -> SocialInteraction:
-        """Record a simulated social action (e.g. 'talk to neighbor')."""
+        """Record a simulated social action (e.g. 'talk to neighbor').
+
+        The action_description is only used to extract the person name;
+        it is never stored.
+        """
         person_name = self._extract_person_from_action(action_description)
         feel = sentiment or self._auto_sentiment(person_name, emotional_tone)
         interaction = SocialInteraction(
@@ -152,10 +175,9 @@ class SocialInteractionTracker:
         """Produce a first-person summary Jenbina can use to describe her social day.
 
         Example output:
-            "Today I met 3 people. I had a warm conversation with Alice and
-             felt happy about it. I also chatted with Bob — the tone was
-             neutral but nice. I briefly talked to a stranger during my walk,
-             which felt a bit tense."
+            "Today I met 3 people. I had a warm conversation with Alice.
+             I also chatted with Bob — the tone was neutral. I briefly
+             talked to a stranger during my walk, which felt a bit tense."
         """
         today = self.get_today_interactions(day_start_ts)
         if not today:
@@ -261,7 +283,10 @@ class SocialInteractionTracker:
 
     @staticmethod
     def _extract_person_from_action(action: str) -> str:
-        """Try to extract a person/entity name from a simulated action string."""
+        """Try to extract a person/entity name from a simulated action string.
+
+        The action string is only inspected for a name — it is not stored.
+        """
         lower = action.lower()
 
         # Generic role nouns — if the action mentions one, use it directly
