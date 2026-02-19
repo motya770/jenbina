@@ -60,10 +60,19 @@ class EmotionSystem:
                 base_intensity=float(base),
             )
 
-    def update_all(self):
-        """Decay all emotions toward their baselines based on elapsed time."""
+    def update_all(self, hours: float | None = None):
+        """Decay all emotions toward their baselines.
+
+        Args:
+            hours: Fixed number of simulated hours to decay.  When *None*
+                   (the default) the method falls back to real elapsed time
+                   since the last update.
+        """
         now = datetime.now()
-        hours_passed = (now - self.last_update).total_seconds() / 3600
+        if hours is not None:
+            hours_passed = hours
+        else:
+            hours_passed = (now - self.last_update).total_seconds() / 3600
         if hours_passed > 0:
             for emotion in self.emotions.values():
                 emotion.update(hours_passed)

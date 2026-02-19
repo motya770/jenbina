@@ -3,8 +3,11 @@ from typing import List, Dict, Any, Optional
 from ..needs.maslow_needs import MaslowNeedsSystem
 from ..emotions.emotion_system import EmotionSystem
 from ..working_memory.working_memory_system import WorkingMemorySystem
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
+
+# How many simulated hours pass each cycle (one "rub").
+CYCLE_HOURS = 5.0
 
 
 @dataclass
@@ -114,15 +117,19 @@ class Person:
         self.insight_system = InsightSystem(llm)
 
     def update_all_needs(self):
-        """Update all needs, decay emotions, and decay lessons"""
-        self.maslow_needs.update_all_needs()
-        self.emotion_system.update_all()
-        # Decay learned lessons over time (small amount per update cycle)
+        """Update all needs, decay emotions, and decay lessons.
+
+        Each call simulates CYCLE_HOURS (default 5) hours of Jenbina's life.
+        """
+        cycle_delta = timedelta(hours=CYCLE_HOURS)
+        self.maslow_needs.update_all_needs(time_delta=cycle_delta)
+        self.emotion_system.update_all(hours=CYCLE_HOURS)
+        # Decay learned lessons over time
         if self.learning_system is not None:
-            self.learning_system.decay_all_lessons(hours=0.5)
+            self.learning_system.decay_all_lessons(hours=CYCLE_HOURS)
         # Decay goal confidence over time
         if self.goal_system is not None:
-            self.goal_system.decay_all_goals(hours=0.5)
+            self.goal_system.decay_all_goals(hours=CYCLE_HOURS)
     
     def get_needs_snapshot(self) -> Dict[str, float]:
         """Get current needs as a flat dict (for learning system)"""
