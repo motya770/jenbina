@@ -49,6 +49,7 @@ jobs:
         
     - name: Run unit tests with coverage
       run: |
+        set -o pipefail
         python -m pytest tests/test_*.py -v --tb=short \
           --cov=core \
           --cov-config=.coveragerc \
