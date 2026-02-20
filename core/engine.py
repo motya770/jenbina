@@ -20,6 +20,7 @@ def run_simulation():
     person.init_social_cognition()
     person.init_self_narrative()
     person.init_curiosity_system()
+    person.init_social_interaction_tracker()
     world = WorldState()
 
     # Create system components

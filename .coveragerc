@@ -1,0 +1,14 @@
+[run]
+source = core
+
+omit =
+    core/ui/*
+    core/app.py
+    core/engine.py
+    core/pages/*
+    core/person.py
+
+[report]
+exclude_lines =
+    if __name__ == .__main__.:
+    pragma: no cover
