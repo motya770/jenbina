@@ -103,3 +103,94 @@ class TestInsightSystem:
         system.insights_delivered = 3
         system.reset_session()
         assert system.insights_delivered == 0
+
+    # ------------------------------------------------------------------
+    # First-impression coverage (lines 78-117)
+    # ------------------------------------------------------------------
+    def test_should_generate_first_impression_true(self):
+        llm = _make_mock_llm()
+        system = InsightSystem(llm)
+        assert system.should_generate_first_impression({"name": "Alice"}) is True
+
+    def test_should_generate_first_impression_false_when_already_delivered(self):
+        llm = _make_mock_llm()
+        system = InsightSystem(llm)
+        system.first_impression_delivered = True
+        assert system.should_generate_first_impression({"name": "Alice"}) is False
+
+    def test_should_generate_first_impression_false_when_no_dossier(self):
+        llm = _make_mock_llm()
+        system = InsightSystem(llm)
+        assert system.should_generate_first_impression({}) is False
+        assert system.should_generate_first_impression(None) is False
+
+    def test_generate_first_impression_success(self):
+        response = "You bridge two worlds most people keep separate."
+        llm = _make_mock_llm(response)
+        system = InsightSystem(llm)
+        insight = system.generate_first_impression(
+            dossier={"career": "lawyer turned engineer"},
+            first_message="Hi there!",
+        )
+        assert insight == response
+        assert system.first_impression_delivered is True
+
+    def test_generate_first_impression_empty_response(self):
+        llm = _make_mock_llm("")
+        system = InsightSystem(llm)
+        insight = system.generate_first_impression(
+            dossier={"name": "Alice"}, first_message="Hello",
+        )
+        assert insight is None
+        assert system.first_impression_delivered is False
+
+    def test_generate_first_impression_llm_failure(self):
+        llm = _make_mock_llm()
+        llm.invoke.side_effect = Exception("LLM error")
+        system = InsightSystem(llm)
+        insight = system.generate_first_impression(
+            dossier={"name": "Alice"}, first_message="Hello",
+        )
+        assert insight is None
+        assert system.first_impression_delivered is False
+
+    # ------------------------------------------------------------------
+    # generate_insight LLM failure path (lines 176-178)
+    # ------------------------------------------------------------------
+    def test_generate_insight_llm_failure_returns_none(self):
+        llm = _make_mock_llm()
+        llm.invoke.side_effect = Exception("LLM error")
+        system = InsightSystem(llm)
+        insight = system.generate_insight(
+            dossier={}, recent_messages=[], emotional_state={}, self_narrative="",
+        )
+        assert insight is None
+
+    # ------------------------------------------------------------------
+    # JENBINA_ALWAYS_INSIGHT env var (line 125-126)
+    # ------------------------------------------------------------------
+    def test_should_generate_insight_always_insight_env(self, monkeypatch):
+        monkeypatch.setenv("JENBINA_ALWAYS_INSIGHT", "1")
+        llm = _make_mock_llm()
+        system = InsightSystem(llm)
+        system.insights_delivered = 100  # over limit, but env var overrides
+        assert system.should_generate_insight(message_count=0) is True
+
+    # ------------------------------------------------------------------
+    # Serialization preserves first_impression_delivered (line 188)
+    # ------------------------------------------------------------------
+    def test_serialization_preserves_first_impression(self):
+        llm = _make_mock_llm()
+        system = InsightSystem(llm)
+        system.first_impression_delivered = True
+        data = system.to_dict()
+        assert data["first_impression_delivered"] is True
+        restored = InsightSystem.from_dict(data, llm)
+        assert restored.first_impression_delivered is True
+
+    def test_from_dict_defaults(self):
+        llm = _make_mock_llm()
+        restored = InsightSystem.from_dict({}, llm)
+        assert restored.max_per_session == 3
+        assert restored.min_messages == 2
+        assert restored.first_impression_delivered is False
