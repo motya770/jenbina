@@ -85,8 +85,6 @@ def _make_mock_person():
     person.social_cognition.choose_social_strategy.return_value = "empathetic"
 
     person.insight_system = MagicMock()
-    person.insight_system.first_impression_delivered = True
-    person.insight_system.should_generate_first_impression.return_value = False
     person.insight_system.should_generate_insight.return_value = False
 
     return person
@@ -479,27 +477,10 @@ class TestHandleChatInteraction(unittest.TestCase):
         call_args = memory.store_conversation.call_args_list[0]
         self.assertEqual(call_args.kwargs["person_name"], "user_abc123")
 
-    def test_first_impression_insight_injected(self):
-        st = _make_mock_st()
-        llm = _make_mock_llm("You're fascinating!")
-        person = _make_mock_person()
-        person.insight_system.should_generate_first_impression.return_value = True
-        person.insight_system.generate_first_impression.return_value = "You bridge two worlds."
-        result = handle_chat_interaction(
-            st=st, llm=llm, needs_response="ok",
-            world_description="{}", action_decision="idle",
-            user_input="Hi!",
-            person=person,
-            conversation_partner_name="User",
-        )
-        self.assertIsNotNone(result["insight"])
-        self.assertIn("bridge two worlds", result["insight"])
-
     def test_subtle_insight_injected(self):
         st = _make_mock_st()
         llm = _make_mock_llm("Interesting thought...")
         person = _make_mock_person()
-        person.insight_system.should_generate_first_impression.return_value = False
         person.insight_system.should_generate_insight.return_value = True
         person.insight_system.generate_insight.return_value = "You seek control."
         result = handle_chat_interaction(
