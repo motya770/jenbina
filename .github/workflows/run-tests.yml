@@ -51,6 +51,7 @@ jobs:
       run: |
         python -m pytest tests/test_*.py -v --tb=short \
           --cov=core \
+          --cov-config=.coveragerc \
           --cov-report=term-missing \
           --cov-report=xml:coverage.xml \
           --cov-fail-under=0 \
