@@ -205,7 +205,9 @@ class TestBuildSubsystemContext(unittest.TestCase):
         self.assertEqual(result, [])
 
     def test_skips_default_values(self):
-        person = MagicMock()
+        person = MagicMock(spec=["inner_monologue", "goal_system",
+                                 "planning_system", "learning_system",
+                                 "working_memory"])
         person.inner_monologue.format_for_prompt.return_value = "No inner thoughts at the moment."
         person.goal_system.format_goals_for_prompt.return_value = "No goals set yet."
         person.planning_system.format_plan_for_prompt.return_value = "No active plan."
@@ -225,12 +227,7 @@ class TestBuildSubsystemContext(unittest.TestCase):
         self.assertIn("Working memory", labels)
 
     def test_missing_subsystem_skipped(self):
-        person = MagicMock()
-        person.inner_monologue = None
-        person.goal_system = None
-        person.planning_system = None
-        person.learning_system = None
-        person.working_memory = None
+        person = MagicMock(spec=[])
         result = _build_subsystem_context(person)
         self.assertEqual(result, [])
 
