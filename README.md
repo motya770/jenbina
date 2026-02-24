@@ -1,5 +1,17 @@
 # Jenbina
 
+[![Run Unit Tests](https://github.com/motya770/jenbina/actions/workflows/run-tests.yml/badge.svg)](https://github.com/motya770/jenbina/actions/workflows/run-tests.yml)
+[![E2E Tests](https://github.com/motya770/jenbina/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/motya770/jenbina/actions/workflows/e2e-tests.yml)
+[![codecov](https://codecov.io/gh/motya770/jenbina/branch/main/graph/badge.svg)](https://codecov.io/gh/motya770/jenbina)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.38-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![LangChain](https://img.shields.io/badge/LangChain-0.3-1C3C3C?logo=langchain&logoColor=white)](https://www.langchain.com/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--5-412991?logo=openai&logoColor=white)](https://openai.com/)
+[![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-000000?logo=ollama&logoColor=white)](https://ollama.com/)
+[![Neo4j](https://img.shields.io/badge/Neo4j-Graph_DB-4581C3?logo=neo4j&logoColor=white)](https://neo4j.com/)
+[![Firebase](https://img.shields.io/badge/Firebase-Auth-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
+[![Discord](https://img.shields.io/badge/Discord-Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/e6sRPpyc)
+
 **Open-source AGI simulation with personality, motivation, and memory.**
 
 Jenbina is a self-sustaining virtual persona that simulates human-like cognition using LLMs, a hybrid memory system, and Maslow's Hierarchy of Needs. Unlike standard chatbots, Jenbina has her own personality, internal drives, emotions, and long-term memory of people and events.
@@ -122,20 +134,20 @@ Jenbina exists in a simulated world (based on Palo Alto, CA) with:
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Language | Python 3.10+ |
-| Web UI | Streamlit |
-| LLM Orchestration | LangChain |
-| LLM (Cloud) | OpenAI (gpt-5.2, gpt-5-nano) |
-| LLM (Local) | Ollama + Llama 3.2 3B |
-| Vector Memory | ChromaDB |
-| Graph Memory | Neo4j |
-| Relational DB | SQLite |
-| Auth | Firebase + Google OAuth |
-| Web Search | SerpAPI |
-| Testing | pytest, pytest-playwright |
-| CI/CD | GitHub Actions |
+| Component | Technology | |
+|-----------|------------|---|
+| Language | Python 3.10+ | ![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white) |
+| Web UI | Streamlit | ![Streamlit](https://img.shields.io/badge/-Streamlit-FF4B4B?logo=streamlit&logoColor=white) |
+| LLM Orchestration | LangChain | ![LangChain](https://img.shields.io/badge/-LangChain-1C3C3C?logo=langchain&logoColor=white) |
+| LLM (Cloud) | OpenAI (gpt-5.2, gpt-5-nano) | ![OpenAI](https://img.shields.io/badge/-OpenAI-412991?logo=openai&logoColor=white) |
+| LLM (Local) | Ollama + Llama 3.2 3B | ![Ollama](https://img.shields.io/badge/-Ollama-000000?logo=ollama&logoColor=white) |
+| Vector Memory | ChromaDB | ![ChromaDB](https://img.shields.io/badge/-ChromaDB-FF6F00) |
+| Graph Memory | Neo4j | ![Neo4j](https://img.shields.io/badge/-Neo4j-4581C3?logo=neo4j&logoColor=white) |
+| Relational DB | SQLite | ![SQLite](https://img.shields.io/badge/-SQLite-003B57?logo=sqlite&logoColor=white) |
+| Auth | Firebase + Google OAuth | ![Firebase](https://img.shields.io/badge/-Firebase-FFCA28?logo=firebase&logoColor=black) |
+| Web Search | SerpAPI | ![SerpAPI](https://img.shields.io/badge/-SerpAPI-23B5E5) |
+| Testing | pytest, pytest-playwright | ![pytest](https://img.shields.io/badge/-pytest-0A9EDC?logo=pytest&logoColor=white) ![Playwright](https://img.shields.io/badge/-Playwright-2EAD33?logo=playwright&logoColor=white) |
+| CI/CD | GitHub Actions | ![GitHub Actions](https://img.shields.io/badge/-GitHub_Actions-2088FF?logo=githubactions&logoColor=white) |
 
 ## Project Structure
 

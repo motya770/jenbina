@@ -60,6 +60,7 @@ class Person:
     self_narrative: Any = None  # Initialized separately
     curiosity_system: Any = None  # Initialized separately
     insight_system: Any = None  # Initialized separately (needs LLM)
+    social_interaction_tracker: Any = None  # Initialized separately
     last_visit_time: Optional[datetime] = None
     conversations: Dict[str, Conversation] = field(default_factory=dict)
 
@@ -112,6 +113,12 @@ class Person:
         """Initialize the insight system with an LLM instance."""
         from ..insights.insight_system import InsightSystem
         self.insight_system = InsightSystem(llm)
+
+    def init_social_interaction_tracker(self):
+        """Initialize social interaction tracker."""
+        from ..social.social_interaction_tracker import SocialInteractionTracker
+        self.social_interaction_tracker = SocialInteractionTracker()
+
 
     def update_all_needs(self):
         """Update all needs, decay emotions, and decay lessons"""
@@ -201,6 +208,13 @@ class Person:
             ]
         }
     
+    def describe_day(self) -> str:
+        """Return a first-person narrative of Jenbina's social day."""
+        if self.social_interaction_tracker is not None:
+            return self.social_interaction_tracker.describe_day()
+        return "I didn't really talk to anyone today."
+
+
     def get_current_state(self):
         """Get a summary of the person's current state"""
         state = {"name": self.name}
@@ -242,6 +256,9 @@ class Person:
         # Add curiosity state
         if self.curiosity_system is not None:
             state["curiosity"] = self.curiosity_system.get_stats()
+        # Add social interaction tracker state
+        if self.social_interaction_tracker is not None:
+            state["social_interactions"] = self.social_interaction_tracker.get_stats()
 
         return state
     
@@ -269,6 +286,8 @@ class Person:
             data["curiosity_system"] = self.curiosity_system.to_dict()
         if self.insight_system is not None:
             data["insight_system"] = self.insight_system.to_dict()
+        if self.social_interaction_tracker is not None:
+            data["social_interaction_tracker"] = self.social_interaction_tracker.to_dict()
         data["last_visit_time"] = self.last_visit_time.isoformat() if self.last_visit_time else None
         return json.dumps(data)
 
@@ -337,6 +356,13 @@ class Person:
             person.insight_system = InsightSystem.from_dict(data["insight_system"], llm)
         else:
             person.insight_system = None
+
+        if "social_interaction_tracker" in data:
+            from ..social.social_interaction_tracker import SocialInteractionTracker
+            person.social_interaction_tracker = SocialInteractionTracker.from_dict(data["social_interaction_tracker"])
+        else:
+            person.social_interaction_tracker = None
+
 
         lvt = data.get("last_visit_time")
         person.last_visit_time = datetime.fromisoformat(lvt) if lvt else None

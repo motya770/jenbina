@@ -24,9 +24,7 @@
       "Bash(git -C:*)",
       "Bash(relevant\" after each response so the user can see how much context\nJenbina is working with.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(+ 3 semantically relevant\"\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(xargs basename:*)",
-      "Bash(pip install:*)",
-      "Bash(JENBINA_DATA_DIR=/Users/wizard/Desktop/programming/projects/jenbina/jenbina_memory python3:*)"
+      "Bash(xargs basename:*)"
     ]
   }
 }

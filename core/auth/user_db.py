@@ -149,6 +149,7 @@ class UserDatabase:
         finally:
             conn.close()
 
+
     # ------------------------------------------------------------------
     # Conversation / message storage
     # ------------------------------------------------------------------
@@ -196,6 +197,29 @@ class UserDatabase:
             # Return oldest-first
             messages.reverse()
             return messages
+        finally:
+            conn.close()
+
+    # ------------------------------------------------------------------
+    # Admin queries
+    # ------------------------------------------------------------------
+
+    def get_all_users_with_message_counts(self) -> list:
+        """Return all users with their total and per-sender message counts."""
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT u.id, u.email, u.display_name, u.photo_url,
+                          u.provider, u.created_at, u.last_login,
+                          COUNT(c.id) AS total_messages,
+                          SUM(CASE WHEN c.sender = 'user' THEN 1 ELSE 0 END) AS user_messages,
+                          SUM(CASE WHEN c.sender = 'jenbina' THEN 1 ELSE 0 END) AS jenbina_messages
+                   FROM users u
+                   LEFT JOIN conversations c ON c.user_id = u.id
+                   GROUP BY u.id
+                   ORDER BY u.last_login DESC"""
+            ).fetchall()
+            return [dict(r) for r in rows]
         finally:
             conn.close()
 

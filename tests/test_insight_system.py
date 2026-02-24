@@ -103,3 +103,31 @@ class TestInsightSystem:
         system.insights_delivered = 3
         system.reset_session()
         assert system.insights_delivered == 0
+
+    # ------------------------------------------------------------------
+    # generate_insight LLM failure path
+    # ------------------------------------------------------------------
+    def test_generate_insight_llm_failure_returns_none(self):
+        llm = _make_mock_llm()
+        llm.invoke.side_effect = Exception("LLM error")
+        system = InsightSystem(llm)
+        insight = system.generate_insight(
+            dossier={}, recent_messages=[], emotional_state={}, self_narrative="",
+        )
+        assert insight is None
+
+    # ------------------------------------------------------------------
+    # JENBINA_ALWAYS_INSIGHT env var (line 125-126)
+    # ------------------------------------------------------------------
+    def test_should_generate_insight_always_insight_env(self, monkeypatch):
+        monkeypatch.setenv("JENBINA_ALWAYS_INSIGHT", "1")
+        llm = _make_mock_llm()
+        system = InsightSystem(llm)
+        system.insights_delivered = 100  # over limit, but env var overrides
+        assert system.should_generate_insight(message_count=0) is True
+
+    def test_from_dict_defaults(self):
+        llm = _make_mock_llm()
+        restored = InsightSystem.from_dict({}, llm)
+        assert restored.max_per_session == 3
+        assert restored.min_messages == 2
