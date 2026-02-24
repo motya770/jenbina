@@ -1,13 +1,7 @@
 name: Playwright E2E Tests
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches:
-      - main
-      - master
-      - develop
-  workflow_dispatch: # allow manual trigger
+  workflow_dispatch: # manual trigger only (E2E requires live LLM)
 
 jobs:
   e2e:
