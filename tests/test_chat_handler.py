@@ -85,6 +85,7 @@ def _make_mock_person():
     person.social_cognition.choose_social_strategy.return_value = "empathetic"
 
     person.insight_system = MagicMock()
+    person.insight_system.should_generate_first_impression.return_value = False
     person.insight_system.should_generate_insight.return_value = False
 
     return person

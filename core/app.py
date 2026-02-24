@@ -26,7 +26,11 @@ from core.ui.chat import render_chat_simple
 
 
 def main():
-    st.set_page_config(page_title="Jenbina — Simulation", page_icon="👧", layout="wide")
+    # Use custom favicon if present, otherwise emoji
+    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _icon = os.path.join(_root, "assets", "favicon.png")
+    page_icon = _icon if os.path.isfile(_icon) else "👧"
+    st.set_page_config(page_title="Jenbina — Simulation", page_icon=page_icon, layout="wide")
     inject_tamagotchi_css()
 
     if not require_auth():

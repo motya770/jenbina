@@ -119,6 +119,7 @@ class Person:
         from ..social.social_interaction_tracker import SocialInteractionTracker
         self.social_interaction_tracker = SocialInteractionTracker()
 
+
     def update_all_needs(self):
         """Update all needs, decay emotions, and decay lessons"""
         self.maslow_needs.update_all_needs()
@@ -212,6 +213,7 @@ class Person:
         if self.social_interaction_tracker is not None:
             return self.social_interaction_tracker.describe_day()
         return "I didn't really talk to anyone today."
+
 
     def get_current_state(self):
         """Get a summary of the person's current state"""
@@ -360,6 +362,7 @@ class Person:
             person.social_interaction_tracker = SocialInteractionTracker.from_dict(data["social_interaction_tracker"])
         else:
             person.social_interaction_tracker = None
+
 
         lvt = data.get("last_visit_time")
         person.last_visit_time = datetime.fromisoformat(lvt) if lvt else None

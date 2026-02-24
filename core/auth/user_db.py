@@ -129,6 +129,27 @@ class UserDatabase:
         finally:
             conn.close()
 
+    def get_user_by_id(self, user_id: int) -> Optional[dict]:
+        """Lookup a user by their integer primary key. Returns dict or None."""
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                "SELECT * FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def get_all_users(self) -> list:
+        """Return all users as a list of dicts."""
+        conn = self._get_conn()
+        try:
+            rows = conn.execute("SELECT * FROM users ORDER BY id").fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+
     # ------------------------------------------------------------------
     # Conversation / message storage
     # ------------------------------------------------------------------

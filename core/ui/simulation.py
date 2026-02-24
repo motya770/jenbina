@@ -1,6 +1,5 @@
 """Simulation UI components and runner for Jenbina app"""
 import streamlit as st
-from contextlib import contextmanager
 from datetime import datetime
 import time
 import json
@@ -689,6 +688,7 @@ def display_social_interaction_stats(person, iteration):
             st.write("*No social interactions yet today.*")
 
 
+
 def display_planning_stats(person, iteration):
     """Display planning system stats"""
     if person.planning_system is None:
@@ -733,14 +733,6 @@ def _print_json(label: str, data):
             print(f"    {line}")
     except Exception:
         print(f"  {label}: {data}")
-
-
-@contextmanager
-def _card(title: str):
-    """Render a bordered card with a bold title."""
-    with st.container(border=True):
-        st.markdown(f"**{title}**")
-        yield
 
 
 def _detect_location_from_action(chosen_action: str) -> str | None:
@@ -1117,6 +1109,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         )
         print(f"  👥 Social interaction recorded: {chosen} (tone: {tone})")
 
+
     # Detect if the action moves Jenbina to a new location
     new_location = _detect_location_from_action(chosen)
     if new_location:
@@ -1366,6 +1359,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         if getattr(person, "social_interaction_tracker", None) is not None:
             display_social_interaction_stats(person, iteration)
 
+
         # Curiosity
         if getattr(person, "curiosity_system", None) is not None:
             with st.container(border=True):
@@ -1556,6 +1550,7 @@ def display_simulation_summary(simulation_history, iterations, person=None):
                 day_description = tracker.describe_day()
                 if day_description:
                     st.write(f"- *Jenbina says: \"{day_description}\"*")
+
 
 
 def render_simulation_controls():
