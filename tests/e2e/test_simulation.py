@@ -36,49 +36,27 @@ class TestSingleIteration:
         ).to_be_visible()
 
     def test_single_iteration_produces_output(self, sim_page: Page):
-        """Click 'Run Single Iteration' and verify each stage card appears
-        with content."""
+        """Click 'Run Single Iteration' and verify key Tamagotchi UI
+        elements appear progressively."""
 
         # Click the single-run button
         sim_page.get_by_role(
             "button", name=re.compile("Run Single Iteration")
         ).click()
 
-        # ── Stage 1: Environment ──────────────────────────────────────
-        # Person State card
-        person_card = sim_page.locator("text=Person State").first
-        expect(person_card).to_be_visible(timeout=STAGE_TIMEOUT)
-
-        # World State card
-        world_card = sim_page.locator("text=World State").first
-        expect(world_card).to_be_visible(timeout=STAGE_TIMEOUT)
-
-        # ── Stage 2: Perception & Context ─────────────────────────────
-        # Needs Analysis card
-        needs_card = sim_page.locator("text=Needs Analysis").first
-        expect(needs_card).to_be_visible(timeout=STAGE_TIMEOUT)
-
-        # Context card (working memory / goals / lessons)
-        context_card = sim_page.locator("text=Context").first
-        expect(context_card).to_be_visible(timeout=STAGE_TIMEOUT)
+        # ── Stage 1-2: Environment & Needs ────────────────────────────
+        # Needs bars render with labels after environment is built
+        needs_bar = sim_page.locator("text=Hunger").first
+        expect(needs_bar).to_be_visible(timeout=STAGE_TIMEOUT)
 
         # ── Stage 3: Action Decision ──────────────────────────────────
-        action_card = sim_page.locator("text=Action Decision").first
+        # The action narrative card shows what Jenbina chose to do
+        action_card = sim_page.locator("text=Jenbina decided to").first
         expect(action_card).to_be_visible(timeout=STAGE_TIMEOUT)
 
-        # ── Stage 4: Checks & Analysis ────────────────────────────────
-        safety_card = sim_page.locator("text=Safety Check").first
-        expect(safety_card).to_be_visible(timeout=STAGE_TIMEOUT)
-
-        state_card = sim_page.locator("text=State Analysis").first
-        expect(state_card).to_be_visible(timeout=STAGE_TIMEOUT)
-
-        emotions_card = sim_page.locator("text=Emotions").first
-        expect(emotions_card).to_be_visible(timeout=STAGE_TIMEOUT)
-
         # ── Stage 5: Learning & Updates ───────────────────────────────
-        learning_card = sim_page.locator("text=Learning").first
-        expect(learning_card).to_be_visible(timeout=STAGE_TIMEOUT)
+        learning_section = sim_page.locator("text=Learning").first
+        expect(learning_section).to_be_visible(timeout=STAGE_TIMEOUT)
 
         # ── Completion ────────────────────────────────────────────────
         # The iteration prints a success banner

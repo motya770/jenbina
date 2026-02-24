@@ -1,6 +1,5 @@
 """Simulation UI components and runner for Jenbina app"""
 import streamlit as st
-from contextlib import contextmanager
 from datetime import datetime
 import time
 import json
@@ -734,14 +733,6 @@ def _print_json(label: str, data):
             print(f"    {line}")
     except Exception:
         print(f"  {label}: {data}")
-
-
-@contextmanager
-def _card(title: str):
-    """Render a bordered card with a bold title."""
-    with st.container(border=True):
-        st.markdown(f"**{title}**")
-        yield
 
 
 def _detect_location_from_action(chosen_action: str) -> str | None:
