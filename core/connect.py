@@ -5,7 +5,7 @@ from langchain_ollama import ChatOllama
 
 
 
-LLMProvider = Literal["openai", "openai-advanced", "ollama", "sambanova"]
+LLMProvider = Literal["openai", "openai-advanced", "ollama"]
 
 def get_llm(provider: LLMProvider = "openai", temperature: float = 1, max_tokens: int = None):
     """
@@ -16,7 +16,6 @@ def get_llm(provider: LLMProvider = "openai", temperature: float = 1, max_tokens
             - "openai": GPT-4o-mini (default, cost-effective and powerful)
             - "openai-advanced": GPT-4o (for complex reasoning tasks)
             - "ollama": Local Llama 3.2 (offline/privacy mode)
-            - "sambanova": SambaNova cloud LLM
         temperature: Creativity level (0 = deterministic, 1 = creative)
         max_tokens: Optional cap on response length (OpenAI providers only)
 
@@ -88,10 +87,6 @@ def get_json_llm(provider: LLMProvider = "openai", temperature: float = 1):
 def get_local_llm():
     """Get local Ollama LLM instance (legacy)"""
     return get_llm(provider="ollama")
-
-def get_sambanova_llm():
-    """Get SambaNova LLM instance (legacy)"""
-    return get_llm(provider="sambanova")
 
 
 # Recommended configurations for different use cases

@@ -207,28 +207,13 @@ def handle_chat_interaction(
         # Scope ChromaDB entries per user
         chroma_person = f"user_{user_id}" if user_id else "User"
 
-        # Store user message in Chroma
-        if memory_manager:
-            print(f"🔵 Storing user message in memory: {user_input[:50]}...")
-
-            # Create metadata with JSON-serialized BasicNeeds
-            metadata = create_metadata_from_person_state(person_state, world_description)
-            embedding_id = memory_manager.store_conversation(
-                person_name=chroma_person,
-                message_content=user_input,
-                message_type="user_message",
-                metadata=metadata
-            )
-            print(f"✅ Stored with embedding ID: {embedding_id}")
-        else:
-            print("❌ No memory manager available for storing user message")
-
-        # --- Prompt-injection guard ---
+        # --- Prompt-injection guard (runs BEFORE persistence to avoid poisoning semantic memory) ---
         should_block, _ = check_injection(user_input)
         if should_block:
             refusal = make_refusal_response()
             st.chat_message("assistant").write(refusal)
-            # Store refusal in memory for context continuity
+            # Store only the refusal — do NOT persist the blocked input, or future
+            # retrieve_relevant_context() calls could feed it back into prompts.
             if memory_manager:
                 metadata = create_metadata_from_person_state(person_state, world_description, action_decision)
                 memory_manager.store_conversation(
@@ -244,6 +229,22 @@ def handle_chat_interaction(
                 "social_context": None,
                 "curiosity_context": None,
             }
+
+        # Store user message in Chroma (only after passing the injection guard)
+        if memory_manager:
+            print(f"🔵 Storing user message in memory: {user_input[:50]}...")
+
+            # Create metadata with JSON-serialized BasicNeeds
+            metadata = create_metadata_from_person_state(person_state, world_description)
+            embedding_id = memory_manager.store_conversation(
+                person_name=chroma_person,
+                message_content=user_input,
+                message_type="user_message",
+                metadata=metadata
+            )
+            print(f"✅ Stored with embedding ID: {embedding_id}")
+        else:
+            print("❌ No memory manager available for storing user message")
 
         # Get relevant context from Chroma
         relevant_context = ""

@@ -10,7 +10,7 @@ from .connect import get_llm, get_json_llm
 def run_simulation():
 
     ### LLM - Using ChatGPT as default (switch to "ollama" for local)
-    # Options: "openai" (default), "openai-advanced", "ollama", "sambanova"
+    # Options: "openai" (default), "openai-advanced", "ollama"
     llm = get_llm(provider="openai", temperature=0)
     llm_json_mode = get_json_llm(provider="openai", temperature=0)
 

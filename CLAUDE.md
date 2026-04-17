@@ -7,7 +7,7 @@ Jenbina is an open-source AGI (Artificial General Intelligence) simulation — a
 - **Language:** Python 3.10+
 - **UI Framework:** Streamlit
 - **LLM Orchestration:** LangChain
-- **LLM Providers:** OpenAI (GPT-5-nano, GPT-5.2), Ollama (Llama 3.2 3B), SambaNova
+- **LLM Providers:** OpenAI (GPT-5-nano, GPT-5.2), Ollama (Llama 3.2 3B)
 - **Databases:** ChromaDB (vector), Neo4j (graph), SQLite (time-series)
 
 ## Repository Structure
@@ -76,7 +76,7 @@ Core Systems (Person, Needs, Memory, Emotions, Goals, Learning)
     ↓
 Database Layer (ChromaDB, Neo4j, SQLite)
     ↓
-LLM Integration (LangChain → OpenAI / Ollama / SambaNova)
+LLM Integration (LangChain → OpenAI / Ollama)
 ```
 
 ### Key Subsystems

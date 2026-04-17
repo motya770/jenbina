@@ -289,6 +289,22 @@ class Person:
         if self.social_interaction_tracker is not None:
             data["social_interaction_tracker"] = self.social_interaction_tracker.to_dict()
         data["last_visit_time"] = self.last_visit_time.isoformat() if self.last_visit_time else None
+        data["conversations"] = {
+            name: {
+                "outsider_name": conv.outsider_name,
+                "last_interaction": conv.last_interaction.isoformat() if conv.last_interaction else None,
+                "messages": [
+                    {
+                        "timestamp": m.timestamp.isoformat() if m.timestamp else None,
+                        "sender": m.sender,
+                        "content": m.content,
+                        "message_type": m.message_type,
+                    }
+                    for m in conv.messages
+                ],
+            }
+            for name, conv in self.conversations.items()
+        }
         return json.dumps(data)
 
     @classmethod
@@ -307,6 +323,22 @@ class Person:
         person.emotion_system = EmotionSystem.from_dict(data["emotion_system"])
         person.working_memory = WorkingMemorySystem.from_dict(data.get("working_memory", {}))
         person.conversations = {}
+        for name, conv_data in data.get("conversations", {}).items():
+            conv = Conversation(outsider_name=conv_data.get("outsider_name", name))
+            li = conv_data.get("last_interaction")
+            if li:
+                conv.last_interaction = datetime.fromisoformat(li)
+            for m in conv_data.get("messages", []):
+                ts = m.get("timestamp")
+                conv.messages.append(
+                    Message(
+                        timestamp=datetime.fromisoformat(ts) if ts else datetime.now(),
+                        sender=m.get("sender", ""),
+                        content=m.get("content", ""),
+                        message_type=m.get("message_type", "text"),
+                    )
+                )
+            person.conversations[name] = conv
 
         # LLM-dependent systems
         if "learning_system" in data and llm is not None:

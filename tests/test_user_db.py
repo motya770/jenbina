@@ -248,5 +248,76 @@ class TestIsolation(unittest.TestCase):
         )
 
 
+class TestAdminMessageCounts(unittest.TestCase):
+    """get_all_users_with_message_counts splits by message_type, not sender."""
+
+    def setUp(self):
+        self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self.tmp.close()
+        self.db = UserDatabase(db_path=self.tmp.name)
+        self.user = self.db.create_or_update_user(
+            firebase_uid="uid_admin", email="admin@test.com", display_name="Alice"
+        )
+
+    def tearDown(self):
+        os.unlink(self.tmp.name)
+
+    def test_counts_split_by_message_type(self):
+        uid = self.user["id"]
+        # Writes mirror core/ui/chat.py: sender = display name / "Jenbina",
+        # message_type carries the canonical split.
+        self.db.store_message(uid, "Alice", "hi", message_type="user_message")
+        self.db.store_message(uid, "Alice", "again", message_type="user_message")
+        self.db.store_message(uid, "Jenbina", "hello", message_type="jenbina_response")
+        self.db.store_message(uid, "Jenbina", "check in?", message_type="proactive_message")
+
+        rows = self.db.get_all_users_with_message_counts()
+        row = next(r for r in rows if r["id"] == uid)
+        self.assertEqual(row["total_messages"], 4)
+        self.assertEqual(row["user_messages"], 2)
+        # Proactive messages count as jenbina-side
+        self.assertEqual(row["jenbina_messages"], 2)
+
+
+class TestMessageOrdering(unittest.TestCase):
+    """Same-second writes must be deterministic by id tiebreaker."""
+
+    def setUp(self):
+        self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self.tmp.close()
+        self.db = UserDatabase(db_path=self.tmp.name)
+        self.user = self.db.create_or_update_user(
+            firebase_uid="uid_order", email="order@test.com"
+        )
+
+    def tearDown(self):
+        os.unlink(self.tmp.name)
+
+    def test_same_second_messages_keep_insertion_order(self):
+        uid = self.user["id"]
+        # Force identical created_at so only the id tiebreaker can distinguish rows.
+        import sqlite3
+        conn = sqlite3.connect(self.tmp.name)
+        ts = "2026-04-18 12:00:00"
+        for i, (sender, content) in enumerate([
+            ("Alice", "u1"),
+            ("Jenbina", "j1"),
+            ("Alice", "u2"),
+            ("Jenbina", "j2"),
+        ]):
+            conn.execute(
+                "INSERT INTO conversations (user_id, sender, content, created_at) VALUES (?, ?, ?, ?)",
+                (uid, sender, content, ts),
+            )
+        conn.commit()
+        conn.close()
+
+        messages = self.db.get_messages(uid, limit=10)
+        self.assertEqual(
+            [m["content"] for m in messages],
+            ["u1", "j1", "u2", "j2"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
