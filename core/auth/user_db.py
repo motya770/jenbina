@@ -180,10 +180,13 @@ class UserDatabase:
         """Retrieve the most recent messages for a user, oldest-first."""
         conn = self._get_conn()
         try:
+            # Tie-break by id (autoincrement) so same-second writes stay in insertion order.
+            # datetime('now') only has 1-second resolution, and chat writes user + assistant
+            # messages back-to-back, which would otherwise scramble the speaker sequence.
             rows = conn.execute(
                 """SELECT * FROM conversations
                     WHERE user_id = ?
-                    ORDER BY created_at DESC
+                    ORDER BY created_at DESC, id DESC
                     LIMIT ?""",
                 (user_id, limit),
             ).fetchall()
@@ -208,12 +211,15 @@ class UserDatabase:
         """Return all users with their total and per-sender message counts."""
         conn = self._get_conn()
         try:
+            # Split by message_type (stable enum: 'user_message' | 'jenbina_response' | 'proactive_message'),
+            # not sender — sender stores display names or "Jenbina" (capital J), which don't match the
+            # lowercase constants the query used previously and silently produced zeros.
             rows = conn.execute(
                 """SELECT u.id, u.email, u.display_name, u.photo_url,
                           u.provider, u.created_at, u.last_login,
                           COUNT(c.id) AS total_messages,
-                          SUM(CASE WHEN c.sender = 'user' THEN 1 ELSE 0 END) AS user_messages,
-                          SUM(CASE WHEN c.sender = 'jenbina' THEN 1 ELSE 0 END) AS jenbina_messages
+                          SUM(CASE WHEN c.message_type = 'user_message' THEN 1 ELSE 0 END) AS user_messages,
+                          SUM(CASE WHEN c.message_type IN ('jenbina_response', 'proactive_message') THEN 1 ELSE 0 END) AS jenbina_messages
                    FROM users u
                    LEFT JOIN conversations c ON c.user_id = u.id
                    GROUP BY u.id

@@ -8,7 +8,6 @@ from core.connect import (
     get_llm,
     get_json_llm,
     get_local_llm,
-    get_sambanova_llm,
     get_recommended_llm,
     RECOMMENDED_CONFIGS,
 )
@@ -110,11 +109,6 @@ class TestLegacyFunctions(unittest.TestCase):
         mock_ollama.return_value = MagicMock()
         get_local_llm()
         mock_ollama.assert_called_once()
-
-    @patch("core.connect.get_llm")
-    def test_get_sambanova_llm_calls_get_llm(self, mock_get_llm):
-        get_sambanova_llm()
-        mock_get_llm.assert_called_once_with(provider="sambanova")
 
 
 class TestGetRecommendedLlm(unittest.TestCase):

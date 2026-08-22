@@ -310,5 +310,34 @@ class TestPerson(unittest.TestCase):
         self.assertEqual(stats["most_active_conversations"][0]["message_count"], 5)
 
 
+class TestPersonSerializeConversations(unittest.TestCase):
+    """Conversations must survive serialize/deserialize (regression: used to be dropped)."""
+
+    def test_conversations_round_trip(self):
+        person = Person(name="Jenbina")
+        person.receive_message("Alice", "Hi there!", "text")
+        person.send_message("Alice", "Hello Alice!", "text")
+        person.receive_message("Bob", "Yo", "text")
+
+        restored = Person.deserialize(person.serialize())
+
+        self.assertIn("Alice", restored.conversations)
+        self.assertIn("Bob", restored.conversations)
+        alice = restored.conversations["Alice"]
+        self.assertEqual(len(alice.messages), 2)
+        self.assertEqual(alice.messages[0].sender, "outsider")
+        self.assertEqual(alice.messages[0].content, "Hi there!")
+        self.assertEqual(alice.messages[1].sender, "person")
+        self.assertEqual(alice.messages[1].content, "Hello Alice!")
+        # Timestamps preserved as datetime
+        self.assertIsInstance(alice.messages[0].timestamp, datetime)
+        self.assertIsInstance(alice.last_interaction, datetime)
+
+    def test_empty_conversations_round_trip(self):
+        person = Person(name="Jenbina")
+        restored = Person.deserialize(person.serialize())
+        self.assertEqual(restored.conversations, {})
+
+
 if __name__ == '__main__':
-    unittest.main() 
+    unittest.main()
