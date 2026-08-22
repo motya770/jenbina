@@ -267,3 +267,13 @@ git commit -m "<conventional commit message>"
 | `2026-02-15-tamagotchi-ui-implementation.md` | Tamagotchi UI redesign — CSS injection, rendering helpers, single-column layout |
 | `2026-02-17-wow-effect-implementation.md` | Deep Emotional Mirror — user research, insight system, GPT-5.2 chat, dynamic greetings |
 | `2026-02-18-llm-knowledge-enriched-dossier.md` | LLM knowledge-enriched dossiers — parallel web search + GPT knowledge query |
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
