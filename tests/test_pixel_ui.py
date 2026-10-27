@@ -2,7 +2,11 @@
 emitted by the simulation page renderers (core.ui.simulation)."""
 
 import unittest
+from collections import namedtuple
+from types import SimpleNamespace
 from unittest.mock import patch
+
+from core.ui.chat import render_chat_simple
 
 from core.ui.simulation import (
     display_jenbina_image,
@@ -141,6 +145,23 @@ class TestActionAndSprite(unittest.TestCase):
     def test_display_jenbina_image_derives_state_from_any_path(self):
         self.assertIn("px-anim-motion", rendered(display_jenbina_image, "/old/src/images/jenbina_eat.png", "Jenbina"))
         self.assertEqual(rendered(display_jenbina_image, "whatever.png"), rendered(display_jenbina_image, "jenbina_base.png"))
+
+
+class TestChatAvatars(unittest.TestCase):
+    @patch("core.ui.chat.handle_user_input")
+    @patch("core.ui.chat.send_proactive_message", return_value=None)
+    @patch("core.ui.chat.check_return_greeting", return_value=None)
+    @patch("core.ui.chat._get_user_display_name", return_value="Matt")
+    @patch("core.ui.chat.st")
+    def test_history_rows_get_sprite_avatars(self, st, *_):
+        st.session_state = {"proactive_checked": True}
+        Msg = namedtuple("Msg", "sender content")
+        person = SimpleNamespace(name="Jenbina", send_message=lambda *a: None,
+                                 get_conversation_history=lambda *a, **k: [Msg("Matt", "hi"), Msg("person", "hello")])
+        render_chat_simple(person, None, None, False)
+        avatars = [c.kwargs.get("avatar") for c in st.chat_message.call_args_list]
+        self.assertTrue(avatars[0].endswith("icons/player.png"))
+        self.assertTrue(avatars[1].endswith("jenbina_avatar.png"))
 
 
 if __name__ == "__main__":
