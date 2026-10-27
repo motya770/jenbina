@@ -32,7 +32,6 @@ class TestMemoryIntegration(unittest.TestCase):
         
         # Initialize memory system without Neo4j for testing
         self.memory_system = HybridMemorySystem(
-            embeddings_model="llama3.2:3b-instruct-fp16",
             neo4j_uri="bolt://localhost:9999",  # Invalid URI to disable Neo4j
             neo4j_user="test",
             neo4j_password="test",

@@ -5,6 +5,7 @@ Tests ChromaDB, Neo4j, and SQLite integration
 """
 
 import unittest
+from unittest.mock import patch
 import sys
 import os
 import tempfile
@@ -78,7 +79,6 @@ class TestHybridMemorySystem(unittest.TestCase):
         
         # Initialize memory system without Neo4j for testing
         self.memory_system = HybridMemorySystem(
-            embeddings_model="llama3.2:3b-instruct-fp16",
             neo4j_uri="bolt://localhost:9999",  # Invalid URI to disable Neo4j
             neo4j_user="test",
             neo4j_password="test",
@@ -86,6 +86,22 @@ class TestHybridMemorySystem(unittest.TestCase):
             time_series_path=self.time_series_path
         )
     
+    def test_embeddings_client_is_created_lazily(self):
+        """Constructing the system must not need an OpenAI key; the client is built on first use"""
+        with patch("core.memory.hybrid_memory_system.OpenAIEmbeddings") as mock_embeddings:
+            system = HybridMemorySystem(
+                neo4j_uri="bolt://localhost:9999",
+                vector_store_path=os.path.join(self.temp_dir, "lazy_store"),
+                time_series_path=os.path.join(self.temp_dir, "lazy.db")
+            )
+            try:
+                mock_embeddings.assert_not_called()
+                self.assertIs(system.embeddings, mock_embeddings.return_value)
+                self.assertIs(system.embeddings, mock_embeddings.return_value)
+                mock_embeddings.assert_called_once_with(model="text-embedding-3-small")
+            finally:
+                system.close()
+
     def tearDown(self):
         """Clean up test fixtures"""
         # Close connections
@@ -449,7 +465,6 @@ class TestHybridMemorySystem(unittest.TestCase):
         
         # Recreate the system with same paths
         new_memory_system = HybridMemorySystem(
-            embeddings_model="llama3.2:3b-instruct-fp16",
             neo4j_uri="bolt://localhost:9999",
             neo4j_user="test",
             neo4j_password="test",

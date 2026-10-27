@@ -94,7 +94,10 @@ class HybridMemorySystem:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
-        self.embeddings = OpenAIEmbeddings(model=embeddings_model)
+        # The OpenAI embeddings client is created on first use (see `embeddings`),
+        # so constructing the memory system does not require an API key.
+        self.embeddings_model = embeddings_model
+        self._embeddings = None
         self.vector_store_path = vector_store_path
         self.time_series_path = time_series_path
 
@@ -118,6 +121,13 @@ class HybridMemorySystem:
         # Initialize time-series database (SQLite)
         self._initialize_time_series_db()
     
+    @property
+    def embeddings(self):
+        """OpenAI embeddings client, built lazily so an API key is only needed once embeddings are used"""
+        if self._embeddings is None:
+            self._embeddings = OpenAIEmbeddings(model=self.embeddings_model)
+        return self._embeddings
+
     def _initialize_vector_store(self):
         """Initialize ChromaDB for semantic memory storage"""
         if not CHROMA_AVAILABLE:

@@ -25,9 +25,6 @@ def test_maslow_decision_system():
     
     print("🧠 Initializing Enhanced Maslow Decision System...")
     
-    # Initialize LLM
-    llm_json_mode = get_json_llm(provider="openai", temperature=0)
-    
     # Create needs system with some needs already low
     needs_system = MaslowNeedsSystem()
     
@@ -45,6 +42,8 @@ def test_maslow_decision_system():
     # Test decision making
     print(f"\n🤔 Testing Decision Making...")
     try:
+        # Built inside the try so a missing OPENAI_API_KEY falls back to the mock decision below
+        llm_json_mode = get_json_llm(provider="openai", temperature=0)
         decision = create_maslow_decision_chain(llm_json_mode, needs_system)
         print(f"Decision: {decision}")
     except Exception as e:
@@ -116,7 +115,6 @@ def demonstrate_growth_progression():
     
     # Create a fresh needs system
     needs_system = MaslowNeedsSystem()
-    llm_json_mode = get_json_llm(provider="openai", temperature=0)
     action_executor = create_maslow_action_executor(needs_system)
     goal_setter = create_maslow_goal_setter(needs_system)
     
