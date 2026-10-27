@@ -11,9 +11,11 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import streamlit as st
+from core.ui.pixel_theme import inject_pixel_css
 from core.auth.user_db import UserDatabase
 
 st.set_page_config(page_title="Jenbina — Admin", page_icon="🔑", layout="wide")
+inject_pixel_css()
 
 ADMIN_EMAIL = "matvei.kudelin@gmail.com"
 
