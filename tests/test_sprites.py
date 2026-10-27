@@ -7,6 +7,7 @@ from core.ui.sprites.art import BODY, HAIR, FACES, PROPS, EFFECTS, STATE_FRAMES
 from core.ui.sprites.build import compose, render_frame, render_sheet
 
 EMOTION_STATES = ["base", "smile", "sad", "angry", "scary", "surprised", "thinking"]
+ACTION_STATES = ["eat", "drink", "read", "sleep", "talk", "walks"]
 
 
 def all_layers():
@@ -81,6 +82,21 @@ class TestEmotionSheets(unittest.TestCase):
     def test_unknown_state_raises(self):
         with self.assertRaises(KeyError):
             render_sheet("dancing")
+
+
+class TestActionSheets(unittest.TestCase):
+    def test_all_thirteen_states_present_in_spec_order(self):
+        self.assertEqual(list(STATE_FRAMES), EMOTION_STATES + ACTION_STATES)
+
+    def test_action_sheets_render_and_animate(self):
+        for s in ACTION_STATES:
+            sheet = render_sheet(s)
+            self.assertEqual(sheet.size, (96, 48), s)
+            self.assertNotEqual(sheet.crop((0, 0, 48, 48)).tobytes(), sheet.crop((48, 0, 96, 48)).tobytes(), s)
+
+    def test_walks_frame_one_is_shifted_up(self):
+        self.assertEqual(STATE_FRAMES["walks"][1]["dy"], -1)
+        self.assertEqual(render_frame(STATE_FRAMES["walks"][1]).getpixel((24, 47)), (0, 0, 0, 0))
 
 
 if __name__ == "__main__":
