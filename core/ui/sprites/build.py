@@ -89,3 +89,109 @@ ICON_SIZE = (8, 8)
 def render_icon(name: str) -> Image.Image:
     """One 8x8 icon; unknown name raises KeyError."""
     return compose([(0, 0, ICON_ART[name])], size=ICON_SIZE)
+
+
+# --------------------------------------------------------------------------
+# Whole-set rendering, writing and checking
+# --------------------------------------------------------------------------
+import argparse  # noqa: E402
+import io  # noqa: E402
+import os  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+from core.ui.sprites import SPRITES_DIR  # noqa: E402
+
+AVATAR_FILE = "jenbina_avatar.png"
+
+
+def render_all() -> dict[str, Image.Image]:
+    """Every output image, keyed by path relative to ``assets/sprites``."""
+    out: dict[str, Image.Image] = {}
+    for state in STATE_FRAMES:
+        out[f"jenbina_{state}.png"] = render_sheet(state)
+    out[AVATAR_FILE] = render_frame(STATE_FRAMES["base"][0])
+    for name in ICON_ART:
+        out[f"icons/{name}.png"] = render_icon(name)
+    return out
+
+
+def png_bytes(img: Image.Image) -> bytes:
+    """Deterministic PNG encoding (no timestamps, fixed encoder settings)."""
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=False)
+    return buf.getvalue()
+
+
+def _pixels(img: Image.Image) -> tuple[tuple[int, int], bytes]:
+    return img.size, img.convert("RGBA").tobytes()
+
+
+def _file_matches(path: Path, img: Image.Image) -> bool:
+    if not path.is_file():
+        return False
+    try:
+        with Image.open(path) as on_disk:
+            return _pixels(on_disk) == _pixels(img)
+    except Exception:
+        return False
+
+
+def write_all(out_dir: Path, favicon: Path | None) -> list[Path]:
+    """Write every sheet, the avatar and the icons under ``out_dir``.
+
+    When ``favicon`` is given it receives a copy of the avatar bytes.
+    Returns the written paths.
+    """
+    out_dir = Path(out_dir)
+    (out_dir / "icons").mkdir(parents=True, exist_ok=True)
+    renders = render_all()
+    written: list[Path] = []
+    for rel, img in renders.items():
+        path = out_dir / rel
+        path.write_bytes(png_bytes(img))
+        written.append(path)
+    if favicon is not None:
+        favicon = Path(favicon)
+        favicon.parent.mkdir(parents=True, exist_ok=True)
+        favicon.write_bytes(png_bytes(renders[AVATAR_FILE]))
+        written.append(favicon)
+    return written
+
+
+def check(out_dir: Path, favicon: Path | None) -> list[str]:
+    """Relative paths under ``out_dir`` (plus the favicon) that are missing or differ from a fresh render."""
+    out_dir = Path(out_dir)
+    renders = render_all()
+    stale = [rel for rel, img in renders.items() if not _file_matches(out_dir / rel, img)]
+    if favicon is not None and not _file_matches(Path(favicon), renders[AVATAR_FILE]):
+        stale.append(os.path.relpath(favicon, out_dir))
+    return stale
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="python -m core.ui.sprites.build",
+        description="Render the pixel sprites into assets/sprites (and the favicon).",
+    )
+    parser.add_argument("--check", action="store_true", help="exit 1 if any committed file differs from a fresh render")
+    parser.add_argument("--out", default=SPRITES_DIR, help="output directory (default: assets/sprites)")
+    parser.add_argument(
+        "--favicon",
+        default=os.path.join(os.path.dirname(SPRITES_DIR), "favicon.png"),
+        help="favicon path (default: assets/favicon.png)",
+    )
+    args = parser.parse_args(argv)
+    out_dir, favicon = Path(args.out), Path(args.favicon)
+    if args.check:
+        stale = check(out_dir, favicon)
+        for rel in stale:
+            print(f"stale: {rel}")
+        print("sprites up to date" if not stale else f"{len(stale)} file(s) differ; run python -m core.ui.sprites.build")
+        return 1 if stale else 0
+    written = write_all(out_dir, favicon)
+    print(f"wrote {len(written)} files under {out_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

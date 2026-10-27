@@ -1,10 +1,15 @@
 """Tests for the pixel sprite pipeline (core.ui.sprites)."""
 
+import tempfile
 import unittest
+from pathlib import Path
 
 from core.ui.sprites.palette import PALETTE
 from core.ui.sprites.art import BODY, HAIR, FACES, PROPS, EFFECTS, STATE_FRAMES, ICON_ART
-from core.ui.sprites.build import compose, render_frame, render_sheet, render_icon
+from core.ui.sprites import STATES, MOTION_STATES, ICONS, SPRITES_DIR, sprite_path
+from core.ui.sprites.build import (
+    compose, render_frame, render_sheet, render_icon, render_all, png_bytes, write_all, check,
+)
 
 EMOTION_STATES = ["base", "smile", "sad", "angry", "scary", "surprised", "thinking"]
 ACTION_STATES = ["eat", "drink", "read", "sleep", "talk", "walks"]
@@ -115,6 +120,43 @@ class TestIcons(unittest.TestCase):
     def test_unknown_icon_raises(self):
         with self.assertRaises(KeyError):
             render_icon("banana")
+
+
+class TestBuild(unittest.TestCase):
+    def test_render_all_has_every_output(self):
+        out = render_all()
+        self.assertEqual(
+            sorted(out),
+            sorted([f"jenbina_{s}.png" for s in STATES] + ["jenbina_avatar.png"] + [f"icons/{i}.png" for i in ICONS]),
+        )
+        self.assertEqual(out["jenbina_avatar.png"].size, (48, 48))
+
+    def test_png_bytes_is_deterministic(self):
+        self.assertEqual(png_bytes(render_sheet("base")), png_bytes(render_sheet("base")))
+
+    def test_write_then_check_is_clean_and_edit_is_detected(self):
+        with tempfile.TemporaryDirectory() as d:
+            out, fav = Path(d) / "sprites", Path(d) / "favicon.png"
+            write_all(out, fav)
+            self.assertEqual(check(out, fav), [])
+            (out / "icons" / "joy.png").write_bytes(b"corrupt")
+            self.assertEqual(check(out, fav), ["icons/joy.png"])
+
+    def test_committed_assets_are_fresh(self):
+        self.assertEqual(check(Path(SPRITES_DIR), Path(SPRITES_DIR).parent / "favicon.png"), [])
+
+
+class TestPaths(unittest.TestCase):
+    def test_sprite_path_falls_back_to_base(self):
+        self.assertTrue(sprite_path("nope").endswith("jenbina_base.png"))
+        self.assertTrue(sprite_path("eat").endswith("jenbina_eat.png"))
+
+    def test_motion_states(self):
+        self.assertEqual(MOTION_STATES, frozenset({"scary", "thinking", "eat", "drink", "sleep", "talk", "walks"}))
+
+    def test_constants_match_the_art(self):
+        self.assertEqual(STATES, tuple(STATE_FRAMES))
+        self.assertEqual(sorted(ICONS), sorted(ICON_ART))
 
 
 if __name__ == "__main__":
