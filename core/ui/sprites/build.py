@@ -54,7 +54,7 @@ def compose(
 # --------------------------------------------------------------------------
 # Frames and sheets
 # --------------------------------------------------------------------------
-from core.ui.sprites.art import BODY, HAIR, FACES, PROPS, EFFECTS, STATE_FRAMES  # noqa: E402
+from core.ui.sprites.art import BODY, HAIR, FACES, PROPS, EFFECTS, STATE_FRAMES, ICON_ART  # noqa: E402
 from core.ui.sprites.palette import FrameSpec  # noqa: E402
 
 FRAME_SIZE = (48, 48)
@@ -81,3 +81,11 @@ def render_sheet(state: str) -> Image.Image:
     sheet.paste(render_frame(frame0), (0, 0))
     sheet.paste(render_frame(frame1), (48, 0))
     return sheet
+
+
+ICON_SIZE = (8, 8)
+
+
+def render_icon(name: str) -> Image.Image:
+    """One 8x8 icon; unknown name raises KeyError."""
+    return compose([(0, 0, ICON_ART[name])], size=ICON_SIZE)

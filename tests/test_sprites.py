@@ -3,11 +3,14 @@
 import unittest
 
 from core.ui.sprites.palette import PALETTE
-from core.ui.sprites.art import BODY, HAIR, FACES, PROPS, EFFECTS, STATE_FRAMES
-from core.ui.sprites.build import compose, render_frame, render_sheet
+from core.ui.sprites.art import BODY, HAIR, FACES, PROPS, EFFECTS, STATE_FRAMES, ICON_ART
+from core.ui.sprites.build import compose, render_frame, render_sheet, render_icon
 
 EMOTION_STATES = ["base", "smile", "sad", "angry", "scary", "surprised", "thinking"]
 ACTION_STATES = ["eat", "drink", "read", "sleep", "talk", "walks"]
+ICON_NAMES = ["hunger", "sleep", "security", "love", "esteem", "self_actualization",
+              "joy", "sadness", "anger", "fear", "surprise", "disgust", "trust", "anticipation",
+              "sunny", "cloudy", "rain", "storm", "snow", "fog", "wind", "player"]
 
 
 def all_layers():
@@ -97,6 +100,21 @@ class TestActionSheets(unittest.TestCase):
     def test_walks_frame_one_is_shifted_up(self):
         self.assertEqual(STATE_FRAMES["walks"][1]["dy"], -1)
         self.assertEqual(render_frame(STATE_FRAMES["walks"][1]).getpixel((24, 47)), (0, 0, 0, 0))
+
+
+class TestIcons(unittest.TestCase):
+    def test_exactly_the_spec_icons(self):
+        self.assertEqual(sorted(ICON_ART), sorted(ICON_NAMES))
+
+    def test_icons_are_8x8_and_not_empty(self):
+        for name in ICON_NAMES:
+            img = render_icon(name)
+            self.assertEqual((img.size, img.mode), ((8, 8), "RGBA"), name)
+            self.assertTrue(any(px[3] for px in img.getdata()), name)
+
+    def test_unknown_icon_raises(self):
+        with self.assertRaises(KeyError):
+            render_icon("banana")
 
 
 if __name__ == "__main__":
