@@ -1,7 +1,7 @@
 # Pixel Art UI Redesign
 
 **Date:** 2026-10-27
-**Status:** Approved
+**Status:** Approved (revision 2, 2026-10-27, applied)
 **Approach:** CSS device shell + CSS-animated hand-authored sprites (no framework change, no iframe)
 
 ## Problem
@@ -274,3 +274,43 @@ a small fake person exposing `maslow_needs.get_need_satisfaction()` and
 - Redesigning the content of the Environment, Console, Debug Info and Admin pages.
 - Sound, a sprite editor, or more than two animation frames per state.
 - Replacing Streamlit or adding a Node build step.
+
+## Revision 2 — portrait + sprite, candy arcade palette
+
+Applied after the first implementation was reviewed in the browser. Two changes;
+everything else above stands.
+
+**The painterly portraits return.** The thirteen `jenbina_<state>.png` portraits live
+in `assets/portraits/` (same names as before, so `get_jenbina_image_for_emotion()` and
+`get_jenbina_image_for_action()` are untouched; `IMAGES_DIR` points there).
+`display_jenbina_image()` shows the portrait as the main character display through
+`st.image(..., width=256)` inside a game-window frame (4px ink border, cream mat, hard
+shadow), and under it a status strip: the pixel sprite at half size (`sprite_html(...,
+scale=2)` → `.px-sprite-2x`, 96px, still animated) beside the caption. Missing portrait
+→ `base` portrait → sprite strip only. The pixel sprite remains the chat avatar and the
+favicon. Section 3's "Removed" list no longer applies to the portraits.
+
+**Candy arcade palette** replaces the section 2 table:
+
+| Role                      | Hex       |
+|---------------------------|-----------|
+| page background           | `#22184A` |
+| device body               | `#FF6B9D` |
+| bezel highlight / shadow  | `#FFA8C9` / `#B3285C` |
+| screen background         | `#4FC3F7` |
+| screen inner line         | `#FFFFFF` |
+| ink (text)                | `#1E1B3A` |
+| muted text                | `#4A4670` |
+| panels (dialogs, chat, ribbon, inputs) | `#FFF6D5`, shade `#E8DCC0` |
+| control pad (sidebar)     | `#2A1F5E` |
+| accent / deep accent      | `#FF3E8A` / `#C2185B` |
+| secondary button          | `#5BE36A` |
+| hover                     | `#FFD93D` |
+| critical / negative       | `#FF4757` |
+
+Each need bar has its own fill: hunger `#FF8C42`, sleep `#9B6BFF`, safety `#2EC4B6`,
+social `#FF5DA2`, esteem `#FFD93D`, growth `#5BE36A` (`.need-<name>` on the row;
+critical rows still blink red). Emotion chips are colored tiles (`.emotion-<name>`):
+joy yellow, sadness blue, anger red, fear purple, surprise orange, disgust green, trust
+teal, anticipation pink. Fonts, scanlines, bevels and the no-gradient / no-radius rules
+are unchanged. `.streamlit/config.toml` carries the screen palette.

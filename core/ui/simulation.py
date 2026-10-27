@@ -4,6 +4,7 @@ from datetime import datetime
 import time
 import html
 import json
+import re
 import os
 from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
@@ -174,11 +175,12 @@ def render_needs_bars(person):
         filled = int((pct + 5) // NEED_SEGMENTS)   # round half up: 85% shows 9 segments, not 8
 
         if pct < 30:
-            row_class = "need-row need-critical"
+            level = " need-critical"
         elif pct < 60:
-            row_class = "need-row need-mid"
+            level = " need-mid"
         else:
-            row_class = "need-row"
+            level = ""
+        row_class = f"need-row need-{need_name}{level}"
 
         segments = (
             '<span class="need-seg on"></span>' * filled
@@ -194,6 +196,11 @@ def render_needs_bars(person):
     st.markdown("".join(rows), unsafe_allow_html=True)
 
 
+def _css_token(name):
+    """Lower-case ``name`` reduced to [a-z0-9_] so it is safe inside a class attribute."""
+    return re.sub(r"[^a-z0-9_]", "", str(name).lower())
+
+
 def render_emotion_chips(person):
     """Render the strongest emotions (above 15, at most four) as square badges."""
     all_emotions = person.emotion_system.get_emotional_state_summary().get("emotions", {})
@@ -207,7 +214,7 @@ def render_emotion_chips(person):
         return
 
     chips = "".join(
-        f'<span class="emotion-chip">{icon_html(name.lower(), alt=name)}'
+        f'<span class="emotion-chip emotion-{_css_token(name)}">{icon_html(name.lower(), alt=name)}'
         f'{html.escape(name.capitalize())} {intensity:.0f}</span>'
         for name, intensity in visible
     )

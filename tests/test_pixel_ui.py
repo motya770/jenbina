@@ -75,8 +75,13 @@ class TestInjectCss(unittest.TestCase):
         css, kwargs = st.markdown.call_args[0][0], st.markdown.call_args[1]
         self.assertTrue(kwargs.get("unsafe_allow_html"))
         for needle in ["Press+Start+2P", "VT323", ".px-sprite", "image-rendering: pixelated",
-                       ".need-seg", ".px-dialog", "steps(1", "#1B1F3B", "#FF8FAB"]:
+                       ".need-seg", ".px-dialog", "steps(1", ".px-sprite-2x", ".px-wrap-2x",
+                       # candy arcade palette: screen, accent, device body, panel, and the six need colors
+                       "#4FC3F7", "#FF3E8A", "#FF6B9D", "#FFF6D5",
+                       ".need-hunger", ".need-sleep", ".need-security", ".need-love", ".need-esteem",
+                       ".need-self_actualization", ".emotion-joy"]:
             self.assertIn(needle, css)
+        self.assertEqual(css.count("linear-gradient("), 1)   # only the scanline overlay
         self.assertNotRegex(css, r"border-radius:\s*[1-9]")   # only `border-radius: 0` overrides are allowed
         self.assertNotIn("linear-gradient(135", css)
 
@@ -121,6 +126,8 @@ class TestNeedsBars(unittest.TestCase):
         html_ = rendered(render_needs_bars, FakePerson(
             {"hunger": 60, "sleep": 43, "security": 80, "love": 0, "esteem": 120, "self_actualization": -5}, {}))
         self.assertEqual(html_.count('class="need-row'), 6)
+        for need in ["hunger", "sleep", "security", "love", "esteem", "self_actualization"]:
+            self.assertIn(f'class="need-row need-{need}', html_)
         self.assertEqual(html_.count('<span class="need-seg'), 60)
         self.assertEqual(html_.count('need-seg on'), 6 + 4 + 8 + 0 + 10 + 0)
 
@@ -138,7 +145,9 @@ class TestChipsMoodRibbon(unittest.TestCase):
     def test_chips_cap_at_four_skip_low_and_survive_unknown_emotion(self):
         html_ = rendered(render_emotion_chips, FakePerson(
             {}, {"joy": 90, "trust": 80, "fear": 70, "curiosity": 60, "anger": 50, "sadness": 15}))
-        self.assertEqual(html_.count('class="emotion-chip"'), 4)
+        self.assertEqual(html_.count('<span class="emotion-chip'), 4)
+        self.assertIn('class="emotion-chip emotion-joy"', html_)
+        self.assertIn('class="emotion-chip emotion-curiosity"', html_)
         self.assertIn("px-icon-missing", html_)
         self.assertNotIn("Sadness", html_)
 
