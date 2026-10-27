@@ -7,7 +7,6 @@ from unittest.mock import patch, MagicMock
 from core.connect import (
     get_llm,
     get_json_llm,
-    get_local_llm,
     get_recommended_llm,
     RECOMMENDED_CONFIGS,
 )
@@ -53,13 +52,9 @@ class TestGetLlm(unittest.TestCase):
         call_kwargs = mock_chat.call_args
         self.assertEqual(call_kwargs.kwargs["max_tokens"], 200)
 
-    @patch("core.connect.ChatOllama")
-    def test_ollama_provider(self, mock_ollama):
-        mock_ollama.return_value = MagicMock()
-        get_llm(provider="ollama", temperature=0.7)
-        mock_ollama.assert_called_once_with(
-            model="llama3.2:3b-instruct-fp16", temperature=0.7
-        )
+    def test_ollama_provider_removed(self):
+        with self.assertRaises(ValueError):
+            get_llm(provider="ollama")
 
     def test_unknown_provider_raises(self):
         with self.assertRaises(ValueError) as ctx:
@@ -88,34 +83,16 @@ class TestGetJsonLlm(unittest.TestCase):
         call_kwargs = mock_chat.call_args
         self.assertEqual(call_kwargs.kwargs["model"], "gpt-5.2")
 
-    @patch("core.connect.ChatOllama")
-    def test_ollama_json_mode(self, mock_ollama):
-        mock_ollama.return_value = MagicMock()
-        get_json_llm(provider="ollama", temperature=0)
-        mock_ollama.assert_called_once_with(
-            model="llama3.2:3b-instruct-fp16", temperature=0, format="json"
-        )
-
     def test_unknown_provider_raises(self):
         with self.assertRaises(ValueError):
             get_json_llm(provider="bad_provider")
-
-
-class TestLegacyFunctions(unittest.TestCase):
-    """Tests for backwards-compatibility functions."""
-
-    @patch("core.connect.ChatOllama")
-    def test_get_local_llm(self, mock_ollama):
-        mock_ollama.return_value = MagicMock()
-        get_local_llm()
-        mock_ollama.assert_called_once()
 
 
 class TestGetRecommendedLlm(unittest.TestCase):
     """Tests for get_recommended_llm."""
 
     def test_recommended_configs_has_expected_keys(self):
-        for key in ("development", "production", "meta_cognition", "offline"):
+        for key in ("development", "production", "meta_cognition"):
             self.assertIn(key, RECOMMENDED_CONFIGS)
 
     @patch("core.connect.get_llm")
