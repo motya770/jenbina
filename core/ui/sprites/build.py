@@ -49,3 +49,35 @@ def compose(
         shifted.paste(img, (0, dy))
         img = shifted
     return img
+
+
+# --------------------------------------------------------------------------
+# Frames and sheets
+# --------------------------------------------------------------------------
+from core.ui.sprites.art import BODY, HAIR, FACES, PROPS, EFFECTS, STATE_FRAMES  # noqa: E402
+from core.ui.sprites.palette import FrameSpec  # noqa: E402
+
+FRAME_SIZE = (48, 48)
+SHEET_SIZE = (96, 48)
+
+
+def frame_layers(spec: FrameSpec) -> list[Layer]:
+    """Body, hair, face, props, effects — in drawing order."""
+    layers: list[Layer] = [BODY, HAIR, FACES[spec["face"]]]
+    layers.extend(PROPS[name] for name in spec.get("props", []))
+    layers.extend(EFFECTS[name] for name in spec.get("effects", []))
+    return layers
+
+
+def render_frame(spec: FrameSpec) -> Image.Image:
+    """One 48x48 frame."""
+    return compose(frame_layers(spec), size=FRAME_SIZE, dy=spec.get("dy", 0))
+
+
+def render_sheet(state: str) -> Image.Image:
+    """The 96x48 two-frame sheet for ``state``; unknown state raises KeyError."""
+    frame0, frame1 = STATE_FRAMES[state]
+    sheet = Image.new("RGBA", SHEET_SIZE, TRANSPARENT)
+    sheet.paste(render_frame(frame0), (0, 0))
+    sheet.paste(render_frame(frame1), (48, 0))
+    return sheet
