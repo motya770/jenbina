@@ -7,7 +7,6 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.38-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![LangChain](https://img.shields.io/badge/LangChain-0.3-1C3C3C?logo=langchain&logoColor=white)](https://www.langchain.com/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--5-412991?logo=openai&logoColor=white)](https://openai.com/)
-[![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-000000?logo=ollama&logoColor=white)](https://ollama.com/)
 [![Neo4j](https://img.shields.io/badge/Neo4j-Graph_DB-4581C3?logo=neo4j&logoColor=white)](https://neo4j.com/)
 [![Firebase](https://img.shields.io/badge/Firebase-Auth-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
 [![Discord](https://img.shields.io/badge/Discord-Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/e6sRPpyc)
@@ -86,7 +85,7 @@ The result is something between a Tamagotchi and HAL — a virtual being with it
 ┌──────────────────────────────┼───────────────────────────────────────┐
 │                       LLM PROVIDERS                                  │
 │                                                                      │
-│  OpenAI (gpt-5.2 / gpt-5-nano)  ·  Ollama (llama3.2:3b local)      │
+│  OpenAI (gpt-5.2 / gpt-5-nano)                                       │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -139,8 +138,7 @@ Jenbina exists in a simulated world (based on Palo Alto, CA) with:
 | Language | Python 3.10+ | ![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white) |
 | Web UI | Streamlit | ![Streamlit](https://img.shields.io/badge/-Streamlit-FF4B4B?logo=streamlit&logoColor=white) |
 | LLM Orchestration | LangChain | ![LangChain](https://img.shields.io/badge/-LangChain-1C3C3C?logo=langchain&logoColor=white) |
-| LLM (Cloud) | OpenAI (gpt-5.2, gpt-5-nano) | ![OpenAI](https://img.shields.io/badge/-OpenAI-412991?logo=openai&logoColor=white) |
-| LLM (Local) | Ollama + Llama 3.2 3B | ![Ollama](https://img.shields.io/badge/-Ollama-000000?logo=ollama&logoColor=white) |
+| LLM | OpenAI (gpt-5.2, gpt-5-nano) | ![OpenAI](https://img.shields.io/badge/-OpenAI-412991?logo=openai&logoColor=white) |
 | Vector Memory | ChromaDB | ![ChromaDB](https://img.shields.io/badge/-ChromaDB-FF6F00) |
 | Graph Memory | Neo4j | ![Neo4j](https://img.shields.io/badge/-Neo4j-4581C3?logo=neo4j&logoColor=white) |
 | Relational DB | SQLite | ![SQLite](https://img.shields.io/badge/-SQLite-003B57?logo=sqlite&logoColor=white) |
@@ -190,7 +188,7 @@ pip install -r requirements.txt
 streamlit run core/app.py
 ```
 
-For detailed setup instructions (Ollama, Neo4j, environment variables, API keys), see **[INSTALL.md](INSTALL.md)**.
+For detailed setup instructions (Neo4j, environment variables, API keys), see **[INSTALL.md](INSTALL.md)**.
 
 ## The Two-Brain Architecture
 
