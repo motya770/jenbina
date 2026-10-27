@@ -18,7 +18,6 @@ from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.ui.chat import update_system_stage, send_proactive_message
 from core.ui.pixel_theme import dialog_html, icon_html, inject_pixel_css, sprite_html
-from core.ui.sprites import SPRITES_DIR
 
 
 def inject_tamagotchi_css():
@@ -27,8 +26,12 @@ def inject_tamagotchi_css():
     inject_pixel_css()
 
 
-# Path to the committed pixel sprite sheets (``jenbina_<state>.png``)
-IMAGES_DIR = SPRITES_DIR
+# Painterly portraits, one per state (``jenbina_<state>.png``). The pixel
+# sprite for the same state is looked up by name through ``sprite_html``.
+IMAGES_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets", "portraits"
+)
+PORTRAIT_WIDTH = 256
 
 
 def _get_image_path(name):
@@ -81,17 +84,32 @@ def get_jenbina_image_for_emotion(person):
     return _get_image_path("jenbina_base.png")
 
 
+def _portrait_path(state):
+    """The portrait file for ``state``, the ``base`` portrait if that is missing, else None."""
+    for candidate in (state, "base"):
+        path = os.path.join(IMAGES_DIR, f"jenbina_{candidate}.png")
+        if os.path.isfile(path):
+            return path
+    return None
+
+
 def display_jenbina_image(image_path, caption=None):
-    """Show the animated pixel sprite for the state named by ``image_path``.
+    """Show the painterly portrait for the state named by ``image_path`` in a
+    game window, with the half-size animated pixel sprite and the caption in
+    a status strip underneath.
 
     The state is the file name without ``jenbina_`` and ``.png``, so legacy
-    paths keep working; unknown names fall back to the ``base`` sprite.
+    paths keep working; unknown names fall back to ``base``. Without any
+    portrait on disk only the sprite strip is shown.
     """
     name = os.path.basename(str(image_path or ""))
     state = name[len("jenbina_"):] if name.startswith("jenbina_") else name
     if state.endswith(".png"):
         state = state[:-4]
-    st.markdown(sprite_html(state, caption), unsafe_allow_html=True)
+    portrait = _portrait_path(state)
+    if portrait:
+        st.image(portrait, width=PORTRAIT_WIDTH)
+    st.markdown(sprite_html(state, caption, scale=2), unsafe_allow_html=True)
 
 
 # Weather keyword -> icon name; the first match wins, so specific words come first.

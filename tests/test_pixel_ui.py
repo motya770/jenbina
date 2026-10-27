@@ -1,6 +1,7 @@
 """Tests for the pixel theme helpers (core.ui.pixel_theme) and the pixel markup
 emitted by the simulation page renderers (core.ui.simulation)."""
 
+import os
 import unittest
 from collections import namedtuple
 from types import SimpleNamespace
@@ -35,6 +36,12 @@ class TestSpriteHtml(unittest.TestCase):
         html_ = sprite_html("base", caption="Jen <3 & co")
         self.assertIn("data:image/png;base64,", html_)
         self.assertIn("Jen &lt;3 &amp; co", html_)
+
+    def test_half_size_sprite_gets_its_own_classes(self):
+        small = sprite_html("base", caption="Jenbina", scale=2)
+        self.assertIn("px-sprite-2x", small)
+        self.assertIn("px-wrap-2x", small)
+        self.assertNotIn("px-sprite-2x", sprite_html("base"))
 
     def test_unknown_state_uses_base_sheet(self):
         self.assertEqual(sprite_html("nope"), sprite_html("base"))
@@ -156,6 +163,27 @@ class TestActionAndSprite(unittest.TestCase):
     def test_display_jenbina_image_derives_state_from_any_path(self):
         self.assertIn("px-anim-motion", rendered(display_jenbina_image, "/old/src/images/jenbina_eat.png", "Jenbina"))
         self.assertEqual(rendered(display_jenbina_image, "whatever.png"), rendered(display_jenbina_image, "jenbina_base.png"))
+
+
+class TestPortrait(unittest.TestCase):
+    def test_display_shows_portrait_window_and_half_size_sprite(self):
+        with patch("core.ui.simulation.st") as st:
+            display_jenbina_image("/old/src/images/jenbina_eat.png", "Jenbina")
+            (path,), kwargs = st.image.call_args
+            self.assertTrue(path.endswith(os.path.join("assets", "portraits", "jenbina_eat.png")), path)
+            self.assertEqual(kwargs.get("width"), 256)
+            self.assertIn("px-sprite-2x", st.markdown.call_args[0][0])
+
+    def test_unknown_state_uses_base_portrait(self):
+        with patch("core.ui.simulation.st") as st:
+            display_jenbina_image("whatever.png")
+            self.assertTrue(st.image.call_args[0][0].endswith("jenbina_base.png"))
+
+    def test_missing_portraits_fall_back_to_sprite_only(self):
+        with patch("core.ui.simulation.st") as st, patch("core.ui.simulation.IMAGES_DIR", "/nonexistent"):
+            display_jenbina_image("jenbina_base.png")
+            st.image.assert_not_called()
+            self.assertIn("px-sprite", st.markdown.call_args[0][0])
 
 
 class TestChatAvatars(unittest.TestCase):

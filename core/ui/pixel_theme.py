@@ -27,20 +27,24 @@ def _data_uri(path: str) -> str:
         return "data:image/png;base64," + base64.b64encode(fh.read()).decode("ascii")
 
 
-def sprite_html(state: str, caption: str | None = None) -> str:
-    """The animated 192x192 sprite for ``state`` with an optional caption.
+def sprite_html(state: str, caption: str | None = None, scale: int = 4) -> str:
+    """The animated sprite for ``state`` with an optional caption.
 
-    Unknown states resolve to the ``base`` sheet; a missing sheet file gives a
-    text placeholder instead of raising.
+    ``scale`` 4 is the 192px hero sprite; ``scale`` 2 is the 96px badge laid
+    out in a row with its caption. Unknown states resolve to the ``base``
+    sheet; a missing sheet file gives a text placeholder instead of raising.
     """
+    small = scale == 2
+    wrap_class = "px-sprite-wrap px-wrap-2x" if small else "px-sprite-wrap"
     path = sprite_path(state)
     if not os.path.isfile(path):
-        return f'<div class="px-sprite-wrap"><span class="px-placeholder">{PLACEHOLDER}</span></div>'
+        return f'<div class="{wrap_class}"><span class="px-placeholder">{PLACEHOLDER}</span></div>'
     anim = "px-anim-motion" if state in MOTION_STATES else "px-anim-blink"
+    size_class = " px-sprite-2x" if small else ""
     caption_html = f'<div class="px-caption">{html.escape(caption)}</div>' if caption else ""
     return (
-        '<div class="px-sprite-wrap">'
-        f'<div class="px-sprite {anim}" style="background-image:url({_data_uri(path)})"></div>'
+        f'<div class="{wrap_class}">'
+        f'<div class="px-sprite{size_class} {anim}" style="background-image:url({_data_uri(path)})"></div>'
         f"{caption_html}"
         "</div>"
     )
