@@ -5,10 +5,12 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import streamlit as st
+from core.ui.pixel_theme import inject_pixel_css
 from core.ui.shared_init import require_auth
 from core.log_capture import install_capture
 
 st.set_page_config(page_title="Jenbina — Console", page_icon="📋", layout="wide")
+inject_pixel_css()
 
 if not require_auth():
     st.stop()

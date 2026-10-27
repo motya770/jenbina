@@ -216,10 +216,10 @@
     "semantic_hash": "1bcfa1cd8fdae54bc3cd20d956f33897"
   },
   "core/interaction/chat_handler.py": {
-    "mtime": 1776466931.5884678,
-    "seen": 1787433966.930256,
-    "ast_hash": "413aa1882b7b7d21c7f271152cb8688b",
-    "semantic_hash": "413aa1882b7b7d21c7f271152cb8688b"
+    "mtime": 1793132910.612494,
+    "seen": 1793132978.007939,
+    "ast_hash": "4d274a04a6d7036631d9c5a8b9d0d882",
+    "semantic_hash": ""
   },
   "core/interaction/guardrails.py": {
     "mtime": 1771368369.4533193,
@@ -288,34 +288,34 @@
     "semantic_hash": "3db6c7803545e6349476355fd640fab1"
   },
   "core/pages/2_\ud83d\udcac_Chat.py": {
-    "mtime": 1771363216.4685326,
-    "seen": 1787433966.930262,
-    "ast_hash": "e2c86aac9d8ce172956253a42b80ca74",
-    "semantic_hash": "e2c86aac9d8ce172956253a42b80ca74"
+    "mtime": 1793132313.730915,
+    "seen": 1793132380.589877,
+    "ast_hash": "1fae389db340acdc3315bdc305bde09f",
+    "semantic_hash": ""
   },
   "core/pages/3_\ud83c\udf0d_Environment.py": {
-    "mtime": 1771363216.4689314,
-    "seen": 1787433966.930263,
-    "ast_hash": "7dd1a63b76ddd3ac1c6303ec5dbb23c5",
-    "semantic_hash": "7dd1a63b76ddd3ac1c6303ec5dbb23c5"
+    "mtime": 1793132313.731374,
+    "seen": 1793132380.589879,
+    "ast_hash": "d5d55f0b6dea0e785e05bd4a53927b82",
+    "semantic_hash": ""
   },
   "core/pages/4_\ud83d\udccb_Console.py": {
-    "mtime": 1771363216.4705203,
-    "seen": 1787433966.930264,
-    "ast_hash": "17182d0494d1aee513e043caf3200858",
-    "semantic_hash": "17182d0494d1aee513e043caf3200858"
+    "mtime": 1793132313.7318125,
+    "seen": 1793132380.58988,
+    "ast_hash": "338a01c2291e1f3b9f285e4d899e719c",
+    "semantic_hash": ""
   },
   "core/pages/5_\ud83d\udd27_Debug_Info.py": {
-    "mtime": 1771363216.4716794,
-    "seen": 1787433966.930264,
-    "ast_hash": "183eaef607e299725be3a9138ef70b5c",
-    "semantic_hash": "183eaef607e299725be3a9138ef70b5c"
+    "mtime": 1793132313.7325068,
+    "seen": 1793132380.5898812,
+    "ast_hash": "40031f77a06f052ca4a551e48c69c944",
+    "semantic_hash": ""
   },
   "core/pages/6_\ud83d\udd11_Admin.py": {
-    "mtime": 1771589819.2372339,
-    "seen": 1787433966.9302652,
-    "ast_hash": "50daf99e06f35a94c7d74fcde55d62f4",
-    "semantic_hash": "50daf99e06f35a94c7d74fcde55d62f4"
+    "mtime": 1793132313.7330983,
+    "seen": 1793132380.5898821,
+    "ast_hash": "88792d12bb62039aec941d1b2c4bfdbd",
+    "semantic_hash": ""
   },
   "core/person.py": {
     "mtime": 1771107322.829243,
@@ -396,10 +396,10 @@
     "semantic_hash": "7dd7ad5bae57bd53edd1b829487f6640"
   },
   "core/ui/chat.py": {
-    "mtime": 1771589819.2384508,
-    "seen": 1787433966.930272,
-    "ast_hash": "f714b532187cd8b2b5aa1e981b8391ae",
-    "semantic_hash": "f714b532187cd8b2b5aa1e981b8391ae"
+    "mtime": 1793132262.3960445,
+    "seen": 1793132283.40371,
+    "ast_hash": "038a98aced90b2c5c13f27fdba512992",
+    "semantic_hash": ""
   },
   "core/ui/shared_init.py": {
     "mtime": 1771964631.41183,
@@ -414,10 +414,10 @@
     "semantic_hash": "e476f6e1cd7eeab12b607646a865d26b"
   },
   "core/ui/simulation.py": {
-    "mtime": 1771964631.412623,
-    "seen": 1787433966.930273,
-    "ast_hash": "6d5f278f43fe65bea63f8a6df7025ecf",
-    "semantic_hash": "6d5f278f43fe65bea63f8a6df7025ecf"
+    "mtime": 1793134617.07442,
+    "seen": 1793134803.38287,
+    "ast_hash": "1638e796b951dcafe19cd04fd7a66a66",
+    "semantic_hash": ""
   },
   "core/working_memory/__init__.py": {
     "mtime": 1770942408.6981816,
@@ -726,10 +726,10 @@
     "semantic_hash": "84ecd6773e6e01508f36ca4090e042d3"
   },
   "CLAUDE.md": {
-    "mtime": 1776467077.5707104,
-    "seen": 1787433966.9302988,
-    "ast_hash": "7dc413bc533379cb8d0b5953a6d0b209",
-    "semantic_hash": "7dc413bc533379cb8d0b5953a6d0b209"
+    "mtime": 1793134650.293686,
+    "seen": 1793134803.382921,
+    "ast_hash": "167653d1e0474ebe737315dc86e03b84",
+    "semantic_hash": ""
   },
   "CURRENT_ARCHITECTURE_DIAGRAMS.md": {
     "mtime": 1771363216.4638321,
@@ -822,87 +822,369 @@
     "semantic_hash": "8c4705cba511bf64a6db437deefc95f9"
   },
   "assets/favicon.png": {
-    "mtime": 1771348309.684376,
-    "seen": 1787433966.930306,
-    "ast_hash": "18cc73fe3744b494cad9f4451266025d",
-    "semantic_hash": "18cc73fe3744b494cad9f4451266025d"
+    "mtime": 1793131717.68959,
+    "seen": 1793131747.7593,
+    "ast_hash": "c31857b21ef831e039fcb3455e47ce1f",
+    "semantic_hash": ""
   },
-  "src/images/jenbina_angry.png": {
-    "mtime": 1771189561.2254822,
-    "seen": 1787433966.9303071,
+  ".claude/launch.json": {
+    "mtime": 1793053199.4204109,
+    "seen": 1793057159.3524292,
+    "ast_hash": "ab51e1a40ba6ca14834b03028127a133",
+    "semantic_hash": ""
+  },
+  ".claude/settings.json": {
+    "mtime": 1787434344.5759869,
+    "seen": 1793057159.352434,
+    "ast_hash": "b8b2c11fd80d02773187c61a2851a901",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-10-27-pixel-art-ui-redesign.md": {
+    "mtime": 1793134650.2929525,
+    "seen": 1793134803.382932,
+    "ast_hash": "68e661bba1f886eab330dd7658e457ff",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-10-27-pixel-art-ui-implementation.md": {
+    "mtime": 1793057894.066332,
+    "seen": 1793057904.149911,
+    "ast_hash": "63400e1d41176c912d234821b1738115",
+    "semantic_hash": ""
+  },
+  "core/ui/sprites/__init__.py": {
+    "mtime": 1793131715.1725328,
+    "seen": 1793131747.759236,
+    "ast_hash": "c0f82cab680a19de274d6deffd61b3d8",
+    "semantic_hash": ""
+  },
+  "core/ui/sprites/build.py": {
+    "mtime": 1793131715.1752853,
+    "seen": 1793131747.759238,
+    "ast_hash": "325b0381bdc5a31f98128f526b15e437",
+    "semantic_hash": ""
+  },
+  "core/ui/sprites/palette.py": {
+    "mtime": 1793111102.2117991,
+    "seen": 1793111117.49503,
+    "ast_hash": "a24f4ad1ef155b90efef717c0cebe3eb",
+    "semantic_hash": ""
+  },
+  "tests/test_sprites.py": {
+    "mtime": 1793131650.0911279,
+    "seen": 1793131747.759275,
+    "ast_hash": "a6ec0c80b1b44cc102dad5f816babeea",
+    "semantic_hash": ""
+  },
+  "core/ui/sprites/art.py": {
+    "mtime": 1793131614.6232634,
+    "seen": 1793131648.942315,
+    "ast_hash": "11b3ac02fbec80151ca888f54e1e8949",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/anger.png": {
+    "mtime": 1793131717.6869233,
+    "seen": 1793131747.7593012,
+    "ast_hash": "ad8f43817ede3f6082ddc95879d256ef",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/anticipation.png": {
+    "mtime": 1793131717.6875772,
+    "seen": 1793131747.759302,
+    "ast_hash": "3420486050ea76ad2a1afd5a2e56a5cb",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/cloudy.png": {
+    "mtime": 1793131717.6878395,
+    "seen": 1793131747.7593029,
+    "ast_hash": "93a1610024cf8ebe5aef2304c2628b98",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/disgust.png": {
+    "mtime": 1793131717.6873374,
+    "seen": 1793131747.759304,
+    "ast_hash": "5a09d6e934a0dc67b740c3141f4a4aa0",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/esteem.png": {
+    "mtime": 1793131717.6863375,
+    "seen": 1793131747.759304,
+    "ast_hash": "dd76561916e356b0a239e63a792e4578",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/fear.png": {
+    "mtime": 1793131717.687063,
+    "seen": 1793131747.759305,
+    "ast_hash": "e06a2a423fb56797736cb7bf9c0acdbd",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/fog.png": {
+    "mtime": 1793131717.6884518,
+    "seen": 1793131747.759306,
+    "ast_hash": "14780a428166abd626798246f544e686",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/hunger.png": {
+    "mtime": 1793131717.6856484,
+    "seen": 1793131747.759306,
+    "ast_hash": "70f80568f44981e4ef4ac1d699490333",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/joy.png": {
+    "mtime": 1793131717.6866422,
+    "seen": 1793131747.759307,
+    "ast_hash": "c56b344d5b77ca0e279b1adb40436696",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/love.png": {
+    "mtime": 1793131717.6861925,
+    "seen": 1793131747.759308,
+    "ast_hash": "04456e2727962440297e7458f1ac9854",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/player.png": {
+    "mtime": 1793131717.688722,
+    "seen": 1793131747.759308,
+    "ast_hash": "b34de7b971bf31550ebd58d2d8acbf60",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/rain.png": {
+    "mtime": 1793131717.6879666,
+    "seen": 1793131747.75931,
+    "ast_hash": "ac47d791d5b47d35f16c87b50ddc0969",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/sadness.png": {
+    "mtime": 1793131717.6867807,
+    "seen": 1793131747.7593112,
+    "ast_hash": "4a5f3634f2e1eafc8e3eab540fa660ef",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/security.png": {
+    "mtime": 1793131717.6860323,
+    "seen": 1793131747.759312,
+    "ast_hash": "6420358d49afd4dd0de671d18ac172b7",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/self_actualization.png": {
+    "mtime": 1793131717.6864886,
+    "seen": 1793131747.759312,
+    "ast_hash": "0183f8df98f456edae7bef618c726d34",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/sleep.png": {
+    "mtime": 1793131717.6858623,
+    "seen": 1793131747.7593129,
+    "ast_hash": "461922f92962b8db83482ba429b18f3b",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/snow.png": {
+    "mtime": 1793131717.6883187,
+    "seen": 1793131747.7593138,
+    "ast_hash": "cd1a537e796c24d3083898e0687afa72",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/storm.png": {
+    "mtime": 1793131717.6881917,
+    "seen": 1793131747.7593138,
+    "ast_hash": "2787f622624e856eb73e2798d276703b",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/sunny.png": {
+    "mtime": 1793131717.6876984,
+    "seen": 1793131747.759315,
+    "ast_hash": "f2ddeee196bbab7bf840f53dddcf2955",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/surprise.png": {
+    "mtime": 1793131717.6872058,
+    "seen": 1793131747.759316,
+    "ast_hash": "60d1cae72556bf0e4d8ddcf2fdb9e536",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/trust.png": {
+    "mtime": 1793131717.6874568,
+    "seen": 1793131747.759316,
+    "ast_hash": "eefacabbf04e3f76f28cfeb0a013f6e8",
+    "semantic_hash": ""
+  },
+  "assets/sprites/icons/wind.png": {
+    "mtime": 1793131717.6885693,
+    "seen": 1793131747.759317,
+    "ast_hash": "1b22fbec60a93af221d0ee46112542a4",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_angry.png": {
+    "mtime": 1793131717.6803734,
+    "seen": 1793131747.759318,
+    "ast_hash": "44ecea99e1eb5ee50a9739708f2cb48d",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_avatar.png": {
+    "mtime": 1793131717.685398,
+    "seen": 1793131747.759318,
+    "ast_hash": "c31857b21ef831e039fcb3455e47ce1f",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_base.png": {
+    "mtime": 1793131717.678776,
+    "seen": 1793131747.759319,
+    "ast_hash": "6ffe4d2970588988aca8d0b57d5a5524",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_drink.png": {
+    "mtime": 1793131717.6829908,
+    "seen": 1793131747.759319,
+    "ast_hash": "3f9611da60fac8d6c356e9174071bd5c",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_eat.png": {
+    "mtime": 1793131717.6824772,
+    "seen": 1793131747.75932,
+    "ast_hash": "e5fbeb1ab82d6e512b20011c58a96e70",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_read.png": {
+    "mtime": 1793131717.6834896,
+    "seen": 1793131747.759321,
+    "ast_hash": "24d50a3d87a110f885de7350f721b544",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_sad.png": {
+    "mtime": 1793131717.679855,
+    "seen": 1793131747.7593222,
+    "ast_hash": "678e04db830ed118a7b8b78d4567c4fe",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_scary.png": {
+    "mtime": 1793131717.6809132,
+    "seen": 1793131747.7593222,
+    "ast_hash": "b5789340e599988acbe30a01cf93c625",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_sleep.png": {
+    "mtime": 1793131717.6839886,
+    "seen": 1793131747.759323,
+    "ast_hash": "c4698637037304441d1a546eb028a498",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_smile.png": {
+    "mtime": 1793131717.6793315,
+    "seen": 1793131747.7593238,
+    "ast_hash": "934fee8242172b6178e226c715393b72",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_surprised.png": {
+    "mtime": 1793131717.6814177,
+    "seen": 1793131747.7593238,
+    "ast_hash": "4c35c5613b7098ced72ff86de77177c1",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_talk.png": {
+    "mtime": 1793131717.6844912,
+    "seen": 1793131747.759325,
+    "ast_hash": "df4eaf4c285b083db1712341f66b7c4f",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_thinking.png": {
+    "mtime": 1793131717.6819386,
+    "seen": 1793131747.759326,
+    "ast_hash": "63f2c138edb8d0538d7f32ff012c8b0b",
+    "semantic_hash": ""
+  },
+  "assets/sprites/jenbina_walks.png": {
+    "mtime": 1793131717.68502,
+    "seen": 1793131747.759326,
+    "ast_hash": "7d84fdd0f872fc94ffaac8c295c8472f",
+    "semantic_hash": ""
+  },
+  "core/ui/pixel_theme.py": {
+    "mtime": 1793134769.115889,
+    "seen": 1793134803.3828669,
+    "ast_hash": "2f2d75bc1cf46178481ce835f524093f",
+    "semantic_hash": ""
+  },
+  "tests/test_pixel_ui.py": {
+    "mtime": 1793134482.5471642,
+    "seen": 1793134485.926871,
+    "ast_hash": "fe84a9979ed4876cece5f6d4de4000a4",
+    "semantic_hash": ""
+  },
+  "assets/portraits/jenbina_angry.png": {
+    "mtime": 1793134396.1189892,
+    "seen": 1793134485.926901,
     "ast_hash": "d2daf1a398f2f422ecd2961da149de3d",
-    "semantic_hash": "d2daf1a398f2f422ecd2961da149de3d"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_base.png": {
-    "mtime": 1771187587.6675007,
-    "seen": 1787433966.9303071,
+  "assets/portraits/jenbina_base.png": {
+    "mtime": 1793134396.1254587,
+    "seen": 1793134485.926902,
     "ast_hash": "c198fda55182f2fb1e75b38c13cfca14",
-    "semantic_hash": "c198fda55182f2fb1e75b38c13cfca14"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_drink.png": {
-    "mtime": 1771188265.883697,
-    "seen": 1787433966.930308,
+  "assets/portraits/jenbina_drink.png": {
+    "mtime": 1793134396.1331837,
+    "seen": 1793134485.926902,
     "ast_hash": "40cd6d53eb57a5b08b8db0d8cc084d12",
-    "semantic_hash": "40cd6d53eb57a5b08b8db0d8cc084d12"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_eat.png": {
-    "mtime": 1771188167.4405928,
-    "seen": 1787433966.930308,
+  "assets/portraits/jenbina_eat.png": {
+    "mtime": 1793134396.1414206,
+    "seen": 1793134485.926903,
     "ast_hash": "38d1e556bf4135b6d5e71d8578dbde08",
-    "semantic_hash": "38d1e556bf4135b6d5e71d8578dbde08"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_read.png": {
-    "mtime": 1771189848.3290515,
-    "seen": 1787433966.930309,
+  "assets/portraits/jenbina_read.png": {
+    "mtime": 1793134396.1521935,
+    "seen": 1793134485.926904,
     "ast_hash": "0f11ecd6ae8dfa1bd7d3a4f37d64f32c",
-    "semantic_hash": "0f11ecd6ae8dfa1bd7d3a4f37d64f32c"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_sad.png": {
-    "mtime": 1771188083.4561074,
-    "seen": 1787433966.930309,
+  "assets/portraits/jenbina_sad.png": {
+    "mtime": 1793134396.162943,
+    "seen": 1793134485.926904,
     "ast_hash": "7a12cd3a0e6425a3ad6b45efed3f1d02",
-    "semantic_hash": "7a12cd3a0e6425a3ad6b45efed3f1d02"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_scary.png": {
-    "mtime": 1771189563.1793852,
-    "seen": 1787433966.9303098,
+  "assets/portraits/jenbina_scary.png": {
+    "mtime": 1793134396.1735582,
+    "seen": 1793134485.9269052,
     "ast_hash": "67445a82ada4af5c97f61082173d7979",
-    "semantic_hash": "67445a82ada4af5c97f61082173d7979"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_sleep.png": {
-    "mtime": 1771189574.0359085,
-    "seen": 1787433966.9303098,
+  "assets/portraits/jenbina_sleep.png": {
+    "mtime": 1793134396.1843305,
+    "seen": 1793134485.926906,
     "ast_hash": "af5b7b317457c52e8ec9d496da642e0f",
-    "semantic_hash": "af5b7b317457c52e8ec9d496da642e0f"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_smile.png": {
-    "mtime": 1771188007.096098,
-    "seen": 1787433966.9303098,
+  "assets/portraits/jenbina_smile.png": {
+    "mtime": 1793134396.1917257,
+    "seen": 1793134485.9269068,
     "ast_hash": "804bdd19a71924428c29a01019fb5e04",
-    "semantic_hash": "804bdd19a71924428c29a01019fb5e04"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_surprised.png": {
-    "mtime": 1771190299.6437562,
-    "seen": 1787433966.930311,
+  "assets/portraits/jenbina_surprised.png": {
+    "mtime": 1793134396.2033045,
+    "seen": 1793134485.9269068,
     "ast_hash": "9641140f1b3c2fef0e966f34411af253",
-    "semantic_hash": "9641140f1b3c2fef0e966f34411af253"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_talk.png": {
-    "mtime": 1771189690.2400548,
-    "seen": 1787433966.930311,
+  "assets/portraits/jenbina_talk.png": {
+    "mtime": 1793134396.2181318,
+    "seen": 1793134485.926908,
     "ast_hash": "b5027b23179acc7323986ff23ec7a3df",
-    "semantic_hash": "b5027b23179acc7323986ff23ec7a3df"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_thinking.png": {
-    "mtime": 1771188011.0504074,
-    "seen": 1787433966.930312,
+  "assets/portraits/jenbina_thinking.png": {
+    "mtime": 1793134396.2255096,
+    "seen": 1793134485.926909,
     "ast_hash": "660fc7a737bed72fb72415bb817f6276",
-    "semantic_hash": "660fc7a737bed72fb72415bb817f6276"
+    "semantic_hash": ""
   },
-  "src/images/jenbina_walks.png": {
-    "mtime": 1771188346.6091304,
-    "seen": 1787433966.930312,
+  "assets/portraits/jenbina_walks.png": {
+    "mtime": 1793134396.234289,
+    "seen": 1793134485.926909,
     "ast_hash": "0af8e64cdaba840358ca29f86b1bc36d",
-    "semantic_hash": "0af8e64cdaba840358ca29f86b1bc36d"
+    "semantic_hash": ""
   }
 }

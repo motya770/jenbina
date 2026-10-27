@@ -38,6 +38,8 @@ jenbina/
 │   ├── social/                  # Social cognition modeling
 │   ├── working_memory/          # Short-term context management
 │   ├── ui/                      # Streamlit UI components
+│   │   ├── pixel_theme.py       # Pixel-art device shell CSS + sprite/icon/dialog HTML helpers
+│   │   └── sprites/             # Pixel art strings, palette, Pillow builder (art.py, build.py)
 │   └── pages/                   # Streamlit multi-page navigation
 │       ├── 2_Chat.py
 │       ├── 3_Environment.py
@@ -50,7 +52,9 @@ jenbina/
 │   └── run_chain_tests.py       # LangChain integration tests
 ├── docs/plans/                  # Design and planning documents
 ├── .github/workflows/           # CI/CD pipelines
-├── assets/                      # Static assets (favicon, images)
+├── assets/                      # Static assets (favicon)
+│   ├── portraits/               # Painterly Jenbina portraits, one per state (jenbina_<state>.png)
+│   └── sprites/                 # Committed pixel sprite sheets and 8x8 icons (python -m core.ui.sprites.build)
 ├── old/                         # Legacy/archived code
 ├── requirements.txt             # Python dependencies
 ├── run_app.py                   # Launcher script
@@ -267,6 +271,8 @@ git commit -m "<conventional commit message>"
 | `2026-02-15-tamagotchi-ui-implementation.md` | Tamagotchi UI redesign — CSS injection, rendering helpers, single-column layout |
 | `2026-02-17-wow-effect-implementation.md` | Deep Emotional Mirror — user research, insight system, GPT-5.2 chat, dynamic greetings |
 | `2026-02-18-llm-knowledge-enriched-dossier.md` | LLM knowledge-enriched dossiers — parallel web search + GPT knowledge query |
+| `2026-10-27-pixel-art-ui-redesign.md` | Pixel art UI spec — handheld device shell, 48x48 animated sprite sheets, 8x8 icons, palette and states; revision 2 restores the portraits and switches to the candy arcade palette |
+| `2026-10-27-pixel-art-ui-implementation.md` | Pixel art UI implementation — sprite pipeline, `core/ui/pixel_theme.py`, pixel markup in the simulation renderers |
 
 ## graphify
 

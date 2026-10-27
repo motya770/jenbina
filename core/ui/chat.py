@@ -10,6 +10,7 @@ from core.interaction.chat_handler import (
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.auth.user_db import UserDatabase
 from core.ui.shared_init import save_person_state
+from core.ui.sprites import avatar_path, icon_path
 
 
 def display_person_state_compact(person):
@@ -254,7 +255,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
 
             # Display insight as a chat message if one was generated
             if chat_result.get("insight"):
-                with st.chat_message("assistant"):
+                with st.chat_message("assistant", avatar=avatar_path()):
                     st.write(f"💡 *{chat_result['insight']}*")
 
             # Store Jenbina's reply in SQLite
@@ -454,7 +455,10 @@ def render_chat_simple(person, llm, memory_manager, debug_mode):
 
     for msg in conversation_history:
         is_user = msg.sender != "person" and msg.sender != person.name
-        with st.chat_message("user" if is_user else "assistant"):
+        with st.chat_message(
+            "user" if is_user else "assistant",
+            avatar=icon_path("player") if is_user else avatar_path(),
+        ):
             st.write(msg.content)
 
     handle_user_input(person, llm, memory_manager, debug_mode)

@@ -5,6 +5,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import streamlit as st
+from core.ui.pixel_theme import inject_pixel_css
 from core.ui.shared_init import require_auth
 from core.ui.simulation import render_mood_indicator
 from core.ui.sidebar import (
@@ -16,6 +17,7 @@ from core.ui.sidebar import (
 )
 
 st.set_page_config(page_title="Jenbina — Environment", page_icon="🌍", layout="wide")
+inject_pixel_css()
 
 if not require_auth():
     st.stop()

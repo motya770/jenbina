@@ -2,7 +2,10 @@
 import streamlit as st
 from datetime import datetime
 import time
+import html
 import json
+import math
+import re
 import os
 from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
@@ -16,252 +19,21 @@ from core.environment.location_system import PaloAltoLocationSystem
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.ui.chat import update_system_stage, send_proactive_message
+from core.ui.pixel_theme import dialog_html, icon_html, inject_pixel_css, sprite_html
 
 
 def inject_tamagotchi_css():
-    """Inject Tamagotchi-themed CSS. Call once at the start of each page render."""
-    st.markdown("""
-    <style>
-    /* Tamagotchi Theme */
-    .stApp {
-        background-color: #FFF8F0;
-    }
-
-    /* Force readable text colors on cream background */
-    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
-        color: #3D2B1F !important;
-    }
-    .stApp p, .stApp span, .stApp label, .stApp div {
-        color: #5C4033;
-    }
-    .stApp .stMarkdown, .stApp .stMarkdown p {
-        color: #5C4033 !important;
-    }
-
-    /* Title styling */
-    .stApp [data-testid="stTitle"],
-    .stApp [data-testid="stHeading"] {
-        color: #3D2B1F !important;
-    }
-
-    /* Page link / nav styling */
-    .stApp a {
-        color: #D4567A !important;
-        font-weight: 500;
-    }
-    .stApp a:hover {
-        color: #FF8FAB !important;
-    }
-
-    /* Number input styling */
-    .stApp [data-testid="stNumberInput"] input {
-        background-color: #FFF !important;
-        color: #3D2B1F !important;
-        border: 2px solid #FFD7BA !important;
-        border-radius: 10px !important;
-    }
-    .stApp [data-testid="stNumberInput"] label {
-        color: #5C4033 !important;
-        font-weight: 500;
-    }
-    .stApp [data-testid="stNumberInput"] button {
-        color: #5C4033 !important;
-        background-color: #FFF3EC !important;
-        border-color: #FFD7BA !important;
-    }
-
-    /* Button styling */
-    .stApp button[kind="primary"],
-    .stApp button[data-testid="stBaseButton-primary"] {
-        background-color: #FF8FAB !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 12px !important;
-        font-weight: 600 !important;
-    }
-    .stApp button[kind="secondary"],
-    .stApp button[data-testid="stBaseButton-secondary"] {
-        background-color: #FFF3EC !important;
-        color: #5C4033 !important;
-        border: 2px solid #FFD7BA !important;
-        border-radius: 12px !important;
-        font-weight: 500 !important;
-    }
-
-    /* Checkbox styling */
-    .stApp [data-testid="stCheckbox"] label {
-        color: #5C4033 !important;
-    }
-
-    /* Divider */
-    .stApp hr {
-        border-color: #F0E6D8 !important;
-    }
-
-    /* Page links in nav */
-    .stApp [data-testid="stPageLink"] {
-        background-color: #FFF3EC !important;
-        border-radius: 10px !important;
-        border: 1px solid #FFD7BA !important;
-    }
-    .stApp [data-testid="stPageLink"] a,
-    .stApp [data-testid="stPageLink"] span {
-        color: #5C4033 !important;
-        font-weight: 500 !important;
-    }
-
-    /* Environment ribbon */
-    .env-ribbon {
-        background: linear-gradient(135deg, #FFE5D9, #FFD7BA);
-        border-radius: 12px;
-        padding: 8px 20px;
-        text-align: center;
-        font-size: 1.1em;
-        color: #5C4033;
-        margin-bottom: 16px;
-        font-weight: 500;
-    }
-
-    /* Character frame */
-    .character-frame {
-        text-align: center;
-        padding: 16px;
-    }
-    .character-frame img {
-        border-radius: 20px;
-        border: 4px solid #FFD7BA;
-        box-shadow: 0 4px 16px rgba(255, 143, 171, 0.2);
-    }
-
-    /* Thought bubble */
-    .thought-bubble {
-        background: white;
-        border-radius: 18px;
-        padding: 12px 20px;
-        margin: 8px auto;
-        max-width: 500px;
-        text-align: center;
-        font-style: italic;
-        color: #666;
-        border: 2px solid #F0E6D8;
-        position: relative;
-    }
-    .thought-bubble::before {
-        content: '💭';
-        position: absolute;
-        top: -14px;
-        left: 20px;
-        font-size: 1.2em;
-    }
-
-    /* Needs bar */
-    .need-row {
-        display: flex;
-        align-items: center;
-        margin: 4px 0;
-        gap: 8px;
-    }
-    .need-icon {
-        font-size: 1.2em;
-        width: 28px;
-        text-align: center;
-    }
-    .need-label {
-        width: 110px;
-        font-size: 0.9em;
-        color: #5C4033;
-    }
-    .need-bar-bg {
-        flex: 1;
-        height: 18px;
-        background: #F0E6D8;
-        border-radius: 9px;
-        overflow: hidden;
-    }
-    .need-bar-fill {
-        height: 100%;
-        border-radius: 9px;
-        transition: width 0.5s ease;
-    }
-    .need-pct {
-        width: 45px;
-        text-align: right;
-        font-size: 0.85em;
-        color: #888;
-        font-weight: 600;
-    }
-
-    /* Pulse animation for critical needs */
-    @keyframes pulse-critical {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.6; }
-    }
-    .need-critical .need-bar-fill {
-        animation: pulse-critical 1.5s ease-in-out infinite;
-    }
-
-    /* Emotion chips */
-    .emotion-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        justify-content: center;
-        margin: 8px 0;
-    }
-    .emotion-chip {
-        background: white;
-        border: 2px solid #FFD7BA;
-        border-radius: 20px;
-        padding: 4px 14px;
-        font-size: 0.9em;
-        color: #5C4033;
-    }
-
-    /* Action story card */
-    .action-card {
-        background: white;
-        border-radius: 16px;
-        padding: 20px;
-        margin: 16px 0;
-        border-left: 5px solid #FF8FAB;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-    .action-title {
-        font-size: 1.15em;
-        font-weight: 600;
-        color: #333;
-        margin-bottom: 6px;
-    }
-    .action-reasoning {
-        font-size: 0.9em;
-        color: #888;
-        margin-bottom: 10px;
-    }
-    .satisfaction-delta {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 12px;
-        font-size: 0.85em;
-        font-weight: 600;
-    }
-    .delta-positive {
-        background: #E8F5E9;
-        color: #2E7D32;
-    }
-    .delta-negative {
-        background: #FFEBEE;
-        color: #C62828;
-    }
-    .delta-neutral {
-        background: #FFF8E1;
-        color: #F57F17;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    """Inject the UI theme. Kept under its historical name; the theme itself
+    lives in ``core.ui.pixel_theme``."""
+    inject_pixel_css()
 
 
-# Path to Jenbina images
-IMAGES_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "src", "images")
+# Painterly portraits, one per state (``jenbina_<state>.png``). The pixel
+# sprite for the same state is looked up by name through ``sprite_html``.
+IMAGES_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets", "portraits"
+)
+PORTRAIT_WIDTH = 256
 
 
 def _get_image_path(name):
@@ -314,87 +86,126 @@ def get_jenbina_image_for_emotion(person):
     return _get_image_path("jenbina_base.png")
 
 
+def _portrait_path(state):
+    """The portrait file for ``state``, the ``base`` portrait if that is missing, else None."""
+    for candidate in (state, "base"):
+        path = os.path.join(IMAGES_DIR, f"jenbina_{candidate}.png")
+        if os.path.isfile(path):
+            return path
+    return None
+
+
 def display_jenbina_image(image_path, caption=None):
-    """Display a Jenbina image in the UI if the file exists."""
-    if os.path.exists(image_path):
-        st.image(image_path, caption=caption, width=175)
-    else:
-        # Fallback to base image if the specific one doesn't exist
-        base = _get_image_path("jenbina_base.png")
-        if os.path.exists(base):
-            st.image(base, caption=caption or "Jenbina", width=125)
+    """Show the painterly portrait for the state named by ``image_path`` in a
+    game window, with the half-size animated pixel sprite and the caption in
+    a status strip underneath.
+
+    The state is the file name without ``jenbina_`` and ``.png``, so legacy
+    paths keep working; unknown names fall back to ``base``. Without any
+    portrait on disk only the sprite strip is shown.
+    """
+    name = os.path.basename(str(image_path or ""))
+    state = name[len("jenbina_"):] if name.startswith("jenbina_") else name
+    if state.endswith(".png"):
+        state = state[:-4]
+    portrait = _portrait_path(state)
+    if portrait:
+        st.image(portrait, width=PORTRAIT_WIDTH)
+    st.markdown(sprite_html(state, caption, scale=2), unsafe_allow_html=True)
+
+
+# Weather keyword -> icon name; the first match wins, so specific words come first.
+_WEATHER_ICONS = {
+    "storm": "storm",
+    "snow": "snow",
+    "rain": "rain",
+    "fog": "fog",
+    "wind": "wind",
+    "sunny": "sunny",
+    "clear": "sunny",
+    "cloudy": "cloudy",
+    "overcast": "cloudy",
+}
+_DEFAULT_WEATHER_ICON = "cloudy"
+
+
+def _weather_icon(description):
+    text = (description or "").lower()
+    for keyword, icon in _WEATHER_ICONS.items():
+        if keyword in text:
+            return icon
+    return _DEFAULT_WEATHER_ICON
 
 
 def render_environment_ribbon(world_summary):
-    """Render a single-line environment ribbon at the top."""
+    """Render the one-line status bar at the top of the screen."""
     location = world_summary.get("location", {}).get("name", "Unknown")
     time_of_day = world_summary.get("time", {}).get("time_of_day", "unknown")
     weather = world_summary.get("weather", {}).get("description", "unknown")
     temp = world_summary.get("weather", {}).get("temperature", 0)
-
-    weather_icons = {
-        "sunny": "☀️", "clear": "☀️", "cloudy": "☁️", "overcast": "☁️",
-        "rain": "🌧️", "storm": "⛈️", "snow": "❄️", "fog": "🌫️",
-        "wind": "💨", "hot": "🔥", "cold": "🥶",
-    }
-    weather_icon = "🌤️"
-    for keyword, icon in weather_icons.items():
-        if keyword in weather.lower():
-            weather_icon = icon
-            break
+    icon = _weather_icon(weather)
 
     st.markdown(
-        f'<div class="env-ribbon">{weather_icon} {location} · {time_of_day.capitalize()} · {weather} · {temp:.0f}°C</div>',
+        f'<div class="env-ribbon">{icon_html(icon, alt=icon)}'
+        f'<span>{html.escape(str(location))}</span><span>&middot;</span>'
+        f'<span>{html.escape(str(time_of_day).capitalize())}</span><span>&middot;</span>'
+        f'<span>{html.escape(str(weather))}</span><span>&middot;</span>'
+        f'<span>{temp:.0f}&deg;C</span></div>',
         unsafe_allow_html=True,
     )
 
 
+NEED_SEGMENTS = 10
+
+
 def render_needs_bars(person):
-    """Render Maslow needs as colored game-style progress bars."""
+    """Render Maslow needs as ten-segment pixel bars with 8x8 icons."""
     needs_config = [
-        ("hunger", "🍔", "Hunger"),
-        ("sleep", "😴", "Sleep"),
-        ("security", "🛡️", "Safety"),
-        ("love", "💕", "Social"),
-        ("esteem", "⭐", "Esteem"),
-        ("self_actualization", "🌟", "Growth"),
+        ("hunger", "Hunger"),
+        ("sleep", "Sleep"),
+        ("security", "Safety"),
+        ("love", "Social"),
+        ("esteem", "Esteem"),
+        ("self_actualization", "Growth"),
     ]
 
-    html_parts = []
-    for need_name, icon, label in needs_config:
+    rows = []
+    for need_name, label in needs_config:
         satisfaction = person.maslow_needs.get_need_satisfaction(need_name)
+        if satisfaction is None or (isinstance(satisfaction, float) and math.isnan(satisfaction)):
+            satisfaction = 0
         pct = max(0, min(100, satisfaction))
+        filled = int((pct + 5) // NEED_SEGMENTS)   # round half up: 85% shows 9 segments, not 8
 
         if pct < 30:
-            color = "#FF6B6B"
+            level = " need-critical"
         elif pct < 60:
-            color = "#FFD93D"
+            level = " need-mid"
         else:
-            color = "#6BCB77"
+            level = ""
+        row_class = f"need-row need-{need_name}{level}"
 
-        critical_class = "need-critical" if pct < 30 else ""
+        segments = (
+            '<span class="need-seg on"></span>' * filled
+            + '<span class="need-seg"></span>' * (NEED_SEGMENTS - filled)
+        )
+        rows.append(
+            f'<div class="{row_class}">{icon_html(need_name, alt=label)}'
+            f'<span class="need-label">{label}</span>'
+            f'<div class="need-segs">{segments}</div>'
+            f'<span class="need-pct">{pct:.0f}%</span></div>'
+        )
 
-        html_parts.append(f"""
-        <div class="need-row {critical_class}">
-            <span class="need-icon">{icon}</span>
-            <span class="need-label">{label}</span>
-            <div class="need-bar-bg">
-                <div class="need-bar-fill" style="width: {pct}%; background: {color};"></div>
-            </div>
-            <span class="need-pct">{pct:.0f}%</span>
-        </div>
-        """)
+    st.markdown("".join(rows), unsafe_allow_html=True)
 
-    st.markdown("".join(html_parts), unsafe_allow_html=True)
+
+def _css_token(name):
+    """Lower-case ``name`` reduced to [a-z0-9_] so it is safe inside a class attribute."""
+    return re.sub(r"[^a-z0-9_]", "", str(name).lower())
 
 
 def render_emotion_chips(person):
-    """Render top emotions as colored pill chips."""
-    emotion_icons = {
-        "joy": "😊", "sadness": "😢", "anger": "😠", "fear": "😨",
-        "surprise": "😮", "disgust": "🤢", "trust": "🤝", "anticipation": "🤩",
-    }
-
+    """Render the strongest emotions (above 15, at most four) as square badges."""
     all_emotions = person.emotion_system.get_emotional_state_summary().get("emotions", {})
     visible = sorted(
         [(name, val) for name, val in all_emotions.items() if val > 15],
@@ -405,73 +216,64 @@ def render_emotion_chips(person):
     if not visible:
         return
 
-    chips_html = '<div class="emotion-chips">'
-    for name, intensity in visible:
-        icon = emotion_icons.get(name.lower(), "💭")
-        chips_html += f'<span class="emotion-chip">{icon} {name.capitalize()} ({intensity:.0f})</span>'
-    chips_html += "</div>"
+    chips = "".join(
+        f'<span class="emotion-chip emotion-{_css_token(name)}">{icon_html(name.lower(), alt=name)}'
+        f'{html.escape(name.capitalize())} {intensity:.0f}</span>'
+        for name, intensity in visible
+    )
+    st.markdown(f'<div class="emotion-chips">{chips}</div>', unsafe_allow_html=True)
 
-    st.markdown(chips_html, unsafe_allow_html=True)
+
+POSITIVE_EMOTIONS = {"joy", "trust", "anticipation", "surprise"}
 
 
 def render_mood_indicator(person):
-    """Render a small colored pill badge showing Jenbina's dominant mood."""
+    """Render a square badge with Jenbina's dominant mood: green when positive, red otherwise."""
     dominant = person.emotion_system.get_dominant_emotions(1)
     if not dominant:
         return
 
-    emotion_name = dominant[0]["name"].lower()
+    emotion_name = str(dominant[0]["name"]).lower()
     intensity = int(dominant[0]["intensity"])
-
-    emoji_map = {
-        "joy": "😊", "sadness": "😢", "anger": "😠", "fear": "😨",
-        "surprise": "😲", "disgust": "🤢", "trust": "🤗", "anticipation": "✨",
-    }
-    positive_emotions = {"joy", "trust", "anticipation", "surprise"}
-    emoji = emoji_map.get(emotion_name, "💭")
-    color = "#4CAF50" if emotion_name in positive_emotions else "#E53935"
+    polarity = "mood-positive" if emotion_name in POSITIVE_EMOTIONS else "mood-negative"
 
     st.markdown(
-        f'<span style="background:{color};color:white;padding:4px 12px;border-radius:12px;'
-        f'font-size:0.9em;font-weight:600;">{emoji} {emotion_name.capitalize()} ({intensity})</span>',
+        f'<span class="mood-badge {polarity}">{icon_html(emotion_name, alt=emotion_name)}'
+        f'{html.escape(emotion_name.capitalize())} {intensity}</span>',
         unsafe_allow_html=True,
     )
 
 
 def render_action_narrative(action_response, satisfaction_before, satisfaction_after):
-    """Render the action decision as a narrative story card."""
+    """Render the action decision as an RPG dialog box."""
     if not isinstance(action_response, dict):
         st.write(str(action_response))
         return
 
-    chosen = action_response.get("chosen_action", "Unknown action")
-    reasoning = action_response.get("reasoning", "")
-    lessons = action_response.get("lessons_applied", "")
+    chosen = html.escape(str(action_response.get("chosen_action", "Unknown action")))
+    reasoning = html.escape(str(action_response.get("reasoning", "") or ""))
+    lessons = html.escape(str(action_response.get("lessons_applied", "") or ""))
 
     delta = satisfaction_after - satisfaction_before
     if delta > 0:
         delta_class = "delta-positive"
-        delta_icon = "📈"
     elif delta < 0:
         delta_class = "delta-negative"
-        delta_icon = "📉"
     else:
         delta_class = "delta-neutral"
-        delta_icon = "➡️"
 
     reasoning_html = f'<div class="action-reasoning">"{reasoning}"</div>' if reasoning else ""
-    lessons_html = f'<div class="action-reasoning">Lessons applied: {lessons}</div>' if lessons else ""
+    lessons_html = f'<div class="action-lessons">Lessons applied: {lessons}</div>' if lessons else ""
 
-    st.markdown(f"""
-    <div class="action-card">
-        <div class="action-title">▶ Jenbina decided to {chosen.lower()}</div>
-        {reasoning_html}
-        {lessons_html}
-        <span class="satisfaction-delta {delta_class}">
-            {delta_icon} Satisfaction: {satisfaction_before:.0f}% → {satisfaction_after:.0f}% ({delta:+.1f}%)
-        </span>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="px-dialog px-dialog-action">'
+        f'<div class="action-title">Jenbina decided to {chosen.lower()}</div>'
+        f"{reasoning_html}{lessons_html}"
+        f'<span class="satisfaction-delta {delta_class}">'
+        f"Satisfaction {satisfaction_before:.0f}% -&gt; {satisfaction_after:.0f}% ({delta:+.1f}%)"
+        f"</span></div>",
+        unsafe_allow_html=True,
+    )
 
 
 def get_person_dict(person):
@@ -993,7 +795,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     with center_col:
         if inner_voice_text != "No inner thoughts at the moment.":
             thought_display = inner_voice_text.split(".")[0] + "..." if "." in inner_voice_text else inner_voice_text
-            st.markdown(f'<div class="thought-bubble">{thought_display}</div>', unsafe_allow_html=True)
+            st.markdown(dialog_html(thought_display, kind="thought"), unsafe_allow_html=True)
 
         render_needs_bars(person)
         render_emotion_chips(person)
@@ -1123,11 +925,11 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     with action_center:
         action_placeholder = st.empty()
         with action_placeholder.container():
-            st.markdown(f"""
-            <div class="action-card">
-                <div class="action-title">▶ Jenbina decided to {chosen.lower()}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="px-dialog px-dialog-action"><div class="action-title">'
+                f'Jenbina decided to {html.escape(str(chosen)).lower()}</div></div>',
+                unsafe_allow_html=True,
+            )
 
     # ==================================================================
     # Stage 4 — Checks & Analysis  (compute only, render in debug)

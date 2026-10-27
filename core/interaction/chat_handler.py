@@ -181,6 +181,17 @@ Write a natural 1-3 sentence message to initiate conversation. Don't explain you
         return None
 
 
+def _chat_avatar(role):
+    """Pixel avatar path for a chat row.
+
+    Imported lazily: ``core.ui`` imports this module, so a top-level import
+    would be circular.
+    """
+    from core.ui.sprites import avatar_path, icon_path
+
+    return icon_path("player") if role == "user" else avatar_path()
+
+
 def handle_chat_interaction(
     st,
     llm,
@@ -202,7 +213,7 @@ def handle_chat_interaction(
     """Handle chat interactions with Jenbina using Chroma memory."""
     if user_input:
         # Display user message
-        st.chat_message("user").write(user_input)
+        st.chat_message("user", avatar=_chat_avatar("user")).write(user_input)
 
         # Scope ChromaDB entries per user
         chroma_person = f"user_{user_id}" if user_id else "User"
@@ -211,7 +222,7 @@ def handle_chat_interaction(
         should_block, _ = check_injection(user_input)
         if should_block:
             refusal = make_refusal_response()
-            st.chat_message("assistant").write(refusal)
+            st.chat_message("assistant", avatar=_chat_avatar("assistant")).write(refusal)
             # Store only the refusal — do NOT persist the blocked input, or future
             # retrieve_relevant_context() calls could feed it back into prompts.
             if memory_manager:
@@ -444,7 +455,7 @@ Use this social strategy: {chosen_social_strategy}
 Keep the response natural and in-character. Consider your current needs and how they might influence your response. If you have conversation history, reference it appropriately to maintain continuity.{insight_injection}""")
         ])
         
-        st.chat_message("assistant").write(response.content)
+        st.chat_message("assistant", avatar=_chat_avatar("assistant")).write(response.content)
 
         if person is not None and getattr(person, "social_cognition", None) is not None:
             person.social_cognition.observe_response_effect(
