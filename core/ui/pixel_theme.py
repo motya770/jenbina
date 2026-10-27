@@ -14,7 +14,7 @@ import os
 
 import streamlit as st
 
-from core.ui.sprites import MOTION_STATES, icon_path, sprite_path
+from core.ui.sprites import ICONS, MOTION_STATES, icon_path, sprite_path
 
 PLACEHOLDER = "[Jenbina]"
 
@@ -47,7 +47,13 @@ def sprite_html(state: str, caption: str | None = None) -> str:
 
 
 def icon_html(name: str, alt: str = "") -> str:
-    """An inline 16x16 pixel icon, or an empty span when the icon does not exist."""
+    """An inline 16x16 pixel icon, or an empty span when the icon does not exist.
+
+    Only names in ``ICONS`` reach the filesystem, so a caller-supplied name can
+    never resolve to another file or fill the data-URI cache.
+    """
+    if name not in ICONS:
+        return '<span class="px-icon px-icon-missing"></span>'
     path = icon_path(name)
     if not os.path.isfile(path):
         return '<span class="px-icon px-icon-missing"></span>'

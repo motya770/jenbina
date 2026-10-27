@@ -153,7 +153,7 @@ def render_needs_bars(person):
     for need_name, label in needs_config:
         satisfaction = person.maslow_needs.get_need_satisfaction(need_name)
         pct = max(0, min(100, satisfaction))
-        filled = int(round(pct / NEED_SEGMENTS))
+        filled = int((pct + 5) // NEED_SEGMENTS)   # round half up: 85% shows 9 segments, not 8
 
         if pct < 30:
             row_class = "need-row need-critical"

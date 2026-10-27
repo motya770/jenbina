@@ -49,6 +49,11 @@ class TestIconAndDialog(unittest.TestCase):
         self.assertIn('class="px-icon"', icon_html("joy", alt="Joy"))
         self.assertIn("px-icon-missing", icon_html("curiosity"))
 
+    def test_icon_html_rejects_names_outside_the_icon_set(self):
+        out = icon_html("../jenbina_base")
+        self.assertIn("px-icon-missing", out)
+        self.assertNotIn("data:image", out)
+
     def test_dialog_escapes_and_breaks_lines(self):
         out = dialog_html("a < b\nc & d", kind="action")
         self.assertIn("px-dialog-action", out)
@@ -111,6 +116,11 @@ class TestNeedsBars(unittest.TestCase):
         self.assertEqual(html_.count('class="need-row'), 6)
         self.assertEqual(html_.count('<span class="need-seg'), 60)
         self.assertEqual(html_.count('need-seg on'), 6 + 4 + 8 + 0 + 10 + 0)
+
+    def test_half_percent_boundaries_round_up(self):
+        html_ = rendered(render_needs_bars, FakePerson(
+            {"hunger": 85, "sleep": 75, "security": 45, "love": 95, "esteem": 5, "self_actualization": 55}, {}))
+        self.assertEqual(html_.count('need-seg on'), 9 + 8 + 5 + 10 + 1 + 6)
 
     def test_critical_only_below_thirty(self):
         html_ = rendered(render_needs_bars, FakePerson({"hunger": 29, "sleep": 30}, {}))
