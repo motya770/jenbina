@@ -23,6 +23,11 @@ _DIALOG_KINDS = ("thought", "action")
 
 @functools.lru_cache(maxsize=None)
 def _data_uri(path: str) -> str:
+    """Base64 data URI of a committed asset, cached for the process lifetime.
+
+    Assets are never rebuilt at runtime; rebuilding them under a running app
+    needs a restart to be seen.
+    """
     with open(path, "rb") as fh:
         return "data:image/png;base64," + base64.b64encode(fh.read()).decode("ascii")
 

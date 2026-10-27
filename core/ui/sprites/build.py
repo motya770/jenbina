@@ -45,6 +45,10 @@ def compose(
                     raise ValueError(f"unknown palette key {key!r}")
                 img.putpixel((x0 + col_index, y0 + row_index), PALETTE[key])
     if dy:
+        lost_rows = range(0, -dy) if dy < 0 else range(height - dy, height)
+        for y in lost_rows:
+            if any(img.getpixel((x, y))[3] for x in range(width)):
+                raise ValueError(f"dy={dy} would shift opaque pixels in row {y} off the canvas")
         shifted = Image.new("RGBA", size, TRANSPARENT)
         shifted.paste(img, (0, dy))
         img = shifted
@@ -116,7 +120,11 @@ def render_all() -> dict[str, Image.Image]:
 
 
 def png_bytes(img: Image.Image) -> bytes:
-    """Deterministic PNG encoding (no timestamps, fixed encoder settings)."""
+    """PNG encoding with fixed settings and no timestamps.
+
+    Bytes are stable for one Pillow/zlib build; ``check()`` therefore compares
+    decoded pixels, which is what "differs from a fresh render" means.
+    """
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=False)
     return buf.getvalue()
@@ -159,12 +167,15 @@ def write_all(out_dir: Path, favicon: Path | None) -> list[Path]:
 
 
 def check(out_dir: Path, favicon: Path | None) -> list[str]:
-    """Relative paths under ``out_dir`` (plus the favicon) that are missing or differ from a fresh render."""
+    """Relative paths under ``out_dir`` (plus the favicon) that are missing, differ
+    from a fresh render, or are PNGs no render produces (orphans of a rename)."""
     out_dir = Path(out_dir)
     renders = render_all()
     stale = [rel for rel, img in renders.items() if not _file_matches(out_dir / rel, img)]
     if favicon is not None and not _file_matches(Path(favicon), renders[AVATAR_FILE]):
         stale.append(os.path.relpath(favicon, out_dir))
+    present = {p.relative_to(out_dir).as_posix() for p in out_dir.rglob("*.png")} if out_dir.is_dir() else set()
+    stale.extend(sorted(present - set(renders)))
     return stale
 
 

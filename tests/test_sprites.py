@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from PIL import Image
+
 from core.ui.sprites.palette import PALETTE
 from core.ui.sprites.art import BODY, HAIR, FACES, PROPS, EFFECTS, STATE_FRAMES, ICON_ART
 from core.ui.sprites import STATES, MOTION_STATES, ICONS, SPRITES_DIR, sprite_path
@@ -56,6 +58,12 @@ class TestCompose(unittest.TestCase):
     def test_overflow_raises(self):
         with self.assertRaises(ValueError):
             compose([(1, 0, ["KK"])], size=(2, 1))
+
+    def test_dy_shifting_opaque_pixels_off_canvas_raises(self):
+        with self.assertRaises(ValueError):
+            compose([(0, 0, ["KK", ".."])], size=(2, 2), dy=-1)
+        with self.assertRaises(ValueError):
+            compose([(0, 0, ["..", "KK"])], size=(2, 2), dy=1)
 
 
 class TestArtLayers(unittest.TestCase):
@@ -142,6 +150,14 @@ class TestBuild(unittest.TestCase):
             (out / "icons" / "joy.png").write_bytes(b"corrupt")
             self.assertEqual(check(out, fav), ["icons/joy.png"])
 
+    def test_check_reports_orphan_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            out, fav = Path(d) / "sprites", Path(d) / "favicon.png"
+            write_all(out, fav)
+            (out / "icons" / "extra.png").write_bytes(b"x")
+            (out / "jenbina_old.png").write_bytes(b"x")
+            self.assertEqual(check(out, fav), ["icons/extra.png", "jenbina_old.png"])
+
     def test_committed_assets_are_fresh(self):
         self.assertEqual(check(Path(SPRITES_DIR), Path(SPRITES_DIR).parent / "favicon.png"), [])
 
@@ -157,6 +173,18 @@ class TestPaths(unittest.TestCase):
     def test_constants_match_the_art(self):
         self.assertEqual(STATES, tuple(STATE_FRAMES))
         self.assertEqual(sorted(ICONS), sorted(ICON_ART))
+
+
+class TestPortraits(unittest.TestCase):
+    PORTRAITS = Path(SPRITES_DIR).parent / "portraits"
+
+    def test_thirteen_portraits_at_display_size_and_within_budget(self):
+        files = sorted(self.PORTRAITS.glob("jenbina_*.png"))
+        self.assertEqual([f.stem[len("jenbina_"):] for f in files], sorted(STATES))
+        for f in files:
+            with Image.open(f) as img:
+                self.assertEqual(img.size, (512, 768), f.name)   # 2x of the 256px window
+            self.assertLess(f.stat().st_size, 1_000_000, f.name)
 
 
 if __name__ == "__main__":

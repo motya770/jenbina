@@ -136,6 +136,11 @@ class TestNeedsBars(unittest.TestCase):
             {"hunger": 85, "sleep": 75, "security": 45, "love": 95, "esteem": 5, "self_actualization": 55}, {}))
         self.assertEqual(html_.count('need-seg on'), 9 + 8 + 5 + 10 + 1 + 6)
 
+    def test_non_finite_need_value_renders_as_empty_bar(self):
+        html_ = rendered(render_needs_bars, FakePerson({"hunger": float("nan"), "sleep": float("inf")}, {}))
+        self.assertEqual(html_.count('class="need-row'), 6)
+        self.assertEqual(html_.count('need-seg on'), 10)   # inf clamps to 100; nan counts as 0
+
     def test_critical_only_below_thirty(self):
         html_ = rendered(render_needs_bars, FakePerson({"hunger": 29, "sleep": 30}, {}))
         self.assertEqual(html_.count("need-critical"), 1 + 4)   # hunger, plus the four needs missing from the dict (0%)

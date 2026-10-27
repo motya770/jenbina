@@ -4,6 +4,7 @@ from datetime import datetime
 import time
 import html
 import json
+import math
 import re
 import os
 from types import SimpleNamespace
@@ -171,6 +172,8 @@ def render_needs_bars(person):
     rows = []
     for need_name, label in needs_config:
         satisfaction = person.maslow_needs.get_need_satisfaction(need_name)
+        if satisfaction is None or (isinstance(satisfaction, float) and math.isnan(satisfaction)):
+            satisfaction = 0
         pct = max(0, min(100, satisfaction))
         filled = int((pct + 5) // NEED_SEGMENTS)   # round half up: 85% shows 9 segments, not 8
 

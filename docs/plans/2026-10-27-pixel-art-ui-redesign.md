@@ -290,6 +290,10 @@ scale=2)` → `.px-sprite-2x`, 96px, still animated) beside the caption. Missing
 → `base` portrait → sprite strip only. The pixel sprite remains the chat avatar and the
 favicon. Section 3's "Removed" list no longer applies to the portraits.
 
+Portrait budget: files are stored at 512x768 (2x of the 256px window) and under 1 MB
+each, pinned by `tests/test_sprites.py::TestPortraits`; the 1024x1536 originals stay in git
+history (commit bda29859).
+
 **Candy arcade palette** replaces the section 2 table:
 
 | Role                      | Hex       |
