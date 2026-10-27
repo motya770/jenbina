@@ -4,6 +4,14 @@ emitted by the simulation page renderers (core.ui.simulation)."""
 import unittest
 from unittest.mock import patch
 
+from core.ui.simulation import (
+    display_jenbina_image,
+    render_action_narrative,
+    render_emotion_chips,
+    render_environment_ribbon,
+    render_mood_indicator,
+    render_needs_bars,
+)
 from core.ui.pixel_theme import (
     PLACEHOLDER,
     dialog_html,
@@ -54,6 +62,85 @@ class TestInjectCss(unittest.TestCase):
             self.assertIn(needle, css)
         self.assertNotRegex(css, r"border-radius:\s*[1-9]")   # only `border-radius: 0` overrides are allowed
         self.assertNotIn("linear-gradient(135", css)
+
+
+# --------------------------------------------------------------------------
+# Simulation page renderers
+# --------------------------------------------------------------------------
+class FakeNeeds:
+    def __init__(self, v):
+        self.v = v
+
+    def get_need_satisfaction(self, n):
+        return self.v.get(n, 0)
+
+
+class FakeEmotions:
+    def __init__(self, e):
+        self.e = e
+
+    def get_emotional_state_summary(self):
+        return {"emotions": self.e}
+
+    def get_dominant_emotions(self, n):
+        return [{"name": k, "intensity": v} for k, v in sorted(self.e.items(), key=lambda kv: -kv[1])[:n]]
+
+
+class FakePerson:
+    name = "Jenbina"
+
+    def __init__(self, needs, emotions):
+        self.maslow_needs, self.emotion_system = FakeNeeds(needs), FakeEmotions(emotions)
+
+
+def rendered(fn, *a):
+    with patch("core.ui.simulation.st") as st:
+        fn(*a)
+        return st.markdown.call_args[0][0]
+
+
+class TestNeedsBars(unittest.TestCase):
+    def test_six_rows_ten_segments_and_fill_count(self):
+        html_ = rendered(render_needs_bars, FakePerson(
+            {"hunger": 60, "sleep": 43, "security": 80, "love": 0, "esteem": 120, "self_actualization": -5}, {}))
+        self.assertEqual(html_.count('class="need-row'), 6)
+        self.assertEqual(html_.count('<span class="need-seg'), 60)
+        self.assertEqual(html_.count('need-seg on'), 6 + 4 + 8 + 0 + 10 + 0)
+
+    def test_critical_only_below_thirty(self):
+        html_ = rendered(render_needs_bars, FakePerson({"hunger": 29, "sleep": 30}, {}))
+        self.assertEqual(html_.count("need-critical"), 1 + 4)   # hunger, plus the four needs missing from the dict (0%)
+
+
+class TestChipsMoodRibbon(unittest.TestCase):
+    def test_chips_cap_at_four_skip_low_and_survive_unknown_emotion(self):
+        html_ = rendered(render_emotion_chips, FakePerson(
+            {}, {"joy": 90, "trust": 80, "fear": 70, "curiosity": 60, "anger": 50, "sadness": 15}))
+        self.assertEqual(html_.count('class="emotion-chip"'), 4)
+        self.assertIn("px-icon-missing", html_)
+        self.assertNotIn("Sadness", html_)
+
+    def test_mood_badge_polarity(self):
+        self.assertIn("mood-positive", rendered(render_mood_indicator, FakePerson({}, {"joy": 50})))
+        self.assertIn("mood-negative", rendered(render_mood_indicator, FakePerson({}, {"anger": 50})))
+
+    def test_ribbon_weather_icon_and_fallback(self):
+        ws = lambda d: {"location": {"name": "Palo Alto"}, "time": {"time_of_day": "night"},
+                        "weather": {"description": d, "temperature": 18}}
+        self.assertIn('alt="rain"', rendered(render_environment_ribbon, ws("light rain")))
+        self.assertIn('alt="cloudy"', rendered(render_environment_ribbon, ws("volcanic ash")))
+
+
+class TestActionAndSprite(unittest.TestCase):
+    def test_action_card_is_a_dialog_and_escapes(self):
+        html_ = rendered(render_action_narrative, {"chosen_action": "Eat <soup>", "reasoning": "a & b"}, 60.0, 68.0)
+        self.assertIn("px-dialog-action", html_)
+        self.assertIn("eat &lt;soup&gt;", html_)
+        self.assertIn("delta-positive", html_)
+
+    def test_display_jenbina_image_derives_state_from_any_path(self):
+        self.assertIn("px-anim-motion", rendered(display_jenbina_image, "/old/src/images/jenbina_eat.png", "Jenbina"))
+        self.assertEqual(rendered(display_jenbina_image, "whatever.png"), rendered(display_jenbina_image, "jenbina_base.png"))
 
 
 if __name__ == "__main__":
