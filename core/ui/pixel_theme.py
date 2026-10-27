@@ -104,7 +104,7 @@ PIXEL_CSS = """
 .stApp .block-container {
     position: relative;
     max-width: 46rem;
-    margin: 2.5rem auto 4rem;
+    margin: 4.5rem auto 4rem;
     padding: 1.25rem 1.25rem 5rem;
     background: #1B1F3B;
     border: 14px solid #2A2D3A;
@@ -326,6 +326,7 @@ PIXEL_CSS = """
 .stApp [data-testid="stExpander"] summary span {
     font-family: var(--px-chrome);
     font-size: 10px;
+    line-height: 1.8;
 }
 .stApp [data-testid="stAlert"] {
     border-radius: 0;
@@ -605,6 +606,7 @@ PIXEL_CSS = """
     margin: 0 0 8px;
     font-family: var(--px-chrome);
     font-size: 11px;
+    line-height: 1.8;
     letter-spacing: 1px;
     color: #FF8FAB;
 }

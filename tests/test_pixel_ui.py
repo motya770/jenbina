@@ -4,8 +4,9 @@ emitted by the simulation page renderers (core.ui.simulation)."""
 import unittest
 from collections import namedtuple
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from core.interaction.chat_handler import handle_chat_interaction
 from core.ui.chat import render_chat_simple
 
 from core.ui.simulation import (
@@ -160,6 +161,17 @@ class TestChatAvatars(unittest.TestCase):
                                  get_conversation_history=lambda *a, **k: [Msg("Matt", "hi"), Msg("person", "hello")])
         render_chat_simple(person, None, None, False)
         avatars = [c.kwargs.get("avatar") for c in st.chat_message.call_args_list]
+        self.assertTrue(avatars[0].endswith("icons/player.png"))
+        self.assertTrue(avatars[1].endswith("jenbina_avatar.png"))
+
+
+class TestChatHandlerAvatars(unittest.TestCase):
+    @patch("core.interaction.chat_handler.check_injection", return_value=(True, "blocked"))
+    def test_live_turn_rows_get_sprite_avatars(self, _):
+        st = MagicMock()
+        handle_chat_interaction(st, None, None, None, None, user_input="hi", memory_manager=None)
+        avatars = [c.kwargs.get("avatar") for c in st.chat_message.call_args_list]
+        self.assertEqual(len(avatars), 2)
         self.assertTrue(avatars[0].endswith("icons/player.png"))
         self.assertTrue(avatars[1].endswith("jenbina_avatar.png"))
 
