@@ -292,5 +292,14 @@ class TestRenderTimeline(unittest.TestCase):
         self.assertIn(EMPTY_TEXT, st.markdown.call_args[0][0])
 
 
+class TestCorruptRows(unittest.TestCase):
+    def test_corrupt_action_detail_still_renders_title(self):
+        ev = TimelineEvent(kind="action", title="Jenbina decided to nap",
+                           detail={"action": "nap", "satisfaction_before": "n/a", "satisfaction_after": None})
+        with patch("core.ui.timeline.st") as st:
+            render_timeline(build_timeline([], [ev]))
+        self.assertIn("Jenbina decided to nap", st.markdown.call_args_list[-1].args[0])
+
+
 if __name__ == "__main__":
     unittest.main()

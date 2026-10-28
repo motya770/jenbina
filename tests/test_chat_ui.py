@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from core.timeline import EventLog
-from core.ui.chat import ensure_outreach, handle_user_input, send_proactive_message
+from core.ui.chat import ensure_outreach, get_event_log, handle_user_input, send_proactive_message
 from tests.test_greeting_generation import _FakeSessionState
 
 
@@ -63,6 +63,17 @@ class TestHandleUserInput(unittest.TestCase):
         self.assertEqual([e.kind for e in log.recent()], ["mood"])
         self.assertEqual(log.recent()[0].detail["source"], "chat")
         st.chat_message.assert_not_called()
+
+
+class TestEventLogPerUser(unittest.TestCase):
+    @patch("core.ui.chat._get_user_db_and_id", return_value=(MagicMock(), 2))
+    @patch("core.ui.chat.st")
+    def test_event_log_follows_the_logged_in_user(self, st, _):
+        stale = EventLog(MagicMock(), 1)
+        st.session_state = _FakeSessionState(event_log=stale)
+        log = get_event_log()
+        self.assertEqual(log.user_id, 2)
+        self.assertIs(st.session_state["event_log"], log)
 
 
 if __name__ == "__main__":

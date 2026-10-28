@@ -369,6 +369,16 @@ class TestEvents(unittest.TestCase):
         conn.commit()
         self.assertEqual(self.db.get_events(self.uid)[0]["detail"], {})
 
+    def test_malformed_created_at_row_is_skipped(self):
+        self.db.store_event(self.uid, "mood", "fine")
+        conn = self.db._get_conn()
+        conn.execute(
+            "INSERT INTO events (user_id, kind, title, detail_json, created_at) VALUES (?, 'goal', 'bad', NULL, 'yesterday')",
+            (self.uid,),
+        )
+        conn.commit()
+        self.assertEqual([e["title"] for e in self.db.get_events(self.uid)], ["fine"])
+
     def test_events_isolated_per_user(self):
         other = self.db.create_or_update_user(
             firebase_uid="u2", email="c@d.e", display_name="B", photo_url="", provider="test"

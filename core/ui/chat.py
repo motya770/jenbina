@@ -175,9 +175,9 @@ def _get_user_db_and_id():
 def get_event_log() -> EventLog:
     """The session's event log, built once from the logged-in user (an
     in-memory log when there is no user)."""
+    user_db, user_id = _get_user_db_and_id()
     log = st.session_state.get("event_log")
-    if log is None:
-        user_db, user_id = _get_user_db_and_id()
+    if log is None or getattr(log, "user_id", None) != user_id:
         log = EventLog(user_db, user_id)
         st.session_state["event_log"] = log
     return log

@@ -127,5 +127,54 @@ class TestHeadlessRunnerEvents(unittest.TestCase):
         self.assertIn("satisfaction_delta", result)
 
 
+def _plan_fixture(person):
+    """Two plans: one finished earlier, one whose last step completes this
+    iteration; a goal behind each."""
+    from core.goals.goal_system import Goal
+    from core.planning.planning_system import Plan, PlanStep
+    old = Plan("old goal", 0, [PlanStep("done step", "", "", status="completed")], status="completed")
+    new = Plan("new goal", 1, [PlanStep("call a friend", "", "", status="active")], status="active")
+    person.planning_system.plans = [old, new]
+    person.goal_system.goals = [Goal("old goal", "short_term", [], []), Goal("new goal", "short_term", [], [])]
+
+    def finish_step(experience):
+        new.steps[0].status = "completed"
+        new.status = "completed"
+        return "step_completed"
+
+    person.planning_system.evaluate_step = finish_step
+    person.planning_system.check_for_replan = lambda **k: None
+    person.goal_system.update_progress = lambda experience: []
+
+
+class TestPlanCompletionEvents(unittest.TestCase):
+    def _assert_events(self, log):
+        finished = [e.title for e in log.recent() if e.title.startswith("Plan finished")]
+        self.assertEqual(finished, ["Plan finished: new goal"])
+        self.assertIn("Plan step done: call a friend", [e.title for e in log.recent()])
+        self.assertIn("Goal advanced: new goal → 30%", [e.title for e in log.recent()])
+
+    def test_ui_runner_records_plan_finished_once_and_goal_advanced(self):
+        import core.ui.simulation as sim
+        person, meta, patches = build_env(sim)
+        _plan_fixture(person)
+        log = EventLog()
+        with patches, patch("core.ui.simulation.st") as st, patch("core.ui.simulation.send_proactive_message"):
+            st.session_state = _session()
+            sim.run_single_iteration(person, MagicMock(), meta, 0, rail=NullRail(), event_log=log)
+        self._assert_events(log)
+
+    def test_headless_runner_records_plan_finished_once_and_goal_advanced(self):
+        import core.simulation_runner as hr
+        person, meta, patches = build_env(hr)
+        _plan_fixture(person)
+        log = EventLog()
+        context = {"simulation_history": [], "jenbina_location": "Jenbina's House", "debug_iterations": [], "event_log": log}
+        with patches, patch("core.simulation_runner.generate_proactive_message", return_value=None), \
+                patch("core.simulation_runner.get_llm", return_value=MagicMock()):
+            hr.run_single_iteration_headless(person, MagicMock(), meta, 0, context)
+        self._assert_events(log)
+
+
 if __name__ == "__main__":
     unittest.main()

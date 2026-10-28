@@ -133,6 +133,13 @@ def action_details_text(reasoning, lessons) -> str:
     return body
 
 
+def _number(value) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _event_row_html(item: TimelineItem) -> str:
     detail = (item.event.detail if item.event is not None else None) or {}
     if item.kind == THOUGHT:
@@ -144,7 +151,7 @@ def _event_row_html(item: TimelineItem) -> str:
             ACTION,
             item.text,
             meta=item.meta,
-            badge=delta_badge_html(detail.get("satisfaction_before", 0) or 0, detail.get("satisfaction_after", 0) or 0),
+            badge=delta_badge_html(_number(detail.get("satisfaction_before")), _number(detail.get("satisfaction_after"))),
             icon=action_icon(str(detail.get("action", "") or "")),
             details=("why?", body) if body else None,
         )
@@ -168,7 +175,12 @@ def render_timeline(items: list[TimelineItem]) -> None:
                 st.write(item.text)
                 st.caption(item.meta)
         else:
-            st.markdown(_event_row_html(item), unsafe_allow_html=True)
+            try:
+                row = _event_row_html(item)
+            except Exception as exc:  # noqa: BLE001 - one bad row must not blank the page
+                print(f"timeline: could not render {item.kind} row: {exc}")
+                row = event_html(item.kind, item.text, meta=item.meta)
+            st.markdown(row, unsafe_allow_html=True)
 
 
 _SCROLL_JS = """<!-- {nonce} --><script>

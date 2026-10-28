@@ -39,19 +39,18 @@ def _run_one_iteration(page: Page, streamlit_url: str) -> dict:
     # Click "Step once"
     page.get_by_role("button", name=re.compile("Step once")).click()
 
-    # Wait for the action row in the timeline
-    action_el = page.locator(".px-event-action .px-event-title").first
-    action_el.wait_for(state="visible", timeout=ITERATION_TIMEOUT)
-    action_text = action_el.inner_text()
-
-    # Wait for iteration completion (the stage pill)
+    # Wait for iteration completion (the stage pill), then read the newest
+    # action row: earlier iterations' rows are still in the timeline.
     page.locator("text=completed in").first.wait_for(
         state="visible", timeout=ITERATION_TIMEOUT
     )
+    action_el = page.locator(".px-event-action .px-event-title").last
+    action_el.wait_for(state="visible", timeout=ITERATION_TIMEOUT)
+    action_text = action_el.inner_text()
 
     # Extract the signed satisfaction delta from the action row's badge
     sat_delta = None
-    for el in page.locator(".satisfaction-delta").all():
+    for el in reversed(page.locator(".satisfaction-delta").all()):
         try:
             txt = el.inner_text()
             # Match pattern like "83% → 85% (+1.7%)"

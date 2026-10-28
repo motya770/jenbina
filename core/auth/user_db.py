@@ -262,6 +262,10 @@ class UserDatabase:
         events = []
         for row in reversed(rows):
             try:
+                created_at = datetime.fromisoformat(row["created_at"])
+            except (TypeError, ValueError):
+                continue  # a row whose timestamp cannot be read is left out
+            try:
                 detail = json.loads(row["detail_json"]) if row["detail_json"] else {}
                 if not isinstance(detail, dict):
                     detail = {}
@@ -272,7 +276,7 @@ class UserDatabase:
                 "kind": row["kind"],
                 "title": row["title"],
                 "detail": detail,
-                "created_at": datetime.fromisoformat(row["created_at"]),
+                "created_at": created_at,
             })
         return events
 

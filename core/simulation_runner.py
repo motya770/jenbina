@@ -535,6 +535,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
 
     lesson_stats = {}
     experience = None
+    goals_before = snapshot_goals(person.goal_system)
 
     if person.learning_system is not None:
         print(f"  Recording experience...")
@@ -558,7 +559,6 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         if person.goal_system is not None:
             print(f"  Updating goal progress...")
             person.goal_system.set_experiences(person.learning_system.experiences)
-            goals_before = snapshot_goals(person.goal_system)
             advanced_goals = person.goal_system.update_progress(experience)
             if advanced_goals:
                 for g in advanced_goals:
@@ -576,7 +576,6 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
                     personality_traits=personality,
                     lessons=lesson_stats.get("lessons", []),
                 )
-            record_goal_changes(event_log, goals_before, snapshot_goals(person.goal_system))
 
         if person.planning_system is not None:
             print(f"  Evaluating plan progress...")
@@ -585,6 +584,8 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
             if step_before:
                 plan_before, step_obj = step_before
                 record_plan_step(event_log, step_result, plan_before.goal_description, step_obj.description)
+                if plan_before.status == "completed":
+                    record_plan_finished(event_log, plan_before)
             if step_result == "step_completed":
                 print(f"  Plan step completed!")
                 current = person.planning_system.get_current_step()
@@ -595,7 +596,6 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
                     for p in person.planning_system.plans:
                         if p.status == "completed" and p.goal_id is not None:
                             print(f"  Plan completed: {p.goal_description}")
-                            record_plan_finished(event_log, p)
                             if person.goal_system is not None:
                                 for g in person.goal_system.goals:
                                     if g.description == p.goal_description and g.is_active():
@@ -636,6 +636,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
                         )
 
     # Identity updates
+    # Goal events once, after plans had their say (finishing a plan advances its goal)
+    record_goal_changes(event_log, goals_before, snapshot_goals(person.goal_system))
+
     if getattr(person, "self_narrative", None) is not None:
         if experience is None:
             experience = SimpleNamespace(
