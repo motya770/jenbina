@@ -11,9 +11,7 @@ from core.interaction.chat_handler import handle_chat_interaction
 
 from core.ui.simulation import (
     display_jenbina_image,
-    render_action_narrative,
     render_emotion_chips,
-    render_environment_ribbon,
     render_mood_indicator,
     render_needs_bars,
 )
@@ -164,20 +162,8 @@ class TestChipsMoodRibbon(unittest.TestCase):
         self.assertIn("mood-positive", rendered(render_mood_indicator, FakePerson({}, {"joy": 50})))
         self.assertIn("mood-negative", rendered(render_mood_indicator, FakePerson({}, {"anger": 50})))
 
-    def test_ribbon_weather_icon_and_fallback(self):
-        ws = lambda d: {"location": {"name": "Palo Alto"}, "time": {"time_of_day": "night"},
-                        "weather": {"description": d, "temperature": 18}}
-        self.assertIn('alt="rain"', rendered(render_environment_ribbon, ws("light rain")))
-        self.assertIn('alt="cloudy"', rendered(render_environment_ribbon, ws("volcanic ash")))
-
 
 class TestActionAndSprite(unittest.TestCase):
-    def test_action_card_is_a_dialog_and_escapes(self):
-        html_ = rendered(render_action_narrative, {"chosen_action": "Eat <soup>", "reasoning": "a & b"}, 60.0, 68.0)
-        self.assertIn("px-dialog-action", html_)
-        self.assertIn("eat &lt;soup&gt;", html_)
-        self.assertIn("delta-positive", html_)
-
     def test_display_jenbina_image_derives_state_from_any_path(self):
         self.assertIn("px-anim-motion", rendered(display_jenbina_image, "/old/src/images/jenbina_eat.png", "Jenbina"))
         self.assertEqual(rendered(display_jenbina_image, "whatever.png"), rendered(display_jenbina_image, "jenbina_base.png"))

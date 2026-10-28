@@ -123,16 +123,23 @@ def build_timeline(messages, events, person_name: str = "Jenbina", filter_name: 
     return out
 
 
+def action_details_text(reasoning, lessons) -> str:
+    """The body of an action row's "why?" details: the reasoning, then the
+    lessons applied on their own line."""
+    body = str(reasoning or "")
+    lessons_line = lessons_text(lessons)
+    if lessons_line:
+        body = (body + "\n" if body else "") + "Lessons applied: " + lessons_line
+    return body
+
+
 def _event_row_html(item: TimelineItem) -> str:
     detail = (item.event.detail if item.event is not None else None) or {}
     if item.kind == THOUGHT:
         head, rest = first_sentence(item.text)
         return event_html(THOUGHT, head, meta=item.meta, details=("more", item.text) if rest else None)
     if item.kind == ACTION:
-        body = str(detail.get("reasoning", "") or "")
-        lessons = lessons_text(detail.get("lessons"))
-        if lessons:
-            body = (body + "\n" if body else "") + "Lessons applied: " + lessons
+        body = action_details_text(detail.get("reasoning", ""), detail.get("lessons"))
         return event_html(
             ACTION,
             item.text,

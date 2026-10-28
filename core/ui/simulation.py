@@ -18,8 +18,22 @@ from core.environment.world_state import create_world_description_system, create
 from core.environment.location_system import PaloAltoLocationSystem
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
-from core.ui.chat import update_system_stage, send_proactive_message
-from core.ui.pixel_theme import dialog_html, icon_html, inject_pixel_css, sprite_html
+from core.timeline import (
+    ACTION,
+    THOUGHT,
+    record_action,
+    record_goal_changes,
+    record_mood,
+    record_move,
+    record_plan_finished,
+    record_plan_step,
+    record_replan,
+    record_thought,
+    snapshot_goals,
+)
+from core.ui.chat import get_event_log, send_proactive_message
+from core.ui.pixel_theme import action_icon, delta_badge_html, event_html, icon_html, inject_pixel_css, sprite_html
+from core.ui.timeline import action_details_text, first_sentence
 
 
 def inject_tamagotchi_css():
@@ -137,24 +151,6 @@ def _weather_icon(description):
     return _DEFAULT_WEATHER_ICON
 
 
-def render_environment_ribbon(world_summary):
-    """Render the one-line status bar at the top of the screen."""
-    location = world_summary.get("location", {}).get("name", "Unknown")
-    time_of_day = world_summary.get("time", {}).get("time_of_day", "unknown")
-    weather = world_summary.get("weather", {}).get("description", "unknown")
-    temp = world_summary.get("weather", {}).get("temperature", 0)
-    icon = _weather_icon(weather)
-
-    st.markdown(
-        f'<div class="env-ribbon">{icon_html(icon, alt=icon)}'
-        f'<span>{html.escape(str(location))}</span><span>&middot;</span>'
-        f'<span>{html.escape(str(time_of_day).capitalize())}</span><span>&middot;</span>'
-        f'<span>{html.escape(str(weather))}</span><span>&middot;</span>'
-        f'<span>{temp:.0f}&deg;C</span></div>',
-        unsafe_allow_html=True,
-    )
-
-
 NEED_SEGMENTS = 10
 
 
@@ -240,38 +236,6 @@ def render_mood_indicator(person):
     st.markdown(
         f'<span class="mood-badge {polarity}">{icon_html(emotion_name, alt=emotion_name)}'
         f'{html.escape(emotion_name.capitalize())} {intensity}</span>',
-        unsafe_allow_html=True,
-    )
-
-
-def render_action_narrative(action_response, satisfaction_before, satisfaction_after):
-    """Render the action decision as an RPG dialog box."""
-    if not isinstance(action_response, dict):
-        st.write(str(action_response))
-        return
-
-    chosen = html.escape(str(action_response.get("chosen_action", "Unknown action")))
-    reasoning = html.escape(str(action_response.get("reasoning", "") or ""))
-    lessons = html.escape(str(action_response.get("lessons_applied", "") or ""))
-
-    delta = satisfaction_after - satisfaction_before
-    if delta > 0:
-        delta_class = "delta-positive"
-    elif delta < 0:
-        delta_class = "delta-negative"
-    else:
-        delta_class = "delta-neutral"
-
-    reasoning_html = f'<div class="action-reasoning">"{reasoning}"</div>' if reasoning else ""
-    lessons_html = f'<div class="action-lessons">Lessons applied: {lessons}</div>' if lessons else ""
-
-    st.markdown(
-        f'<div class="px-dialog px-dialog-action">'
-        f'<div class="action-title">Jenbina decided to {chosen.lower()}</div>'
-        f"{reasoning_html}{lessons_html}"
-        f'<span class="satisfaction-delta {delta_class}">'
-        f"Satisfaction {satisfaction_before:.0f}% -&gt; {satisfaction_after:.0f}% ({delta:+.1f}%)"
-        f"</span></div>",
         unsafe_allow_html=True,
     )
 
@@ -581,12 +545,22 @@ def _detect_location_from_action(chosen_action: str) -> str | None:
     return None
 
 
-def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration):
-    """Run a single simulation iteration with live-updating card grid.
+def _now_hhmm() -> str:
+    return datetime.now().strftime("%H:%M")
 
-    Each card computes its data then renders immediately so the UI
-    updates progressively as each LLM call completes.
+
+def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration, rail=None, event_log=None):
+    """Run a single simulation iteration.
+
+    The computation happens here; the screen is updated through ``rail`` (a
+    ``StatusRail``: stage pill, portrait, vitals, live timeline rows) and the
+    events of the iteration are recorded in ``event_log``. Without a rail
+    nothing is drawn; without a log the session's log is used.
     """
+    from core.ui.rail import NullRail  # local import: rail.py imports this module's renderers
+    rail = rail if rail is not None else NullRail()
+    event_log = event_log if event_log is not None else get_event_log()
+
     iteration_start_time = datetime.now()
     iter_num = iteration + 1
     print(f"{'='*60}")
@@ -605,7 +579,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🌍 Stage 1: Environment")
     print(f"{'─'*40}")
-    update_system_stage("Building environment...")
+    rail.stage("looking around…")
     person_dict = get_person_dict(person)
     # Use tracked location (updated after each action) or default to home
     current_location = st.session_state.get("jenbina_location", "Jenbina's House")
@@ -616,17 +590,9 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"  🕐 Time: {world_summary['time']['time_of_day']}")
     print(f"  🌤️  Weather: {world_summary['weather']['description']} ({world_summary['weather']['temperature']:.0f}°C)")
 
-    # ── Tamagotchi Screen ─────────────────────────────────────────────
-    inject_tamagotchi_css()
-    render_environment_ribbon(world_summary)
-
-    # Centered Jenbina avatar
-    _, avatar_center, _ = st.columns([1, 2, 1])
-    with avatar_center:
-        avatar_placeholder = st.empty()
-        initial_image = get_jenbina_image_for_emotion(person)
-        with avatar_placeholder.container():
-            display_jenbina_image(initial_image, caption=f"{person.name}")
+    # ── Status rail: place and portrait ───────────────────────────────
+    rail.world_summary = world_summary
+    rail.portrait(get_jenbina_image_for_emotion(person), caption=f"{person.name}")
 
     # ==================================================================
     # Stage 2 — Perception & Context  (compute, render later)
@@ -636,7 +602,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🧠 Stage 2: Perception & Context")
     print(f"{'─'*40}")
-    update_system_stage("Analyzing needs & building context...")
+    rail.stage("thinking…")
 
     # Prepare recent actions string for world chain
     prev_actions_list = []
@@ -790,26 +756,20 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         inner_voice_text = person.inner_monologue.format_for_prompt()
         print(f"  ✅ Inner monologue generated")
 
-    # Render Tamagotchi center panel: thought bubble, needs, emotions
-    _, center_col, _ = st.columns([1, 2, 1])
-    with center_col:
-        if inner_voice_text != "No inner thoughts at the moment.":
-            thought_display = inner_voice_text.split(".")[0] + "..." if "." in inner_voice_text else inner_voice_text
-            st.markdown(dialog_html(thought_display, kind="thought"), unsafe_allow_html=True)
-
-        render_needs_bars(person)
-        render_emotion_chips(person)
+    # The thought goes to the timeline: persisted, and shown live
+    thought_event = record_thought(event_log, person.inner_monologue)
+    if thought_event is not None:
+        rail.live_row(event_html(THOUGHT, first_sentence(thought_event.title)[0], meta=_now_hhmm()))
 
     # Card 3: Action Decision (LLM call → display)
     print(f"{'─'*40}")
     print(f"  ⚡ Stage 3: Action Decision")
     print(f"{'─'*40}")
-    update_system_stage("Deciding next action...")
+    rail.stage("deciding…")
     print(f"  🤔 Running meta-cognitive action chain...")
 
     # Show thinking image while deciding
-    with avatar_placeholder.container():
-        display_jenbina_image(_get_image_path("jenbina_thinking.png"), caption=f"{person.name} is thinking...")
+    rail.portrait(_get_image_path("jenbina_thinking.png"), caption=f"{person.name} is thinking...")
 
     action_response = create_meta_cognitive_action_chain(
         llm=llm_json_mode,
@@ -826,8 +786,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     action_image = get_jenbina_image_for_action(chosen)
     if action_image is None:
         action_image = get_jenbina_image_for_emotion(person)
-    with avatar_placeholder.container():
-        display_jenbina_image(action_image, caption=f"{person.name}: {chosen}")
+    rail.portrait(action_image, caption=f"{person.name}: {chosen}")
 
     if getattr(person, "curiosity_system", None) is not None and isinstance(action_response, dict):
         person.curiosity_system.update_after_action(action_response.get("chosen_action", ""))
@@ -919,17 +878,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         if new_location != old_location:
             st.session_state["jenbina_location"] = new_location
             print(f"  📍 Location changed: {old_location} → {new_location}")
-
-    # Action narrative placeholder — updated after post-processing with satisfaction delta
-    _, action_center, _ = st.columns([1, 2, 1])
-    with action_center:
-        action_placeholder = st.empty()
-        with action_placeholder.container():
-            st.markdown(
-                f'<div class="px-dialog px-dialog-action"><div class="action-title">'
-                f'Jenbina decided to {html.escape(str(chosen)).lower()}</div></div>',
-                unsafe_allow_html=True,
-            )
+            record_move(event_log, old_location, new_location)
 
     # ==================================================================
     # Stage 4 — Checks & Analysis  (compute only, render in debug)
@@ -937,7 +886,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🛡️  Stage 4: Checks & Analysis")
     print(f"{'─'*40}")
-    update_system_stage("Running safety & emotion checks...")
+    rail.stage("checking…")
     asimov_chain = create_asimov_check_system(llm_json_mode)
     action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
 
@@ -961,6 +910,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
 
     if emotion_adjustments:
         person.emotion_system.apply_adjustments(emotion_adjustments)
+        record_mood(event_log, emotions_before, person.get_emotions_snapshot(), "action")
         print(f"  ✅ Emotions: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
         _print_json("💭 Emotion Adjustments", emotion_adjustments)
     else:
@@ -982,7 +932,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  📝 Stage 5: Learning & Updates")
     print(f"{'─'*40}")
-    update_system_stage("Learning & updating...")
+    rail.stage("learning…")
     print(f"  🔄 Updating needs & decaying emotions...")
     person.update_all_needs()
 
@@ -992,6 +942,17 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     sat_delta = satisfaction_after - satisfaction_before
     chosen_action = action_response.get("chosen_action", "unknown") if isinstance(action_response, dict) else str(action_response)
     reasoning = action_response.get("reasoning", "") if isinstance(action_response, dict) else ""
+
+    rail.refresh(person)
+    action_event = record_action(event_log, action_response, satisfaction_before, satisfaction_after, world_summary)
+    rail.live_row(event_html(
+        ACTION,
+        action_event.title,
+        meta=_now_hhmm(),
+        badge=delta_badge_html(satisfaction_before, satisfaction_after),
+        icon=action_icon(str(chosen_action)),
+        details=("why?", action_details_text(reasoning, action_event.detail.get("lessons"))) or None,
+    ))
     world_ctx = {
         "location": world_summary.get("location", {}).get("name", "unknown"),
         "time_of_day": world_summary.get("time", {}).get("time_of_day", "unknown"),
@@ -1028,6 +989,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         if person.goal_system is not None:
             print(f"  🎯 Updating goal progress...")
             person.goal_system.set_experiences(person.learning_system.experiences)
+            goals_before = snapshot_goals(person.goal_system)
             advanced_goals = person.goal_system.update_progress(experience)
             if advanced_goals:
                 for g in advanced_goals:
@@ -1046,10 +1008,15 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                     personality_traits=personality,
                     lessons=lesson_stats.get("lessons", []),
                 )
+            record_goal_changes(event_log, goals_before, snapshot_goals(person.goal_system))
 
         if person.planning_system is not None:
             print(f"  📋 Evaluating plan progress...")
+            step_before = person.planning_system.get_current_step()
             step_result = person.planning_system.evaluate_step(experience)
+            if step_before:
+                plan_before, step_obj = step_before
+                record_plan_step(event_log, step_result, plan_before.goal_description, step_obj.description)
             if step_result == "step_completed":
                 plan_messages.append("📋 Plan step completed!")
                 current = person.planning_system.get_current_step()
@@ -1060,6 +1027,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                     for p in person.planning_system.plans:
                         if p.status == "completed" and p.goal_id is not None:
                             plan_messages.append(f"📋 Plan completed: {p.goal_description}")
+                            record_plan_finished(event_log, p)
                             if person.goal_system is not None:
                                 for g in person.goal_system.goals:
                                     if g.description == p.goal_description and g.is_active():
@@ -1072,6 +1040,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                 needs=needs_after, world_context=world_ctx,
             )
             if replan_result is not None:
+                record_replan(event_log, replan_result)
                 plan_messages.append(f"📋 Replanned: {replan_result.goal_description}")
                 plan_messages.append(f"New first step: {replan_result.steps[0].description}")
 
@@ -1113,60 +1082,10 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             lessons_for_identity = person.learning_system.lessons if person.learning_system is not None else []
         person.self_narrative.integrate_experience(experience, lessons_for_identity)
 
-    # ==================================================================
-    # Update action narrative with final satisfaction delta
-    # ==================================================================
-    with action_placeholder.container():
-        render_action_narrative(action_response, satisfaction_before, satisfaction_after)
-
     # Final avatar update — reflect post-action emotional state
     final_image = get_jenbina_image_for_emotion(person)
-    with avatar_placeholder.container():
-        display_jenbina_image(final_image, caption=f"{person.name}")
+    rail.portrait(final_image, caption=f"{person.name}")
 
-    # ==================================================================
-    # Tier 2 — Auto-expanding sections (interesting content only)
-    # ==================================================================
-    _, tier2_center, _ = st.columns([1, 2, 1])
-    with tier2_center:
-        # Learning
-        with st.container(border=True):
-            st.caption("📚 Learning")
-            for msg in learning_messages:
-                st.write(msg)
-            if not learning_messages:
-                st.write("*No learning updates.*")
-            if goal_messages:
-                st.caption("Goals Advanced")
-                for msg in goal_messages:
-                    st.write(msg)
-            if plan_messages:
-                st.caption("Plan Updates")
-                for msg in plan_messages:
-                    st.write(msg)
-
-        # Goals
-        if person.goal_system is not None:
-            with st.container(border=True):
-                st.caption("🎯 Goals")
-                display_goal_stats(person, iteration)
-
-        # Plans
-        if person.planning_system is not None:
-            with st.container(border=True):
-                st.caption("📋 Plans")
-                display_planning_stats(person, iteration)
-
-        # Social interactions
-        if getattr(person, "social_interaction_tracker", None) is not None:
-            display_social_interaction_stats(person, iteration)
-
-
-        # Curiosity
-        if getattr(person, "curiosity_system", None) is not None:
-            with st.container(border=True):
-                st.caption("🔎 Curiosity")
-                display_curiosity_stats(person, iteration)
 
     # ==================================================================
     # Store debug data in session state for the Debug Info page
@@ -1186,6 +1105,10 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         "learning_stats": person.learning_system.get_learning_stats() if person.learning_system else None,
         "person_dict": person_dict,
         "world_summary": world_summary,
+        "curiosity_stats": person.curiosity_system.get_stats() if getattr(person, "curiosity_system", None) else None,
+        "social_interaction_stats": (
+            person.social_interaction_tracker.get_stats() if getattr(person, "social_interaction_tracker", None) else None
+        ),
     }
     if "debug_iterations" not in st.session_state:
         st.session_state.debug_iterations = []
@@ -1206,8 +1129,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'='*60}")
     print(f"  ✅ ITERATION {iter_num} COMPLETE — {iteration_duration:.2f}s")
     print(f"{'='*60}")
-    update_system_stage(f"Iteration {iter_num} complete ({iteration_duration:.1f}s)")
-    st.success(f"Iteration {iter_num} completed in {iteration_duration:.2f}s")
+    rail.stage(f"completed in {iteration_duration:.0f}s")
 
     return {
         "needs_response": needs_response,
@@ -1221,56 +1143,43 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     }
 
 
-def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations, delay_seconds):
-    """Run the simulation loop for specified iterations"""
-    # Progress tracking
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    # Container for all iterations
-    iterations_container = st.container()
-    
+def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations, delay_seconds,
+                        rail=None, event_log=None):
+    """Run ``iterations`` iterations back to back, ``delay_seconds`` apart.
+
+    Progress shows in the rail's stage pill. Each iteration's record is
+    appended to ``st.session_state.simulation_history`` right away so the next
+    iteration sees it among its recent actions.
+    """
+    from core.ui.rail import NullRail  # local import: rail.py imports this module's renderers
+    rail = rail if rail is not None else NullRail()
+    event_log = event_log if event_log is not None else get_event_log()
+
     results = []
-    
     for iteration in range(iterations):
-        # Update progress
-        progress = (iteration + 1) / iterations
-        progress_bar.progress(progress)
-        status_text.text(f"🔄 Running iteration {iteration + 1} of {iterations}...")
-        
-        with iterations_container:
-            # Create expander for each iteration
-            with st.expander(f"📍 Iteration {iteration + 1} of {iterations}", expanded=(iteration == iterations - 1)):
-                result = run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration)
+        if iterations > 1:
+            rail.stage(f"iteration {iteration + 1} of {iterations}")
+        result = run_single_iteration(
+            person, llm_json_mode, meta_cognitive_system, iteration, rail=rail, event_log=event_log
+        )
+        iteration_record = {
+            "iteration": iteration + 1,
+            "timestamp": datetime.now().isoformat(),
+            "duration_seconds": result["iteration_duration"],
+            "action_decision": result["action_decision"],
+            "needs_state": result["person_dict"]["maslow_needs"],
+            "emotions_state": result["person_dict"].get("emotions", {}),
+            "world_summary": result["world_summary"],
+            "satisfaction_delta": result["satisfaction_delta"],
+        }
+        results.append(iteration_record)
+        if "simulation_history" not in st.session_state:
+            st.session_state.simulation_history = []
+        st.session_state.simulation_history.append(iteration_record)
 
-                # Store iteration record and immediately update session
-                # history so the NEXT iteration sees this action in
-                # recent_actions / last_action prompts.
-                iteration_record = {
-                    "iteration": iteration + 1,
-                    "timestamp": datetime.now().isoformat(),
-                    "duration_seconds": result["iteration_duration"],
-                    "action_decision": result["action_decision"],
-                    "needs_state": result["person_dict"]["maslow_needs"],
-                    "emotions_state": result["person_dict"].get("emotions", {}),
-                    "world_summary": result["world_summary"]
-                }
-                results.append(iteration_record)
-                # Push to session history immediately so next iteration
-                # can read recent actions from it.
-                if "simulation_history" not in st.session_state:
-                    st.session_state.simulation_history = []
-                st.session_state.simulation_history.append(iteration_record)
-
-        # Wait before next iteration (except for the last one)
-        if iteration < iterations - 1:
-            status_text.text(f"⏳ Waiting {delay_seconds} seconds before next iteration...")
+        if iteration < iterations - 1 and delay_seconds:
+            rail.stage(f"waiting {delay_seconds}s…")
             time.sleep(delay_seconds)
-    
-    # Simulation completed
-    progress_bar.progress(1.0)
-    status_text.text(f"✅ Simulation completed! Ran {iterations} iteration(s).")
-    
     return results
 
 
