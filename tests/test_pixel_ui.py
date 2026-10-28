@@ -8,7 +8,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from core.interaction.chat_handler import handle_chat_interaction
-from core.ui.chat import render_chat_simple
 
 from core.ui.simulation import (
     display_jenbina_image,
@@ -203,23 +202,6 @@ class TestPortrait(unittest.TestCase):
             display_jenbina_image("jenbina_base.png")
             st.image.assert_not_called()
             self.assertIn("px-sprite", st.markdown.call_args[0][0])
-
-
-class TestChatAvatars(unittest.TestCase):
-    @patch("core.ui.chat.handle_user_input")
-    @patch("core.ui.chat.send_proactive_message", return_value=None)
-    @patch("core.ui.chat.check_return_greeting", return_value=None)
-    @patch("core.ui.chat._get_user_display_name", return_value="Matt")
-    @patch("core.ui.chat.st")
-    def test_history_rows_get_sprite_avatars(self, st, *_):
-        st.session_state = {"proactive_checked": True}
-        Msg = namedtuple("Msg", "sender content")
-        person = SimpleNamespace(name="Jenbina", send_message=lambda *a: None,
-                                 get_conversation_history=lambda *a, **k: [Msg("Matt", "hi"), Msg("person", "hello")])
-        render_chat_simple(person, None, None, False)
-        avatars = [c.kwargs.get("avatar") for c in st.chat_message.call_args_list]
-        self.assertTrue(avatars[0].endswith("icons/player.png"))
-        self.assertTrue(avatars[1].endswith("jenbina_avatar.png"))
 
 
 class TestChatHandlerAvatars(unittest.TestCase):

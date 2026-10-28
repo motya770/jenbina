@@ -5,6 +5,7 @@ import os
 import sys
 import tempfile
 import unittest
+from collections import namedtuple
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -36,6 +37,15 @@ from core.timeline.recording import (
     record_thought,
     snapshot_goals,
 )
+from core.ui.timeline import (
+    EMPTY_TEXT,
+    build_timeline,
+    first_sentence,
+    render_timeline,
+)
+
+Msg = namedtuple("Msg", "timestamp sender content message_type")
+T = datetime(2026, 10, 27, 23, 38)
 
 
 class TestTitles(unittest.TestCase):
@@ -179,6 +189,107 @@ class TestRecording(unittest.TestCase):
         self.assertEqual(record_replan(self.log, plan).title, "Replanned: g, first step s1")
         self.assertIsNone(record_replan(self.log, None))
         self.assertEqual(record_plan_finished(self.log, plan).title, "Plan finished: g")
+
+
+class TestBuildTimeline(unittest.TestCase):
+    def test_merges_by_time_and_detects_speakers(self):
+        msgs = [Msg(T, "person", "hi", "greeting"), Msg(T + timedelta(minutes=3), "Matt", "hello", "text")]
+        evs = [make_thought("x", "Quiet.")]
+        evs[0].created_at = T + timedelta(minutes=1)
+        kinds = [i.kind for i in build_timeline(msgs, evs)]
+        self.assertEqual(kinds, ["marker", "jenbina", "thought", "user"])
+
+    def test_meta_marks_outreach(self):
+        items = build_timeline([Msg(T, "person", "hi", "proactive"), Msg(T, "person", "hi", "text")], [])
+        self.assertEqual(items[1].meta, "23:38 · she reached out first")
+        self.assertEqual(items[2].meta, "23:38")
+
+    def test_markers_on_gap_and_day_change(self):
+        msgs = [
+            Msg(T, "Matt", "a", "text"),
+            Msg(T + timedelta(minutes=61), "Matt", "b", "text"),
+            Msg(T + timedelta(days=1, minutes=5), "Matt", "c", "text"),
+        ]
+        markers = [i.text for i in build_timeline(msgs, []) if i.kind == "marker"]
+        self.assertEqual(markers[0], "23:38")
+        self.assertEqual(markers[1], "00:39 · Wed 28 Oct")
+        self.assertEqual(len(markers), 3)
+
+    def test_marker_carries_world_context_of_latest_action(self):
+        T0 = datetime(2026, 10, 27, 20, 0)
+        act = make_action("nap", "", [], 1, 2, "Jenbina's House", "night", "Clear skies", 15.1)
+        act.created_at = T0
+        items = build_timeline([Msg(T0 + timedelta(hours=2), "Matt", "a", "text")], [act])
+        self.assertEqual([i.kind for i in items], ["marker", "action", "marker", "user"])
+        self.assertEqual(items[0].text, "20:00 · Jenbina's House · night · Clear skies, 15°C")
+        self.assertEqual(items[2].text, "22:00 · Jenbina's House · night · Clear skies, 15°C")
+
+    def test_filters(self):
+        evs = [make_thought("x", "t"), make_move("a", "b"), make_goal("created", "g", 0)]
+        msgs = [Msg(T, "Matt", "m", "text")]
+        self.assertEqual([i.kind for i in build_timeline(msgs, evs, filter_name="Chat") if i.kind != "marker"], ["user"])
+        self.assertEqual({i.kind for i in build_timeline(msgs, evs, filter_name="Her day") if i.kind != "marker"}, {"move", "goal"})
+        self.assertEqual([i.kind for i in build_timeline(msgs, evs, filter_name="Thoughts") if i.kind != "marker"], ["thought"])
+
+    def test_limit_keeps_newest(self):
+        msgs = [Msg(T + timedelta(minutes=i), "Matt", str(i), "text") for i in range(10)]
+        texts = [i.text for i in build_timeline(msgs, [], limit=3) if i.kind == "user"]
+        self.assertEqual(texts, ["7", "8", "9"])
+
+    def test_equal_timestamps_put_event_before_message(self):
+        ev = make_move("a", "b")
+        ev.created_at = T
+        kinds = [i.kind for i in build_timeline([Msg(T, "person", "x", "proactive")], [ev])]
+        self.assertEqual(kinds, ["marker", "move", "jenbina"])
+
+    def test_empty_inputs_give_no_items(self):
+        self.assertEqual(build_timeline([], []), [])
+
+    def test_first_sentence(self):
+        self.assertEqual(first_sentence("Quiet night. Maybe text someone."), ("Quiet night.", "Maybe text someone."))
+
+    def test_first_sentence_without_punctuation_is_whole_text(self):
+        self.assertEqual(first_sentence("maybe text someone"), ("maybe text someone", ""))
+
+
+class TestRenderTimeline(unittest.TestCase):
+    def test_rows_get_sprite_avatars_and_captions(self):
+        items = build_timeline([Msg(T, "Matt", "hi", "text"), Msg(T, "person", "hello", "greeting")], [])
+        with patch("core.ui.timeline.st") as st:
+            render_timeline(items)
+        avatars = [c.kwargs.get("avatar") for c in st.chat_message.call_args_list]
+        self.assertTrue(avatars[0].endswith("icons/player.png"))
+        self.assertTrue(avatars[1].endswith("jenbina_avatar.png"))
+        self.assertIn("she reached out first", st.caption.call_args_list[-1].args[0])
+
+    def test_action_row_has_badge_and_details(self):
+        act = make_action("Eat soup", "hungry", ["eat early"], 80, 82, "Home", "noon", "Sunny", 20)
+        with patch("core.ui.timeline.st") as st:
+            render_timeline(build_timeline([], [act]))
+        html_ = st.markdown.call_args_list[-1].args[0]
+        for needle in ("px-event-action", "Jenbina decided to eat soup", "80% → 82% (+2.0%)",
+                       "<summary>why?</summary>", "Lessons applied: eat early", 'alt="hunger"'):
+            self.assertIn(needle, html_)
+
+    def test_thought_row_details_only_when_longer(self):
+        with patch("core.ui.timeline.st") as st:
+            render_timeline(build_timeline([], [make_thought("x", "Quiet night. Maybe text someone.")]))
+            long_html = st.markdown.call_args_list[-1].args[0]
+            render_timeline(build_timeline([], [make_thought("x", "Quiet night.")]))
+            short_html = st.markdown.call_args_list[-1].args[0]
+        self.assertIn("<summary>more</summary>", long_html)
+        self.assertNotIn("<details", short_html)
+
+    def test_unknown_kind_renders_title(self):
+        ev = TimelineEvent(kind="mystery", title="Something happened")
+        with patch("core.ui.timeline.st") as st:
+            render_timeline(build_timeline([], [ev]))
+        self.assertIn("Something happened", st.markdown.call_args_list[-1].args[0])
+
+    def test_empty_timeline_shows_empty_text(self):
+        with patch("core.ui.timeline.st") as st:
+            render_timeline([])
+        self.assertIn(EMPTY_TEXT, st.markdown.call_args[0][0])
 
 
 if __name__ == "__main__":
