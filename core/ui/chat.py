@@ -10,6 +10,7 @@ from core.interaction.chat_handler import (
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.auth.user_db import UserDatabase
 from core.ui.shared_init import save_person_state
+from core.timeline import EventLog, record_mood
 from core.ui.pixel_theme import stage_pill_html
 from core.ui.sprites import avatar_path, icon_path
 
@@ -110,7 +111,7 @@ def send_proactive_message(person, llm):
             return None
 
         display_name = _get_user_display_name()
-        person.send_message(display_name, message, "text")
+        person.send_message(display_name, message, "proactive")
 
         # Store in SQLite
         user_db, user_id = _get_user_db_and_id()
@@ -185,10 +186,37 @@ def _get_user_db_and_id():
     return user_db, user["id"]
 
 
-def handle_user_input(person, llm, memory_manager, debug_mode):
-    """Handle user chat input and return result"""
+def get_event_log() -> EventLog:
+    """The session's event log, built once from the logged-in user (an
+    in-memory log when there is no user)."""
+    log = st.session_state.get("event_log")
+    if log is None:
+        user_db, user_id = _get_user_db_and_id()
+        log = EventLog(user_db, user_id)
+        st.session_state["event_log"] = log
+    return log
+
+
+def ensure_outreach(person, llm) -> None:
+    """Let Jenbina speak first when she should: the return greeting, and the
+    once-per-session proactive message. Both land in the conversation with
+    their own message types so the timeline can label them."""
     display_name = _get_user_display_name()
-    user_input = st.chat_input("Talk to Jenbina...")
+    greeting = check_return_greeting(person, llm)
+    if greeting:
+        person.send_message(display_name, greeting, "greeting")
+
+    if not st.session_state.get("proactive_checked"):
+        st.session_state.proactive_checked = True
+        proactive_msg = send_proactive_message(person, llm)
+        if proactive_msg:
+            save_person_state()
+
+
+def handle_user_input(person, llm, memory_manager, debug_mode, user_input):
+    """Handle one submitted chat message and return the chat result, or
+    ``None`` when there is no input. The caller reads ``st.chat_input``."""
+    display_name = _get_user_display_name()
 
     if user_input:
         print("User input:", user_input)
@@ -254,11 +282,6 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             semantic_count = chat_result.get("semantic_docs_count", 0)
             st.toast(f"Context: {recent_count} recent messages + {semantic_count} semantically relevant", icon="📚")
 
-            # Display insight as a chat message if one was generated
-            if chat_result.get("insight"):
-                with st.chat_message("assistant", avatar=avatar_path()):
-                    st.write(f"💡 *{chat_result['insight']}*")
-
             # Store Jenbina's reply in SQLite
             if user_db and user_id:
                 user_db.store_message(user_id, "Jenbina", chat_result["assistant_response"], "jenbina_response")
@@ -266,6 +289,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             try:
                 update_system_stage("Analyzing emotions...")
                 chat_situation = f"User said: \"{user_input}\". Jenbina responded: \"{chat_result['assistant_response']}\""
+                emotions_before = person.get_emotions_snapshot()
                 emotion_adjustments = analyze_emotion_impact(
                     llm=llm,
                     situation=chat_situation,
@@ -274,6 +298,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
                 )
                 if emotion_adjustments:
                     person.emotion_system.apply_adjustments(emotion_adjustments)
+                    record_mood(get_event_log(), emotions_before, person.get_emotions_snapshot(), "chat")
             except Exception as e:
                 print(f"Emotion analysis after chat failed: {e}")
 
@@ -441,16 +466,7 @@ def render_chat_simple(person, llm, memory_manager, debug_mode):
     _init_stage_placeholder()
 
     # Check for return greeting
-    greeting = check_return_greeting(person, llm)
-    if greeting:
-        person.send_message(display_name, greeting, "text")
-
-    # Check for proactive message (independent of simulation)
-    if not st.session_state.get("proactive_checked"):
-        st.session_state.proactive_checked = True
-        proactive_msg = send_proactive_message(person, llm)
-        if proactive_msg:
-            save_person_state()
+    ensure_outreach(person, llm)
 
     conversation_history = person.get_conversation_history(display_name, count=50)
 
@@ -462,7 +478,8 @@ def render_chat_simple(person, llm, memory_manager, debug_mode):
         ):
             st.write(msg.content)
 
-    handle_user_input(person, llm, memory_manager, debug_mode)
+    user_input = st.chat_input("Talk to Jenbina...")
+    handle_user_input(person, llm, memory_manager, debug_mode, user_input)
 
 
 def render_chat_interface(person, llm, memory_manager, debug_mode):
@@ -475,19 +492,11 @@ def render_chat_interface(person, llm, memory_manager, debug_mode):
 
     # Check for return greeting
     display_name = _get_user_display_name()
-    greeting = check_return_greeting(person, llm)
-    if greeting:
-        person.send_message(display_name, greeting, "text")
-
-    # Check for proactive message (independent of simulation)
-    if not st.session_state.get("proactive_checked"):
-        st.session_state.proactive_checked = True
-        proactive_msg = send_proactive_message(person, llm)
-        if proactive_msg:
-            save_person_state()
+    ensure_outreach(person, llm)
 
     display_person_state_compact(person)
-    handle_user_input(person, llm, memory_manager, debug_mode)
+    user_input = st.chat_input("Talk to Jenbina...")
+    handle_user_input(person, llm, memory_manager, debug_mode, user_input)
     display_communication_stats(person)
     display_conversation_history(person)
     display_social_model(person)
