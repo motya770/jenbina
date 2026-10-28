@@ -25,6 +25,17 @@ from core.timeline import (
     mood_changes,
     shorten,
 )
+from core.timeline.recording import (
+    record_action,
+    record_goal_changes,
+    record_mood,
+    record_move,
+    record_plan_finished,
+    record_plan_step,
+    record_replan,
+    record_thought,
+    snapshot_goals,
+)
 
 
 class TestTitles(unittest.TestCase):
@@ -119,6 +130,55 @@ class TestEventLog(unittest.TestCase):
         db.store_event.side_effect = RuntimeError("disk")
         ev = EventLog(db, 1).record(make_move("a", "b"))
         self.assertEqual(ev.title, "Walked from a to b")
+
+
+class TestRecording(unittest.TestCase):
+    def setUp(self):
+        self.log = EventLog()
+
+    def test_record_thought_uses_current_thought(self):
+        im = SimpleNamespace(get_current_thought=lambda: SimpleNamespace(content="Quiet night.", mode="deliberation"))
+        ev = record_thought(self.log, im)
+        self.assertEqual((ev.kind, ev.title, ev.detail["mode"]), ("thought", "Quiet night.", "deliberation"))
+        self.assertIsNone(record_thought(self.log, None))
+        self.assertIsNone(record_thought(self.log, SimpleNamespace(get_current_thought=lambda: None)))
+
+    def test_record_move_only_on_change(self):
+        self.assertIsNone(record_move(self.log, "Home", "Home"))
+        self.assertIsNone(record_move(self.log, "Home", None))
+        self.assertEqual(record_move(self.log, "Home", "Coupa Cafe").detail, {"from": "Home", "to": "Coupa Cafe"})
+
+    def test_record_action_reads_world_summary(self):
+        ws = {"location": {"name": "Jenbina's House"}, "time": {"time_of_day": "night"},
+              "weather": {"description": "Clear skies", "temperature": 15.1}}
+        ev = record_action(self.log, {"chosen_action": "Nap", "reasoning": "tired", "lessons_applied": "rest early"}, 80.0, 82.5, ws)
+        self.assertEqual(ev.detail["location"], "Jenbina's House")
+        self.assertEqual(ev.detail["lessons"], ["rest early"])
+        self.assertEqual(record_action(self.log, {"chosen_action": "Nap"}, 1, 2, {}).detail["location"], "")
+
+    def test_record_mood_none_when_unchanged(self):
+        self.assertIsNone(record_mood(self.log, {"joy": 30}, {"joy": 30.4}, "chat"))
+        self.assertEqual(record_mood(self.log, {"joy": 30}, {"joy": 35}, "chat").detail["source"], "chat")
+
+    def test_snapshot_goals(self):
+        gs = SimpleNamespace(goals=[SimpleNamespace(description="a", status="active", progress=0.1)])
+        self.assertEqual(snapshot_goals(gs), {"a": ("active", 0.1)})
+        self.assertEqual(snapshot_goals(None), {})
+
+    def test_goal_changes(self):
+        before = {"a": ("active", 0.1), "b": ("active", 0.5), "c": ("active", 0.2)}
+        after = {"a": ("active", 0.3), "b": ("completed", 1.0), "c": ("active", 0.205), "d": ("active", 0.0)}
+        titles = [e.title for e in record_goal_changes(self.log, before, after)]
+        self.assertEqual(titles, ["Goal advanced: a → 30%", "Goal reached: b", "New goal: d"])
+
+    def test_plan_events(self):
+        self.assertEqual(record_plan_step(self.log, "step_completed", "g", "call").title, "Plan step done: call")
+        self.assertEqual(record_plan_step(self.log, "step_overridden", "g", "call").title, "Plan step skipped for an urgent need")
+        self.assertIsNone(record_plan_step(self.log, None, "g", "call"))
+        plan = SimpleNamespace(goal_description="g", steps=[SimpleNamespace(description="s1")])
+        self.assertEqual(record_replan(self.log, plan).title, "Replanned: g, first step s1")
+        self.assertIsNone(record_replan(self.log, None))
+        self.assertEqual(record_plan_finished(self.log, plan).title, "Plan finished: g")
 
 
 if __name__ == "__main__":
