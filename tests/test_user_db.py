@@ -6,6 +6,7 @@ import tempfile
 import os
 import sys
 import json
+from datetime import datetime
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -317,6 +318,63 @@ class TestMessageOrdering(unittest.TestCase):
             [m["content"] for m in messages],
             ["u1", "j1", "u2", "j2"],
         )
+
+
+
+class TestEvents(unittest.TestCase):
+    """The per-user events table that stores Jenbina's life events."""
+
+    def setUp(self):
+        self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self.tmp.close()
+        self.db = UserDatabase(db_path=self.tmp.name)
+        self.uid = self.db.create_or_update_user(
+            firebase_uid="u1", email="a@b.c", display_name="A", photo_url="", provider="test"
+        )["id"]
+
+    def tearDown(self):
+        os.unlink(self.tmp.name)
+
+    def test_events_table_created(self):
+        names = [
+            r["name"]
+            for r in self.db._get_conn().execute("SELECT name FROM sqlite_master WHERE type='table'")
+        ]
+        self.assertIn("events", names)
+
+    def test_store_and_get_round_trip(self):
+        when = datetime(2026, 10, 27, 23, 41, 5, 123456)
+        row_id = self.db.store_event(self.uid, "action", "Jenbina decided to nap", {"a": 1}, created_at=when)
+        [ev] = self.db.get_events(self.uid)
+        self.assertEqual(
+            (ev["id"], ev["kind"], ev["title"], ev["detail"], ev["created_at"]),
+            (row_id, "action", "Jenbina decided to nap", {"a": 1}, when),
+        )
+
+    def test_oldest_first_and_limit(self):
+        for i in range(5):
+            self.db.store_event(self.uid, "mood", f"m{i}", created_at=datetime(2026, 1, 1, 0, 0, i))
+        self.assertEqual([e["title"] for e in self.db.get_events(self.uid, limit=3)], ["m2", "m3", "m4"])
+
+    def test_empty_detail_is_empty_dict(self):
+        self.db.store_event(self.uid, "move", "Walked home")
+        self.assertEqual(self.db.get_events(self.uid)[0]["detail"], {})
+
+    def test_bad_detail_json_becomes_empty_dict(self):
+        conn = self.db._get_conn()
+        conn.execute(
+            "INSERT INTO events (user_id, kind, title, detail_json, created_at) VALUES (?, 'goal', 'x', '{not json', ?)",
+            (self.uid, datetime.now().isoformat()),
+        )
+        conn.commit()
+        self.assertEqual(self.db.get_events(self.uid)[0]["detail"], {})
+
+    def test_events_isolated_per_user(self):
+        other = self.db.create_or_update_user(
+            firebase_uid="u2", email="c@d.e", display_name="B", photo_url="", provider="test"
+        )["id"]
+        self.db.store_event(self.uid, "mood", "mine")
+        self.assertEqual(self.db.get_events(other), [])
 
 
 if __name__ == "__main__":
