@@ -25,6 +25,18 @@ from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.interaction.chat_handler import generate_proactive_message
 from core.connect import get_llm
+from core.timeline import (
+    EventLog,
+    record_action,
+    record_goal_changes,
+    record_mood,
+    record_move,
+    record_plan_finished,
+    record_plan_step,
+    record_replan,
+    record_thought,
+    snapshot_goals,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -215,6 +227,11 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         state_response, person_dict, world_summary, iteration_duration,
         satisfaction_delta.
     """
+    event_log = context.get("event_log")
+    if event_log is None:
+        event_log = EventLog(context.get("user_db"), context.get("user_id"))
+        context["event_log"] = event_log
+
     iteration_start_time = datetime.now()
     iter_num = iteration + 1
     print(f"{'='*60}")
@@ -368,6 +385,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         world_response = world_future.result()
         if monologue_future is not None:
             monologue_future.result()
+    record_thought(event_log, person.inner_monologue)
 
     print(f"  Needs analysis complete")
     _print_json("Needs Response", needs_response)
@@ -447,6 +465,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         if new_location != old_location:
             context["jenbina_location"] = new_location
             print(f"  Location changed: {old_location} -> {new_location}")
+            record_move(event_log, old_location, new_location)
 
     # ==================================================================
     # Stage 4: Checks & Analysis
@@ -476,6 +495,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
 
     if emotion_adjustments:
         person.emotion_system.apply_adjustments(emotion_adjustments)
+        record_mood(event_log, emotions_before, person.get_emotions_snapshot(), "action")
         print(f"  Emotions: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
         _print_json("Emotion Adjustments", emotion_adjustments)
     else:
@@ -506,6 +526,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     sat_delta = satisfaction_after - satisfaction_before
     chosen_action = action_response.get("chosen_action", "unknown") if isinstance(action_response, dict) else str(action_response)
     reasoning = action_response.get("reasoning", "") if isinstance(action_response, dict) else ""
+    record_action(event_log, action_response, satisfaction_before, satisfaction_after, world_summary)
     world_ctx = {
         "location": world_summary.get("location", {}).get("name", "unknown"),
         "time_of_day": world_summary.get("time", {}).get("time_of_day", "unknown"),
@@ -537,6 +558,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         if person.goal_system is not None:
             print(f"  Updating goal progress...")
             person.goal_system.set_experiences(person.learning_system.experiences)
+            goals_before = snapshot_goals(person.goal_system)
             advanced_goals = person.goal_system.update_progress(experience)
             if advanced_goals:
                 for g in advanced_goals:
@@ -554,10 +576,15 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
                     personality_traits=personality,
                     lessons=lesson_stats.get("lessons", []),
                 )
+            record_goal_changes(event_log, goals_before, snapshot_goals(person.goal_system))
 
         if person.planning_system is not None:
             print(f"  Evaluating plan progress...")
+            step_before = person.planning_system.get_current_step()
             step_result = person.planning_system.evaluate_step(experience)
+            if step_before:
+                plan_before, step_obj = step_before
+                record_plan_step(event_log, step_result, plan_before.goal_description, step_obj.description)
             if step_result == "step_completed":
                 print(f"  Plan step completed!")
                 current = person.planning_system.get_current_step()
@@ -568,6 +595,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
                     for p in person.planning_system.plans:
                         if p.status == "completed" and p.goal_id is not None:
                             print(f"  Plan completed: {p.goal_description}")
+                            record_plan_finished(event_log, p)
                             if person.goal_system is not None:
                                 for g in person.goal_system.goals:
                                     if g.description == p.goal_description and g.is_active():
@@ -580,6 +608,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
                 needs=needs_after, world_context=world_ctx,
             )
             if replan_result is not None:
+                record_replan(event_log, replan_result)
                 print(f"  Replanned: {replan_result.goal_description}")
                 print(f"  New first step: {replan_result.steps[0].description}")
 

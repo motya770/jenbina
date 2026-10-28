@@ -110,5 +110,22 @@ class TestUiRunnerEvents(unittest.TestCase):
         st.progress.assert_not_called()
 
 
+class TestHeadlessRunnerEvents(unittest.TestCase):
+    def test_headless_iteration_records_same_events(self):
+        import core.simulation_runner as hr
+        person, meta, patches = build_env(hr)
+        log = EventLog()
+        context = {"simulation_history": [], "jenbina_location": "Jenbina's House", "debug_iterations": [], "event_log": log}
+        with patches, patch("core.simulation_runner.generate_proactive_message", return_value=None), \
+                patch("core.simulation_runner.get_llm", return_value=MagicMock()):
+            result = hr.run_single_iteration_headless(person, MagicMock(), meta, 0, context)
+        kinds = [e.kind for e in log.recent()]
+        self.assertEqual(kinds[:2], ["thought", "move"])
+        self.assertIn("action", kinds)
+        self.assertIn("mood", kinds)
+        self.assertEqual(context["jenbina_location"], "Coupa Cafe")
+        self.assertIn("satisfaction_delta", result)
+
+
 if __name__ == "__main__":
     unittest.main()
