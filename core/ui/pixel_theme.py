@@ -887,6 +887,17 @@ PIXEL_CSS = """
     box-shadow: 3px 3px 0 0 #1E1B3A;
 }
 
+/* ---- bordered containers (the timeline box and the rail's cards) ------ */
+/* Streamlit 1.38 styles bordered/height-limited containers through a generated
+   emotion class; wrappers without styles carry the "-0" class, so everything
+   else is a card. */
+.stApp [data-testid="stVerticalBlockBorderWrapper"]:not(.st-emotion-cache-0) {
+    border: 3px solid #1E1B3A;
+    border-radius: 0;
+    box-shadow: 4px 4px 0 0 #1E1B3A;
+    padding: 10px 12px;
+}
+
 /* ---- status rail ----------------------------------------------------- */
 .px-card-title {
     margin: 0 0 8px;

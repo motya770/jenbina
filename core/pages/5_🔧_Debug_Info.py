@@ -139,6 +139,39 @@ if learning:
         else:
             st.write("*No lessons learned yet.*")
 
+# Curiosity & exploration
+curiosity = data.get("curiosity_stats")
+if curiosity:
+    with st.container(border=True):
+        st.caption("🔎 Curiosity & Exploration")
+        st.write(
+            f"**Curiosity:** {curiosity.get('curiosity_level', 0):.2f} | "
+            f"**Boredom:** {curiosity.get('boredom_level', 0):.2f} | "
+            f"**Novelty:** {curiosity.get('last_novelty_score', 0):.2f} | "
+            f"**Explore?:** {'yes' if curiosity.get('should_explore') else 'no'}"
+        )
+        if curiosity.get("open_questions"):
+            st.write("**Open Questions:**")
+            for q in curiosity["open_questions"][:3]:
+                st.write(f"- {q}")
+        if curiosity.get("suggested_explorations"):
+            st.write("**Exploration Candidates:**")
+            for a in curiosity["suggested_explorations"][:5]:
+                st.write(f"- {a}")
+
+# Social interactions
+social = data.get("social_interaction_stats")
+if social:
+    with st.container(border=True):
+        st.caption("👥 Social Interactions")
+        st.write(
+            f"**People met today:** {social.get('people_met_today', 0)} | "
+            f"**Total interactions:** {social.get('total_interactions', 0)}"
+        )
+        unique = social.get("unique_people_today", [])
+        if unique:
+            st.write(f"**Met:** {', '.join(unique)}")
+
 st.caption("Person State")
 st.json(data["person_dict"])
 

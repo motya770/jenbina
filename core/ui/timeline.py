@@ -176,7 +176,10 @@ _SCROLL_JS = """<!-- {nonce} --><script>
   try {{
     var doc = window.parent.document;
     var boxes = Array.prototype.slice.call(doc.querySelectorAll('[data-testid="stVerticalBlockBorderWrapper"]'))
-      .filter(function (el) {{ return (el.getAttribute('style') || '').indexOf('overflow') !== -1; }});
+      .filter(function (el) {{
+        var o = window.parent.getComputedStyle(el).overflowY;
+        return (o === 'auto' || o === 'scroll') && el.scrollHeight > el.clientHeight;
+      }});
     if (boxes.length) {{ boxes[0].scrollTop = boxes[0].scrollHeight; }}
   }} catch (e) {{}}
 }})();
@@ -184,7 +187,10 @@ _SCROLL_JS = """<!-- {nonce} --><script>
 
 
 def scroll_timeline_to_bottom() -> None:
-    """Scroll the height-limited timeline container to its newest row. A nonce
-    makes the snippet differ per rerun so the browser runs it again; when the
-    container cannot be found nothing happens."""
+    """Scroll the height-limited timeline container to its newest row.
+
+    Streamlit 1.38 gives that container no inline style; its overflow comes
+    from a generated class, so the snippet picks the first block wrapper whose
+    computed ``overflow-y`` scrolls. A nonce makes the snippet differ per rerun
+    so the browser runs it again; when no container matches nothing happens."""
     components.html(_SCROLL_JS.format(nonce=time.time()), height=0)
