@@ -498,6 +498,9 @@ class TestHandleChatInteraction(unittest.TestCase):
         )
         self.assertIsNotNone(result["insight"])
         self.assertIn("seek control", result["insight"])
+        self.assertEqual(result["insight"], "You seek control.")
+        self.assertNotIn("Lead with this observation", result["insight"])
+        self.assertNotIn("weave this observation", result["insight"])
 
     def test_no_insight_system(self):
         st = _make_mock_st()

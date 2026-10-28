@@ -389,6 +389,7 @@ def handle_chat_interaction(
 
         # Deep Emotional Mirror: generate insight if conditions are met
         insight_injection = ""
+        insight_text = None
         if person is not None and getattr(person, "insight_system", None) is not None:
             dossier = {}
             if getattr(person, "social_cognition", None) is not None:
@@ -404,6 +405,7 @@ def handle_chat_interaction(
                     first_message=user_input,
                 )
                 if insight:
+                    insight_text = insight
                     insight_injection = (
                         f"\n\nYou have just noticed something striking about this person. "
                         f"Lead with this observation — say it directly and boldly, "
@@ -435,6 +437,7 @@ def handle_chat_interaction(
                         self_narrative=narrative,
                     )
                     if insight:
+                        insight_text = insight
                         insight_injection = (
                             f"\n\nYou have noticed something about this person. "
                             f"If it fits naturally, weave this observation into your response: "
@@ -494,7 +497,7 @@ Keep the response natural and in-character. Consider your current needs and how 
             "social_strategy": chosen_social_strategy,
             "social_context": social_context,
             "curiosity_context": curiosity_context,
-            "insight": insight_injection if insight_injection else None,
+            "insight": insight_text,
             "recent_messages_count": len(conversation_context.split("\n")) if conversation_context else 0,
             "semantic_docs_count": len(relevant_context_docs) if relevant_context_docs else 0,
         }
