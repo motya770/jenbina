@@ -95,7 +95,7 @@ def _portrait_path(state):
     return None
 
 
-def display_jenbina_image(image_path, caption=None):
+def display_jenbina_image(image_path, caption=None, width=PORTRAIT_WIDTH):
     """Show the painterly portrait for the state named by ``image_path`` in a
     game window, with the half-size animated pixel sprite and the caption in
     a status strip underneath.
@@ -110,7 +110,7 @@ def display_jenbina_image(image_path, caption=None):
         state = state[:-4]
     portrait = _portrait_path(state)
     if portrait:
-        st.image(portrait, width=PORTRAIT_WIDTH)
+        st.image(portrait, width=width)
     st.markdown(sprite_html(state, caption, scale=2), unsafe_allow_html=True)
 
 

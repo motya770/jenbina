@@ -887,6 +887,28 @@ PIXEL_CSS = """
     box-shadow: 3px 3px 0 0 #1E1B3A;
 }
 
+/* ---- status rail ----------------------------------------------------- */
+.px-card-title {
+    margin: 0 0 8px;
+    font-family: var(--px-chrome);
+    font-size: 11px;
+    line-height: 1.8;
+    letter-spacing: 1px;
+    color: #C2185B;
+    text-shadow: 2px 2px 0 #FFF6D5;
+}
+.px-env-line, .px-now-lines {
+    margin: 6px 0 10px;
+    font-family: var(--px-chrome);
+    font-size: 9px;
+    line-height: 1.9;
+    letter-spacing: 1px;
+    color: #1E1B3A;
+}
+.px-env-line .px-icon {
+    margin-right: 4px;
+}
+
 /* ---- icons ----------------------------------------------------------- */
 .px-icon {
     display: inline-block;

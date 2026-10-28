@@ -10,6 +10,7 @@ from core.interaction.chat_handler import (
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.auth.user_db import UserDatabase
 from core.ui.shared_init import save_person_state
+from core.ui.pixel_theme import stage_pill_html
 from core.ui.sprites import avatar_path, icon_path
 
 
@@ -419,8 +420,8 @@ def _init_stage_placeholder():
     """Create or reuse the st.empty() placeholder for system stage."""
     placeholder = st.empty()
     st.session_state["_stage_placeholder"] = placeholder
-    stage = st.session_state.get("system_stage", "Idle")
-    placeholder.markdown(f"`⚙️ {stage}`")
+    stage = st.session_state.get("system_stage", "idle")
+    placeholder.markdown(stage_pill_html(stage), unsafe_allow_html=True)
     return placeholder
 
 
@@ -429,7 +430,7 @@ def update_system_stage(stage: str):
     st.session_state["system_stage"] = stage
     placeholder = st.session_state.get("_stage_placeholder")
     if placeholder is not None:
-        placeholder.markdown(f"`⚙️ {stage}`")
+        placeholder.markdown(stage_pill_html(stage), unsafe_allow_html=True)
 
 
 def render_chat_simple(person, llm, memory_manager, debug_mode):
