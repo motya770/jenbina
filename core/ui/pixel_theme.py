@@ -11,6 +11,7 @@ import base64
 import functools
 import html
 import os
+import re
 
 import streamlit as st
 
@@ -77,9 +78,105 @@ def dialog_html(body: str, kind: str = "thought") -> str:
     return f'<div class="px-dialog px-dialog-{kind}">{text}</div>'
 
 
-def inject_pixel_css() -> None:
-    """Inject the pixel theme. Call once per page, right after ``st.set_page_config``."""
-    st.markdown(f"<style>{PIXEL_CSS}</style>", unsafe_allow_html=True)
+# Event kind -> 8x8 icon name. Unknown kinds fall back to the generic star.
+EVENT_ICONS = {
+    "thought": "thought",
+    "action": "act",
+    "mood": "mood",
+    "goal": "esteem",
+    "plan": "plan",
+    "move": "walk",
+}
+GENERIC_EVENT_ICON = "act"
+
+# First matching group wins.
+_ACTION_ICON_KEYWORDS = (
+    (("eat", "food", "meal", "snack", "cook", "breakfast", "lunch", "dinner"), "hunger"),
+    (("drink", "coffee", "tea", "water"), "drink"),
+    (("sleep", "nap", "rest"), "sleep"),
+    (("walk", "stroll", "visit", "go to", "wander", "explor", "hike"), "walk"),
+    (("talk", "chat", "call", "friend", "social", "music", "convers"), "love"),
+    (("read", "study", "learn", "book"), "self_actualization"),
+)
+
+
+def action_icon(action: str) -> str:
+    """The icon name for an action's row, by keyword; the star when none fits."""
+    text = (action or "").lower()
+    for keywords, icon in _ACTION_ICON_KEYWORDS:
+        if any(keyword in text for keyword in keywords):
+            return icon
+    return GENERIC_EVENT_ICON
+
+
+def event_html(kind: str, title: str, meta: str = "", details: tuple | None = None,
+               badge: str | None = None, icon: str | None = None) -> str:
+    """One timeline row for a life event.
+
+    ``details`` is ``(summary, body)`` rendered as a native ``<details>``;
+    ``badge`` is trusted HTML (build it with ``delta_badge_html``); ``icon``
+    overrides the kind's icon. Everything else is escaped.
+    """
+    kind_token = re.sub(r"[^a-z0-9_]", "", str(kind).lower())
+    icon_name = icon or EVENT_ICONS.get(kind_token, GENERIC_EVENT_ICON)
+    if icon_name not in ICONS:
+        icon_name = GENERIC_EVENT_ICON
+    parts = [
+        icon_html(icon_name, alt=icon_name),
+        f'<span class="px-event-title">{html.escape(title)}</span>',
+    ]
+    if badge:
+        parts.append(badge)
+    if meta:
+        parts.append(f'<span class="px-event-meta">{html.escape(meta)}</span>')
+    if details:
+        summary, body = details
+        body_html = html.escape(body).replace("\n", "<br>")
+        parts.append(
+            f"<details><summary>{html.escape(summary)}</summary>"
+            f'<div class="px-event-body">{body_html}</div></details>'
+        )
+    return f'<div class="px-event px-event-{kind_token}">' + "".join(parts) + "</div>"
+
+
+def delta_badge_html(before: float, after: float) -> str:
+    """The satisfaction badge ``83% → 85% (+1.7%)`` with data attributes for tests."""
+    delta = round(float(after) - float(before), 1) or 0.0
+    if delta > 0:
+        cls = "delta-positive"
+    elif delta < 0:
+        cls = "delta-negative"
+    else:
+        cls = "delta-neutral"
+    return (
+        f'<span class="satisfaction-delta {cls}" data-before="{float(before):g}" '
+        f'data-after="{float(after):g}" data-delta="{delta:.1f}">'
+        f"{float(before):.0f}% → {float(after):.0f}% ({delta:+.1f}%)</span>"
+    )
+
+
+def marker_html(text: str) -> str:
+    """A centered time/place divider between timeline rows."""
+    return f'<div class="px-marker">{html.escape(text)}</div>'
+
+
+def stage_pill_html(text: str) -> str:
+    """The system stage pill in the status rail."""
+    return f'<span class="px-stage">{html.escape(text)}</span>'
+
+
+def inject_pixel_css(wide: bool = False) -> None:
+    """Inject the pixel theme. Call once per page, right after ``st.set_page_config``.
+
+    ``wide=True`` widens the device to 64rem for the two-column home screen.
+    """
+    css = PIXEL_CSS + (WIDE_CSS if wide else "")
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+
+
+WIDE_CSS = """
+.stApp .block-container { max-width: 64rem; }
+"""
 
 
 # --------------------------------------------------------------------------
@@ -704,6 +801,124 @@ PIXEL_CSS = """
 .delta-positive { background: #5BE36A; }
 .delta-negative { background: #FF4757; }
 .delta-neutral  { background: #E8DCC0; }
+
+/* ---- timeline rows, markers, stage pill ------------------------------ */
+.px-event {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0;
+    padding: 8px 12px;
+    font-family: var(--px-body);
+    font-size: 20px;
+    line-height: 1.1;
+    color: #1E1B3A;
+    background: #FFF6D5;
+    border: 3px solid #1E1B3A;
+    box-shadow: 4px 4px 0 0 #1E1B3A;
+}
+.px-event .px-icon {
+    flex: 0 0 16px;
+}
+.px-event-title {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.px-event-thought .px-event-title {
+    font-style: italic;
+    color: #4A4670;
+}
+.px-event-action {
+    margin-top: 18px;
+}
+.px-event-action::before {
+    content: "";
+    position: absolute;
+    top: -9px;
+    left: 24px;
+    width: 12px;
+    height: 6px;
+    background: #1E1B3A;
+    box-shadow: 3px -6px 0 0 #1E1B3A;
+}
+.px-event-meta {
+    flex: 1 0 100%;
+    font-family: var(--px-chrome);
+    font-size: 9px;
+    line-height: 1.8;
+    letter-spacing: 1px;
+    color: #C2185B;
+}
+.px-event details {
+    flex: 1 0 100%;
+}
+.px-event summary {
+    font-family: var(--px-chrome);
+    font-size: 9px;
+    line-height: 1.8;
+    letter-spacing: 1px;
+    color: #C2185B;
+    cursor: pointer;
+}
+.px-event-body {
+    margin-top: 6px;
+    color: #4A4670;
+}
+.px-marker {
+    margin: 14px 0 6px;
+    font-family: var(--px-chrome);
+    font-size: 9px;
+    line-height: 1.8;
+    letter-spacing: 1px;
+    text-align: center;
+    color: #1E1B3A;
+}
+.px-stage {
+    display: inline-block;
+    padding: 6px 8px;
+    font-family: var(--px-chrome);
+    font-size: 9px;
+    line-height: 1.6;
+    color: #1E1B3A;
+    background: #FFD93D;
+    border: 3px solid #1E1B3A;
+    box-shadow: 3px 3px 0 0 #1E1B3A;
+}
+
+/* ---- bordered containers (the timeline box and the rail's cards) ------ */
+/* Streamlit 1.38 styles bordered/height-limited containers through a generated
+   emotion class; wrappers without styles carry the "-0" class, so everything
+   else is a card. */
+.stApp [data-testid="stVerticalBlockBorderWrapper"]:not(.st-emotion-cache-0) {
+    border: 3px solid #1E1B3A;
+    border-radius: 0;
+    box-shadow: 4px 4px 0 0 #1E1B3A;
+    padding: 10px 12px;
+}
+
+/* ---- status rail ----------------------------------------------------- */
+.px-card-title {
+    margin: 0 0 8px;
+    font-family: var(--px-chrome);
+    font-size: 11px;
+    line-height: 1.8;
+    letter-spacing: 1px;
+    color: #C2185B;
+    text-shadow: 2px 2px 0 #FFF6D5;
+}
+.px-env-line, .px-now-lines {
+    margin: 6px 0 10px;
+    font-family: var(--px-chrome);
+    font-size: 9px;
+    line-height: 1.9;
+    letter-spacing: 1px;
+    color: #1E1B3A;
+}
+.px-env-line .px-icon {
+    margin-right: 4px;
+}
 
 /* ---- icons ----------------------------------------------------------- */
 .px-icon {

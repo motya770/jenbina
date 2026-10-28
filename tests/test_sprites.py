@@ -17,7 +17,8 @@ EMOTION_STATES = ["base", "smile", "sad", "angry", "scary", "surprised", "thinki
 ACTION_STATES = ["eat", "drink", "read", "sleep", "talk", "walks"]
 ICON_NAMES = ["hunger", "sleep", "security", "love", "esteem", "self_actualization",
               "joy", "sadness", "anger", "fear", "surprise", "disgust", "trust", "anticipation",
-              "sunny", "cloudy", "rain", "storm", "snow", "fog", "wind", "player"]
+              "sunny", "cloudy", "rain", "storm", "snow", "fog", "wind", "player",
+              "thought", "act", "mood", "plan", "walk", "drink"]
 
 
 def all_layers():
@@ -185,6 +186,12 @@ class TestPortraits(unittest.TestCase):
             with Image.open(f) as img:
                 self.assertEqual(img.size, (512, 768), f.name)   # 2x of the 256px window
             self.assertLess(f.stat().st_size, 1_000_000, f.name)
+
+
+
+class TestTimelineIcons(unittest.TestCase):
+    def test_event_icons_exist(self):
+        self.assertLessEqual({"thought", "act", "mood", "plan", "walk", "drink"}, set(ICONS))
 
 
 if __name__ == "__main__":

@@ -1,16 +1,16 @@
-# Graph Report - mdev-ci  (2026-10-27)
+# Graph Report - silly-noether  (2026-10-28)
 
 ## Corpus Check
-- 141 files · ~441,211 words
+- 153 files · ~457,089 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2679 nodes · 5555 edges · 122 communities (109 shown, 13 thin omitted)
-- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 346 edges (avg confidence: 0.9)
+- 2890 nodes · 6072 edges · 134 communities (116 shown, 18 thin omitted)
+- Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 367 edges (avg confidence: 0.9)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `f43d4ab2`
+- Built from commit: `3a9dc594`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -18,47 +18,47 @@
 - InnerMonologueSystem
 - _make_mock_person
 - DynamicEventsSystem
-- Jenbina README
+- CLAUDE.md Project Instructions
 - generate_first_greeting
 - MetaCognitiveSystem
 - simulation.py
 - Person
-- EnvironmentSimulator
+- .get_dynamic_recommendations
 - SocialCognitionSystem
-- world_state.py
+- StatusRail
 - generate_proactive_message
-- shared_init.py
+- sidebar.py
 - InsightSystem
 - CuriositySystem
 - Person
 - TestPerson
 - LearningSystem
 - Deep Emotional Mirror Implementation Plan
-- BasicNeeds
+- requirements.txt Dependency Manifest
 - make_experience
 - SelfNarrativeSystem
 - generate_return_greeting
-- HybridMemorySystem
+- MemoryEvent
 - Test Suite README
 - .create_plan
 - TestEnvironmentSimulator
 - StreamCapture
-- requirements.txt Dependency Manifest
+- timeline.py
 - get_llm
-- PaloAltoLocationSystem
+- core/__init__.py
 - chat_handler.py
 - GoalSystem
 - PlanningSystem
 - _FakeSessionState
 - TestEmotion
-- timedelta
+- TestMemoryIntegration
 - TestMaslowNeedsSystem
-- auth_page.py
-- Experience
+- CognitiveProcess
+- TestExperience
 - WorkingMemorySystem
-- sidebar.py
+- EventLog
 - UserDatabase
-- Any
+- MemoryIntegration
 - TestSocialInteractionTracker
 - TestEmotionSystem
 - make_goal
@@ -66,31 +66,31 @@
 - ChromaMemoryManager
 - TestCheckInjectionBlock
 - handle_chat_interaction
-- person/person.py
+- Need
 - Plan
 - TestLesson
 - EmotionSystem
-- .update_all_needs
-- create_basic_needs_chain
-- MemoryEvent
+- .get_needs_summary
+- simulation_runner.py
+- TestHybridMemorySystem
 - Lesson
 - TestUserCRUD
 - WorkingMemoryItem
-- _invoke_and_parse
-- TestChainEdgeCases
 - fix_llm_json
+- TestLearningSystemStats
+- get_json_llm
 - TestBasicNeedsBackwardCompatibility
 - test_sprites.py
 - _run_one_iteration
 - make_plan
-- TestLearningSystemStats
+- .analyze_cognitive_patterns
 - FirebaseAuth
 - Conversation
-- make_mock_llm
-- SimpleEmbeddings
+- Inner Life Surfacing via Prompt Engineering
+- Design
 - TestConversation
 - SocialInteractionTracker
-- MaslowNeedsSystem
+- TestResearchUser
 - test_simulation.py
 - File Structure
 - TestLearningSystemSerialization
@@ -98,61 +98,73 @@
 - Design
 - Conversation
 - test_working_memory.py
-- CLAUDE.md Project Instructions
-- TestLearningSystemDecay
-- test_pixel_ui.py
+- NullRail
+- .store_event
 - test_person.py
-- .store_memory
 - Emotion
-- sprite_html
+- test_pixel_ui.py
 - .record_social_action
 - streamlit_server
-- test_goal_system.py
 - SocialInteraction
-- Any
+- HybridMemorySystem
 - .from_dict
-- make_experience
-- .test_maslow_decision_chain
+- Review Focus
+- timedelta
 - .get_current_step
-- TestGoalSystemFormatting
-- .__init__
+- check
 - make_needs
 - .get_planning_stats
-- .test_embeddings_client_is_created_lazily
+- test_user_db.py
+- TestEvents
 - .from_dict
-- .from_dict
-- chat.py
+- compose
+- render_frame
+- TestChainRealWorldScenarios
+- TestMessages
+- build.py
+- shared_init.py
 - Jenbina Blob Character
 - clear_chromadb.py
+- _build_subsystem_context
 - .test_full_plan_lifecycle
+- render_sheet
 - TestFocusNoise
+- TestPersonState
+- _is_admin
 - TestContextSwitch
+- .add_conversation
 - ._get_capacity
 - .from_dict
-- MaslowNeed
+- art.py
+- MaslowNeedsSystem
+- sprite_path
 - TestFormatting
+- TestIsolation
+- TestUserDatabase
+- TestUiExports
+- .init_planning_system
 
 ## God Nodes (most connected - your core abstractions)
 1. `GoalSystem` - 82 edges
-2. `Person` - 80 edges
+2. `Person` - 82 edges
 3. `WorkingMemorySystem` - 72 edges
 4. `PlanningSystem` - 66 edges
 5. `InnerMonologueSystem` - 64 edges
 6. `MaslowNeedsSystem` - 53 edges
-7. `CLAUDE.md Project Instructions` - 47 edges
-8. `run_single_iteration()` - 45 edges
-9. `generate_return_greeting()` - 44 edges
-10. `Person` - 44 edges
+7. `run_single_iteration()` - 49 edges
+8. `UserDatabase` - 48 edges
+9. `CLAUDE.md Project Instructions` - 47 edges
+10. `Person` - 45 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Goal System Design` --semantically_similar_to--> `create_maslow_goal_setter()`  [INFERRED] [semantically similar]
   docs/plans/2026-02-07-goal-system-design.md → core/needs/maslow_decision_chain.py
-- `app.py Simulation Data Flow (6-step button-click pipeline + chat flow)` --semantically_similar_to--> `run_single_iteration_headless()`  [INFERRED] [semantically similar]
-  CURRENT_ARCHITECTURE_DIAGRAMS.md → core/simulation_runner.py
 - `app.py Simulation Data Flow (6-step button-click pipeline + chat flow)` --semantically_similar_to--> `run_single_iteration()`  [INFERRED] [semantically similar]
   CURRENT_ARCHITECTURE_DIAGRAMS.md → core/ui/simulation.py
 - `query_llm_knowledge() (planned function)` --semantically_similar_to--> `search_web()`  [INFERRED] [semantically similar]
   docs/plans/2026-02-18-llm-knowledge-enriched-dossier.md → core/research/user_research.py
+- `app.py Simulation Data Flow (6-step button-click pipeline + chat flow)` --semantically_similar_to--> `run_single_iteration_headless()`  [INFERRED] [semantically similar]
+  CURRENT_ARCHITECTURE_DIAGRAMS.md → core/simulation_runner.py
 - `APScheduler (background scheduling)` --conceptually_related_to--> `run_simulation_loop()`  [AMBIGUOUS]
   requirements.txt → core/ui/simulation.py
 
@@ -165,59 +177,55 @@
 - **Motivation-to-action stack injected into the action decision prompt (working memory, plan step, goals, lessons)** — core_working_memory_working_memory_system_workingmemorysystem, core_planning_planning_system_planningsystem, core_goals_goal_system_goalsystem, core_learning_learning_system_learningsystem, core_needs_maslow_needs_maslowneedssystem, core_cognition_action_decision_chain_create_action_decision_chain [INFERRED 0.85]
 - **Simulation iteration LLM chain pipeline (needs -> world -> description -> action -> Asimov -> state)** — core_needs_maslow_needs_create_basic_needs_chain, core_environment_world_state_create_comprehensive_world_state, core_environment_world_state_create_world_description_system, core_cognition_enhanced_action_decision_chain_create_meta_cognitive_action_chain, core_cognition_action_decision_chain_create_action_decision_chain, core_cognition_asimov_check_chain_create_asimov_check_system, core_cognition_state_analysis_chain_create_state_analysis_system, core_ui_simulation_run_single_iteration [INFERRED 0.85]
 
-## Communities (122 total, 13 thin omitted)
+## Communities (134 total, 18 thin omitted)
 
 ### Community 0 - "InnerMonologueSystem"
 Cohesion: 0.05
-Nodes (38): InnerMonologueSystem, InnerThought, Any, Enum, Internal monologue / stream-of-consciousness system for Jenbina. Generates the…, Generates Jenbina's internal stream of consciousness between decisions., Determine which thought mode to activate based on current state. Priority…, Use the LLM to generate an inner-monologue thought in the given mode. (+30 more)
+Nodes (39): InnerMonologueSystem, InnerThought, Any, Enum, Internal monologue / stream-of-consciousness system for Jenbina. Generates the…, Generates Jenbina's internal stream of consciousness between decisions., Determine which thought mode to activate based on current state. Priority…, Use the LLM to generate an inner-monologue thought in the given mode. (+31 more)
 
 ### Community 1 - "_make_mock_person"
 Cohesion: 0.09
-Nodes (24): _make_mock_llm(), _make_mock_llm_failing(), _make_mock_person(), Tests for GPT-generated greeting functions., LLM response is returned when generation succeeds., The prompt sent to the LLM includes the user's display name., The prompt includes the person's emotional state., Goals are included in the prompt when the goal system exists. (+16 more)
+Nodes (23): _make_mock_llm(), _make_mock_llm_failing(), _make_mock_person(), LLM response is returned when generation succeeds., The prompt sent to the LLM includes the user's display name., The prompt includes the person's emotional state., Goals are included in the prompt when the goal system exists., Self-narrative is included when available. (+15 more)
 
 ### Community 2 - "DynamicEventsSystem"
-Cohesion: 0.12
-Nodes (14): DynamicEventsSystem, Get events from multiple sources, Get venues from multiple sources, Fetch events from Eventbrite API, Fetch events from Ticketmaster API, Fetch events from Yelp API, Fetch venues from Yelp API, Flexible system to fetch real-time events and venue information (+6 more)
+Cohesion: 0.13
+Nodes (15): DynamicEventsSystem, Event, Get events from multiple sources, Get venues from multiple sources, Fetch events from Eventbrite API, Fetch events from Ticketmaster API, Fetch events from Yelp API, Fetch venues from Yelp API (+7 more)
 
-### Community 3 - "Jenbina README"
-Cohesion: 0.18
-Nodes (24): Layered Architecture (UI -> Interaction -> Cognition -> Core -> DB -> LLM), Current Architecture Diagrams, Database Schemas (Chroma collection, Neo4j graph, SQLite tables), Installation Guide, Environment API Keys (Eventbrite, Ticketmaster, Yelp, Google Places), LangSmith Tracing (optional env vars), Neo4j Docker Setup (optional, neo4j:5.17.0 with APOC), Ollama Local LLM Setup (llama3.2:3b-instruct-fp16) (+16 more)
+### Community 3 - "CLAUDE.md Project Instructions"
+Cohesion: 0.15
+Nodes (28): CLAUDE.md Project Instructions, Code Conventions (PascalCase classes, snake_case funcs, dataclasses, LangChain chains, factory functions, type hints), Layered Architecture (UI -> Interaction -> Cognition -> Core -> DB -> LLM), Current Architecture Diagrams, Database Schemas (Chroma collection, Neo4j graph, SQLite tables), Installation Guide, Environment API Keys (Eventbrite, Ticketmaster, Yelp, Google Places), LangSmith Tracing (optional env vars) (+20 more)
 
 ### Community 4 - "generate_first_greeting"
 Cohesion: 0.11
-Nodes (14): generate_first_greeting(), Generate a personalized first greeting for a new user., JENBINA_SYSTEM_PROMPT, TestGenerateFirstGreeting, Tests for generate_first_greeting., LLM response is returned for a new user with no dossier., Prompt for user without dossier mentions meeting for the first time., LLM response is returned for a new user with existing dossier. (+6 more)
+Nodes (13): generate_first_greeting(), Generate a personalized first greeting for a new user., TestGenerateFirstGreeting, Tests for generate_first_greeting., LLM response is returned for a new user with no dossier., Prompt for user without dossier mentions meeting for the first time., LLM response is returned for a new user with existing dossier., Prompt for user with dossier includes their data. (+5 more)
 
 ### Community 5 - "MetaCognitiveSystem"
-Cohesion: 0.07
-Nodes (24): CognitiveProcess, MetaCognitiveInsight, MetaCognitiveSystem, Any, BaseLLM, Represents a single cognitive process/decision, Analyze patterns across multiple cognitive processes, Suggest thinking strategies based on meta-cognitive insights (+16 more)
+Cohesion: 0.17
+Nodes (5): MetaCognitiveSystem, BaseLLM, _make_mock_llm(), Tests for MetaCognitiveSystem., TestMetaCognitiveSystem
 
 ### Community 6 - "simulation.py"
-Cohesion: 0.07
-Nodes (61): main(), Jenbina - AGI Simulation Streamlit App Main entry point — Simulation page., UI components for Jenbina Streamlit app, _css_token(), _detect_location_from_action(), display_curiosity_stats(), display_goal_stats(), display_identity_stats() (+53 more)
+Cohesion: 0.08
+Nodes (44): Streamlit session_state Persistence, icon_html(), An inline 16x16 pixel icon, or an empty span when the icon does not exist. Only…, _about_you_lines(), env_line_html(), _goal_lines(), _lesson_lines(), _plan_lines() (+36 more)
 
 ### Community 7 - "Person"
-Cohesion: 0.06
-Nodes (19): Person, Any, Update all needs, decay emotions, and decay lessons, Get current needs as a flat dict (for learning system), Get current emotions as a flat dict (for learning system), Start a new conversation with an outsider, Receive a message from an outsider, Send a message to an outsider (+11 more)
-
-### Community 8 - "EnvironmentSimulator"
-Cohesion: 0.11
-Nodes (14): EnvironmentSimulator, any, Fetch real weather data from OpenWeatherMap, Simulate realistic weather based on time and season, Update time-related data, Get complete environment state, Calculate how environment affects mood, Get local events based on Palo Alto location system (+6 more)
+Cohesion: 0.05
+Nodes (21): Person Management Submodule This submodule handles the AI's person…, Person, Any, Update all needs, decay emotions, and decay lessons, Get current needs as a flat dict (for learning system), Get current emotions as a flat dict (for learning system), Start a new conversation with an outsider, Receive a message from an outsider (+13 more)
 
 ### Community 9 - "SocialCognitionSystem"
 Cohesion: 0.09
-Nodes (14): Initialize social cognition / theory-of-mind system., Social cognition submodule (Theory of Mind)., PersonModel, Any, Social cognition / Theory-of-Mind system for Jenbina. Tracks beliefs about…, Update person model from an incoming message., Estimate relationship drift after Jenbina's response strategy., Choose when to be nice, polite, or assertive. (+6 more)
+Nodes (15): Initialize social cognition / theory-of-mind system., Social cognition submodule (Theory of Mind)., PersonModel, Any, Social cognition / Theory-of-Mind system for Jenbina. Tracks beliefs about…, Update person model from an incoming message., Estimate relationship drift after Jenbina's response strategy., Choose when to be nice, polite, or assertive. (+7 more)
 
-### Community 10 - "world_state.py"
-Cohesion: 0.10
-Nodes (25): Event, EnvironmentState, Environment and World Simulation Submodule This submodule handles all aspects…, Location, Neighborhood, create_comprehensive_world_state(), _format_current_events(), _format_location_details() (+17 more)
+### Community 10 - "StatusRail"
+Cohesion: 0.12
+Nodes (10): Handles on the Now card's placeholders, plus the timeline's live slot., Show the system stage in the pill and remember it for reruns., Append a row to the timeline's live slot (a thought or action in progress)., StatusRail, FakePerson, rendered(), TestChipsMoodRibbon, TestNeedsBars (+2 more)
 
 ### Community 11 - "generate_proactive_message"
 Cohesion: 0.27
 Nodes (3): generate_proactive_message(), Generate a 1-3 sentence natural message Jenbina sends on her own. Args: person:…, TestGenerateProactiveMessage
 
-### Community 12 - "shared_init.py"
-Cohesion: 0.07
-Nodes (35): Streamlit session_state Persistence, Jenbina — Environment & Debug page., Jenbina — Console Log page., Jenbina — Debug Info page., _is_admin(), _is_local_request(), Jenbina — Admin Panel. Access restricted to: - Local requests (localhost /…, Check if the request originates from localhost. (+27 more)
+### Community 12 - "sidebar.py"
+Cohesion: 0.20
+Nodes (13): Sidebar UI components for Jenbina app, Render environment info as a full-width section (formerly sidebar), Render location exploration section in sidebar, Render dynamic events and venues section, Render the environment information in the sidebar, Render location recommendations section, Render debug controls in sidebar, render_debug_controls() (+5 more)
 
 ### Community 13 - "InsightSystem"
 Cohesion: 0.11
@@ -228,24 +236,24 @@ Cohesion: 0.10
 Nodes (9): CuriositySystem, NoveltyEvent, Any, Curiosity and exploration system for Jenbina. Implements: - Information-seeking…, Tracks curiosity, boredom, novelty, and exploration opportunities., Update curiosity state from current world and repetition patterns., Initialize curiosity / exploration system., TestCuriositySystem (+1 more)
 
 ### Community 15 - "Person"
-Cohesion: 0.09
-Nodes (11): Any, Person, Get overall communication statistics, Get a summary of the person's current state, Update all needs for this person, Start a new conversation with an outsider, Receive a message from an outsider, Send a message to an outsider (+3 more)
+Cohesion: 0.11
+Nodes (8): Any, Person, Get overall communication statistics, Get a summary of the person's current state, Update all needs for this person, Get a summary of conversation with a specific outsider, Tests for the legacy Person class in core/person.py., TestLegacyPerson
 
 ### Community 16 - "TestPerson"
 Cohesion: 0.05
 Nodes (19): Test Person functionality, Test person initialization, Test person with default name, Test updating all needs, Test adding a new conversation, Test adding conversation with existing person, Test receiving a message from outsider, Test sending a message to outsider (+11 more)
 
 ### Community 17 - "LearningSystem"
-Cohesion: 0.09
-Nodes (19): Learning system for Jenbina - extracts lessons from experiences, LearningSystem, Any, Learning system for Jenbina — records experiences, extracts lessons, and…, Records experiences, extracts lessons via LLM, and formats them for prompts., Decay all lessons and prune dead ones., make_mock_llm(), Test LLM-based lesson extraction (+11 more)
+Cohesion: 0.07
+Nodes (25): Learning system for Jenbina - extracts lessons from experiences, Experience, LearningSystem, Any, Learning system for Jenbina — records experiences, extracts lessons, and…, Records experiences, extracts lessons via LLM, and formats them for prompts., Before/after snapshot around an action., Use LLM to analyse recent experiences and add new lessons (max 3). (+17 more)
 
 ### Community 18 - "Deep Emotional Mirror Implementation Plan"
-Cohesion: 0.10
-Nodes (31): Plan Document Format (Goal/Architecture/Tech Stack/Tasks with files, steps, tests, commit), Superpowers executing-plans Workflow, build_search_query(), generate_user_dossier(), parse_research_results(), Any, Background user research for the Deep Emotional Mirror feature. Searches the…, Full pipeline: search web -> parse -> generate dossier. Returns a dossier dict,… (+23 more)
+Cohesion: 0.14
+Nodes (23): Plan Document Format (Goal/Architecture/Tech Stack/Tasks with files, steps, tests, commit), Superpowers executing-plans Workflow, build_search_query(), generate_user_dossier(), parse_research_results(), Any, Background user research for the Deep Emotional Mirror feature. Searches the…, Full pipeline: search web -> parse -> generate dossier. Returns a dossier dict,… (+15 more)
 
-### Community 19 - "BasicNeeds"
-Cohesion: 0.06
-Nodes (20): BasicNeeds, Any, Get the most urgent needs to address, Get insights about personal growth and development, Get human-readable name for growth stage, Get a comprehensive summary of all needs, String representation of the needs system, Convert to dictionary for serialization (+12 more)
+### Community 19 - "requirements.txt Dependency Manifest"
+Cohesion: 0.17
+Nodes (21): .coveragerc coverage config, .env.example template, GitHub Actions Workflows README, Playwright E2E Tests Workflow, JENBINA_SKIP_AUTH E2E Auth Bypass Flag, Feedback Loop E2E Test Workflow, Run Unit Tests Workflow (PR gate), Codecov Coverage Upload (+13 more)
 
 ### Community 20 - "make_experience"
 Cohesion: 0.07
@@ -259,9 +267,9 @@ Nodes (9): Identity / self-narrative submodule., NarrativeEvent, Any, Self-narra
 Cohesion: 0.25
 Nodes (5): generate_return_greeting(), Generate a dynamic return greeting based on Jenbina's state and relationship., _make_mock_person(), Create a minimal mock Person with all subsystems stubbed., TestGenerateReturnGreeting
 
-### Community 23 - "HybridMemorySystem"
-Cohesion: 0.11
-Nodes (24): ConversationMemory, Represents a conversation memory entry, HybridMemorySystem, LocationNode, PersonNode, OpenAI embeddings client, built lazily so an API key is only needed once…, Represents a person in the graph database, Represents a location in the graph database (+16 more)
+### Community 23 - "MemoryEvent"
+Cohesion: 0.10
+Nodes (21): ConversationMemory, Represents a conversation memory entry, LocationNode, MemoryEvent, PersonNode, Represents a memory event with all its components, Represents a person in the graph database, Represents a location in the graph database (+13 more)
 
 ### Community 24 - "Test Suite README"
 Cohesion: 0.25
@@ -272,36 +280,36 @@ Cohesion: 0.20
 Nodes (5): Use LLM to decompose a goal into steps., Extract steps array from various LLM response formats., Check if any active plan needs replanning. Returns replanned Plan or None., Generate a new plan from current state., Get active plan for a given goal id.
 
 ### Community 26 - "TestEnvironmentSimulator"
-Cohesion: 0.12
-Nodes (9): TimeData, WeatherData, Tests for core/environment/environment_simulator.py., Tests for the WeatherData dataclass., Tests for the TimeData dataclass., Tests for EnvironmentSimulator., TestEnvironmentSimulator, TestTimeData (+1 more)
+Cohesion: 0.11
+Nodes (10): Calculate how environment affects mood, TimeData, WeatherData, Tests for core/environment/environment_simulator.py., Tests for the WeatherData dataclass., Tests for the TimeData dataclass., Tests for EnvironmentSimulator., TestEnvironmentSimulator (+2 more)
 
 ### Community 27 - "StreamCapture"
 Cohesion: 0.11
 Nodes (10): install_capture(), Capture stdout/stderr to session state while preserving console output., Tee-style stream wrapper that captures output and forwards to original stream., Sync the global log buffer into session state. Call on every page load., StreamCapture, Tests for core/log_capture.py — StreamCapture and global log buffer., Tests for the StreamCapture tee-style stream wrapper., Tests for install_capture() function. (+2 more)
 
-### Community 28 - "requirements.txt Dependency Manifest"
-Cohesion: 0.20
-Nodes (16): .env.example template, Playwright E2E Tests Workflow, JENBINA_SKIP_AUTH E2E Auth Bypass Flag, Feedback Loop E2E Test Workflow, Environment Variables (.env / .env.example), Firebase Auth + Google OAuth, Neocortex (LLM reasoning layer), OpenAI GPT-5.2 / GPT-5-nano (+8 more)
+### Community 28 - "timeline.py"
+Cohesion: 0.09
+Nodes (24): lessons_text(), Lessons as one line: lists joined with '; ', strings as they are., marker_html(), A centered time/place divider between timeline rows., action_details_text(), build_timeline(), _event_row_html(), first_sentence() (+16 more)
 
 ### Community 29 - "get_llm"
-Cohesion: 0.08
-Nodes (31): get_json_llm(), get_llm(), get_recommended_llm(), Get LLM instance based on provider preference. Args: provider: Which LLM…, Get LLM configured for reliable JSON output. Args: provider: Which LLM service…, Get LLM with recommended configuration for specific use case. Args: use_case:…, _check_proactive_triggers(), _detect_location_from_action() (+23 more)
+Cohesion: 0.17
+Nodes (10): get_llm(), get_recommended_llm(), Get LLM instance based on provider preference. Args: provider: Which LLM…, Get LLM with recommended configuration for specific use case. Args: use_case:…, patch, Tests for core/connect.py — LLM provider connections., Tests for get_llm factory function., Tests for get_recommended_llm. (+2 more)
 
-### Community 30 - "PaloAltoLocationSystem"
-Cohesion: 0.08
-Nodes (16): PaloAltoLocationSystem, any, datetime, Initialize neighborhoods in Palo Alto and surrounding areas, Get a specific location by name, Get a specific neighborhood by name, Get all locations of a specific type, Get locations within a certain radius of current location (+8 more)
+### Community 30 - "core/__init__.py"
+Cohesion: 0.04
+Nodes (52): EnvironmentSimulator, EnvironmentState, Fetch real weather data from OpenWeatherMap, Simulate realistic weather based on time and season, Update time-related data, Get complete environment state, Get local events based on Palo Alto location system, Get a natural language description of the current environment (+44 more)
 
 ### Community 31 - "chat_handler.py"
-Cohesion: 0.12
-Nodes (11): basic_needs_to_json(), _build_subsystem_context(), create_metadata_from_person_state(), Convert BasicNeeds object to JSON-serializable format, Create metadata dictionary from person state and other context, Extract formatted context from all person subsystems. Returns a list of (label,…, Interaction and Communication Submodule This submodule handles all aspects of…, Tests for core/interaction/chat_handler.py — chat orchestration. (+3 more)
+Cohesion: 0.09
+Nodes (19): Safety Constraints (Asimov check chain + guardrails), basic_needs_to_json(), _chat_avatar(), create_metadata_from_person_state(), Convert BasicNeeds object to JSON-serializable format, Pixel avatar path for a chat row. Imported lazily: ``core.ui`` imports this…, Create metadata dictionary from person state and other context, JENBINA_SYSTEM_PROMPT (+11 more)
 
 ### Community 32 - "GoalSystem"
-Cohesion: 0.11
-Nodes (7): GoalSystem, Any, Generates, tracks, and manages goals across time horizons., Set experience list for milestone checking., Decay confidence and abandon dead goals., TestGoalSystem, TestGoalSystemGeneration
+Cohesion: 0.07
+Nodes (19): GoalSystem, Any, Generates, tracks, and manages goals across time horizons., Set experience list for milestone checking., Decay confidence and abandon dead goals., Initialize the goal system with an LLM instance. Called separately because LLM…, make_experience(), make_mock_llm() (+11 more)
 
 ### Community 33 - "PlanningSystem"
-Cohesion: 0.17
-Nodes (9): PlanningSystem, Decomposes goals into plans and tracks execution across cycles., Planning System Design, Multi-step Chain-of-Thought Planning, Plan Step Completion Detection & Replan Trigger, make_mock_llm(), TestPlanningSystem, TestPlanningSystemCreation (+1 more)
+Cohesion: 0.16
+Nodes (7): PlanningSystem, Decomposes goals into plans and tracks execution across cycles., make_mock_llm(), TestPlanningSystem, TestPlanningSystemCreation, TestPlanningSystemReplan, TestPlanningSystemStats
 
 ### Community 34 - "_FakeSessionState"
 Cohesion: 0.12
@@ -311,69 +319,65 @@ Nodes (15): dict, _FakeSessionState, patch, Dict subclass that also supports att
 Cohesion: 0.07
 Nodes (14): Test individual Emotion functionality, Intensity above baseline should decay downward, Intensity below baseline should rise toward it, Decay should not go below baseline when coming from above, Recovery should not go above baseline when coming from below, No time passed should leave intensity unchanged, Negative hours should leave intensity unchanged, At baseline, decay should have no effect (+6 more)
 
-### Community 36 - "timedelta"
-Cohesion: 0.06
-Nodes (20): Update need satisfaction over time, Test need satisfaction decay over time, Test storing action memory, Test storing action memory with people and location, Test storing need change memory, Test storing need change memory with current needs state, Test MemoryIntegration functionality, Test getting relevant context for a query (+12 more)
+### Community 36 - "TestMemoryIntegration"
+Cohesion: 0.07
+Nodes (14): Test storing action memory, Test storing need change memory, Test MemoryIntegration functionality, Test getting relevant context for a query, Test getting context for a specific person, Test getting recent memories, Test getting recent memories with event type filter, Test getting needs trends (+6 more)
 
 ### Community 37 - "TestMaslowNeedsSystem"
 Cohesion: 0.07
 Nodes (15): Test the complete Maslow needs system, Test system initialization with all needs, Test updating all needs over time, Test satisfying a specific need, Test getting average satisfaction for a level, Test overall satisfaction calculation, Test getting critical needs, Test getting low needs (+7 more)
 
-### Community 38 - "auth_page.py"
-Cohesion: 0.27
-Nodes (9): _get_credentials_path(), _get_redirect_uri(), _get_user_db(), Login / signup UI for Jenbina (Streamlit) — Google SSO only., Return path to Google credentials file. Locally, reads…, Return the OAuth redirect URI. Uses the ``REDIRECT_URI`` env var if set…, Return a shared UserDatabase instance via session state., Show Google sign-in. Returns True once authenticated. (+1 more)
+### Community 38 - "CognitiveProcess"
+Cohesion: 0.16
+Nodes (11): CognitiveProcess, MetaCognitiveInsight, Represents a single cognitive process/decision, Represents insights about cognitive processes, Monitor and record a cognitive process, Reflect on the quality of a cognitive process, Tests for core/cognition/meta_cognition.py — MetaCognitiveSystem., Tests for the CognitiveProcess dataclass. (+3 more)
 
-### Community 39 - "Experience"
-Cohesion: 0.11
-Nodes (12): Experience, Before/after snapshot around an action., Use LLM to analyse recent experiences and add new lessons (max 3)., Check each active lesson against a new experience., Test that from_dict(to_dict()) preserves data, Test that timestamp is auto-set, Test that world_context defaults to empty dict, Test Experience dataclass (+4 more)
+### Community 39 - "TestExperience"
+Cohesion: 0.14
+Nodes (7): Test that from_dict(to_dict()) preserves data, Test that timestamp is auto-set, Test that world_context defaults to empty dict, Test Experience dataclass, Test experience stores all fields, Test serialization to dict, TestExperience
 
 ### Community 40 - "WorkingMemorySystem"
 Cohesion: 0.14
 Nodes (7): Maintains a salience-ranked buffer of what Jenbina is currently thinking about., WorkingMemorySystem, Working Memory Design, Focus Tied to Sleep Need, Salience-Based Working Memory Buffer (3-7 items), TestBufferCapacity, TestSalienceScoring
 
-### Community 41 - "sidebar.py"
-Cohesion: 0.20
-Nodes (13): Sidebar UI components for Jenbina app, Render environment info as a full-width section (formerly sidebar), Render location exploration section in sidebar, Render dynamic events and venues section, Render the environment information in the sidebar, Render location recommendations section, Render debug controls in sidebar, render_debug_controls() (+5 more)
+### Community 41 - "EventLog"
+Cohesion: 0.07
+Nodes (39): EventLog, make_action(), make_goal(), make_mood(), make_move(), make_plan(), make_thought(), mood_changes() (+31 more)
 
 ### Community 42 - "UserDatabase"
-Cohesion: 0.04
-Nodes (25): Connection, SQLite user database for authentication and conversation persistence., SQLite-backed storage for users, conversations, and person state., Lookup a user by Firebase UID. Returns dict or None., Lookup a user by their integer primary key. Returns dict or None., Return all users as a list of dicts., Store a chat message. Returns the new row id., Retrieve the most recent messages for a user, oldest-first. (+17 more)
+Cohesion: 0.11
+Nodes (13): Connection, SQLite-backed storage for users, conversations, and person state., Lookup a user by Firebase UID. Returns dict or None., Lookup a user by their integer primary key. Returns dict or None., Return all users as a list of dicts., Store a chat message. Returns the new row id., Retrieve the most recent messages for a user, oldest-first., The most recent ``limit`` events for a user, oldest first. (+5 more)
 
-### Community 43 - "Any"
+### Community 43 - "MemoryIntegration"
 Cohesion: 0.12
-Nodes (10): Any, Person, Store a memory of need state changes Args: need_name: Name of the need that…, Get relevant context for decision making Args: query: Query to search for…, Get comprehensive context about a person Args: person_name: Name of the person…, Get recent memories within a time window Args: hours: Number of hours to look…, Get trends in needs satisfaction over time Args: need_name: Optional specific…, Get a summary of all memory statistics Returns: Dictionary containing memory… (+2 more)
+Nodes (15): example_usage(), MemoryIntegration, Any, Person, Integrates the hybrid memory system with Jenbina's existing components, Store a memory of need state changes Args: need_name: Name of the need that…, Get relevant context for decision making Args: query: Query to search for…, Get comprehensive context about a person Args: person_name: Name of the person… (+7 more)
 
 ### Community 45 - "TestEmotionSystem"
 Cohesion: 0.08
 Nodes (13): Test EmotionSystem functionality, Should initialize with 8 Plutchik emotions, Check Jenbina's character baselines, Initially, intensity should equal base_intensity, Should spike the named emotion, Triggering unknown emotion should be a no-op, Should apply multiple adjustments at once, Should return top-k emotions by intensity (+5 more)
-
-### Community 46 - "make_goal"
-Cohesion: 0.15
-Nodes (3): make_goal(), TestGoal, TestGoalSystemDecay
 
 ### Community 47 - "Goal"
 Cohesion: 0.10
 Nodes (11): Goal, Goal system for Jenbina — generates and tracks short/mid/long-term goals., Use LLM to propose new goals based on current state., Update goal progress based on a new experience. Returns goals that advanced., Ask LLM whether a goal has been achieved., A goal Jenbina is pursuing., Goal System Design, Goal Generation Prompt (needs, traits, emotions, lessons -> up to 3 goals) (+3 more)
 
 ### Community 48 - "ChromaMemoryManager"
-Cohesion: 0.08
-Nodes (23): clear_memory(), ChromaMemoryManager, parse_basic_needs_from_json(), Any, datetime, Generate a unique ID for the embedding, Store a conversation message in Chroma Args: person_name: Name of the person…, Parse BasicNeeds from JSON string stored in metadata (+15 more)
+Cohesion: 0.06
+Nodes (29): clear_memory(), ChromaMemoryManager, parse_basic_needs_from_json(), Any, datetime, Initialize or load the Chroma vector store, Generate a unique ID for the embedding, Store a conversation message in Chroma Args: person_name: Name of the person… (+21 more)
 
 ### Community 49 - "TestCheckInjectionBlock"
 Cohesion: 0.06
-Nodes (20): Safety Constraints (Asimov check chain + guardrails), build_system_message(), check_injection(), make_refusal_response(), Prompt-injection guardrails for Jenbina's chat interface. All detection is…, In-character vague deflection for blocked messages., Check user input for injection patterns. Returns: (should_block, should_warn), Return the system prompt, optionally with a warning addendum. (+12 more)
+Nodes (17): build_system_message(), check_injection(), make_refusal_response(), In-character vague deflection for blocked messages., Check user input for injection patterns. Returns: (should_block, should_warn), Return the system prompt, optionally with a warning addendum., Tests for core/interaction/guardrails.py — prompt injection detection., Normal messages should return (False, False). (+9 more)
 
 ### Community 50 - "handle_chat_interaction"
 Cohesion: 0.29
 Nodes (6): handle_chat_interaction(), Handle chat interactions with Jenbina using Chroma memory., _make_mock_llm(), _make_mock_st(), Create a mock Streamlit module., TestHandleChatInteraction
 
-### Community 51 - "person/person.py"
-Cohesion: 0.31
-Nodes (3): run_simulation(), Person Management Submodule This submodule handles the AI's person…, Critical Missing Flow Components (gap analysis)
+### Community 51 - "Need"
+Cohesion: 0.09
+Nodes (13): Need, Legacy Need class for backward compatibility, Decrease satisfaction over time, Increase satisfaction by given amount, Check if need is critically low (below 20), Check if need is low (below 50), Legacy needs property that maps to Maslow needs, Test the legacy Need class (+5 more)
 
 ### Community 52 - "Plan"
-Cohesion: 0.15
-Nodes (8): Plan, PlanStep, Planning system for Jenbina — decomposes goals into multi-step plans., A single step in a plan., An ordered sequence of steps to achieve a goal., make_step(), Tests for the planning system., TestPlanStep
+Cohesion: 0.13
+Nodes (11): Plan, PlanStep, Planning system for Jenbina — decomposes goals into multi-step plans., A single step in a plan., An ordered sequence of steps to achieve a goal., Planning System Design, Multi-step Chain-of-Thought Planning, Plan Step Completion Detection & Replan Trigger (+3 more)
 
 ### Community 53 - "TestLesson"
 Cohesion: 0.09
@@ -383,17 +387,21 @@ Nodes (11): Test Lesson dataclass, Test lesson stores all fields, Test that rein
 Cohesion: 0.12
 Nodes (10): EmotionSystem, Any, Serialize to dictionary., Complete emotion system with decay toward character baselines., Initialize Jenbina's default character emotions (Plutchik's wheel)., Decay all emotions toward their baselines based on elapsed time., Spike a specific emotion by amount (positive or negative)., Apply a dict of emotion adjustments, e.g. {"joy": 15, "fear": -10}. (+2 more)
 
-### Community 56 - "create_basic_needs_chain"
-Cohesion: 0.05
-Nodes (43): callable, create_action_decision_chain(), Return a callable that runs a 3-step chain-of-thought action decision. Steps:…, create_asimov_check_system(), BaseLLM, Creates and returns a function that checks if actions comply with Asimov's…, create_meta_cognitive_action_chain(), Enhanced action decision with meta-cognitive monitoring (+35 more)
+### Community 55 - ".get_needs_summary"
+Cohesion: 0.12
+Nodes (10): Any, Get the most urgent needs to address, Get insights about personal growth and development, Get human-readable name for growth stage, Get a comprehensive summary of all needs, String representation of the needs system, Convert to dictionary for serialization, Calculate overall satisfaction percentage across all needs (+2 more)
 
-### Community 57 - "MemoryEvent"
-Cohesion: 0.07
-Nodes (21): MemoryEvent, Represents a memory event with all its components, Clean up test fixtures, Test system initialization, Test storing a memory event, Test storing memory with auto-generated ID, Test semantic memory retrieval, Test temporal memory retrieval (+13 more)
+### Community 56 - "simulation_runner.py"
+Cohesion: 0.04
+Nodes (72): callable, create_action_decision_chain(), Return a callable that runs a 3-step chain-of-thought action decision. Steps:…, create_asimov_check_system(), BaseLLM, Creates and returns a function that checks if actions comply with Asimov's…, create_meta_cognitive_action_chain(), Enhanced action decision with meta-cognitive monitoring (+64 more)
+
+### Community 57 - "TestHybridMemorySystem"
+Cohesion: 0.09
+Nodes (12): Clean up test fixtures, Test system initialization, Test storing a memory event, Test storing memory with auto-generated ID, Test semantic memory retrieval, Test memory statistics, Test person relationships when Neo4j is not available, Test error handling in memory operations (+4 more)
 
 ### Community 58 - "Lesson"
-Cohesion: 0.12
-Nodes (9): Lesson, A learned pattern extracted from experiences., Test format_lessons_for_prompt, No lessons should return default message, Active lessons should appear in formatted text, Lessons should be sorted by confidence descending, Inactive lessons should not appear, Should show at most 10 lessons (+1 more)
+Cohesion: 0.08
+Nodes (15): Lesson, A learned pattern extracted from experiences., Test lesson decay and pruning, All lessons should lose confidence, Lessons at or below threshold are removed, Heavy decay should prune all low-confidence lessons, Zero hours decay should not change anything, Test format_lessons_for_prompt (+7 more)
 
 ### Community 59 - "TestUserCRUD"
 Cohesion: 0.20
@@ -403,37 +411,37 @@ Nodes (3): Test user create / read / update operations., COALESCE(?, col) keeps 
 Cohesion: 0.17
 Nodes (6): Any, Working memory system for Jenbina — short-term buffer of current thoughts., An item currently in working memory., Recalculate working memory from current state. Called once per cycle., WorkingMemoryItem, TestWorkingMemoryItem
 
-### Community 61 - "_invoke_and_parse"
-Cohesion: 0.13
-Nodes (13): _invoke_and_parse(), Any, BaseLLM, Invoke the LLM and parse the JSON response, repairing if needed., _make_mock_llm(), patch, Tests for core/cognition/action_decision_chain.py., Tests for the prompt template definitions. (+5 more)
+### Community 61 - "fix_llm_json"
+Cohesion: 0.07
+Nodes (23): _invoke_and_parse(), Any, BaseLLM, Invoke the LLM and parse the JSON response, repairing if needed., analyze_emotion_impact(), Analyze a situation and return emotion adjustments. Args: llm: Language model…, fix_llm_json(), Any (+15 more)
 
-### Community 62 - "TestChainEdgeCases"
+### Community 62 - "TestLearningSystemStats"
 Cohesion: 0.22
-Nodes (5): Test edge cases and boundary conditions for chains, Test chains with empty or minimal needs, Test chains with extreme need values, Test chains with very large world descriptions, TestChainEdgeCases
+Nodes (5): Test get_learning_stats, Empty system should return zero counts, Stats should reflect recorded data, recent_experiences should show at most 5, TestLearningSystemStats
 
-### Community 63 - "fix_llm_json"
+### Community 63 - "get_json_llm"
 Cohesion: 0.18
-Nodes (9): LLM JSON Parsing via fix_llm_json, fix_llm_json(), Any, BaseLLM, Attempts to fix and parse JSON from LLM output that may be malformed. Args:…, patch, Tests for core/fix_llm_json.py — JSON repair utility., Tests for fix_llm_json function. (+1 more)
+Nodes (11): LLM JSON Parsing via fix_llm_json, get_json_llm(), Get LLM configured for reliable JSON output. Args: provider: Which LLM service…, LLMProvider, load_person(), main(), Load Person from SQLite, initializing all subsystems. Mirrors…, Execute one simulation iteration and persist results. (+3 more)
 
 ### Community 64 - "TestBasicNeedsBackwardCompatibility"
 Cohesion: 0.13
 Nodes (8): Test backward compatibility with BasicNeeds, Test BasicNeeds initialization, Test the needs property mapping, Test updating basic needs, Test satisfying basic needs, Test critical and low need detection, Test adding and removing needs, TestBasicNeedsBackwardCompatibility
 
 ### Community 65 - "test_sprites.py"
-Cohesion: 0.05
-Nodes (40): _frame(), FrameSpec, Pixel art for Jenbina, as palette-key strings. Every layer is ``(x, y, rows)``…, check(), compose(), _file_matches(), frame_layers(), main() (+32 more)
+Cohesion: 0.13
+Nodes (9): One 8x8 icon; unknown name raises KeyError., render_icon(), all_layers(), Tests for the pixel sprite pipeline (core.ui.sprites)., TestArtLayers, TestIcons, TestPalette, TestPortraits (+1 more)
 
 ### Community 66 - "_run_one_iteration"
 Cohesion: 0.18
 Nodes (13): skip, fixture, Page, Over 5 iterations, Jenbina should not repeat the exact same action every single…, After running an iteration, need bars should be visible in the UI., Navigate to the Streamlit app and wait for it to be ready., Run a single simulation iteration and return observed data. Reloads the page…, Run multiple iterations and verify the simulation feedback loop produces… (+5 more)
 
 ### Community 67 - "make_plan"
-Cohesion: 0.22
-Nodes (3): make_plan(), TestPlan, TestPlanningSystemReplan
+Cohesion: 0.20
+Nodes (4): make_experience(), make_plan(), TestPlan, TestPlanningSystemEvaluation
 
-### Community 68 - "TestLearningSystemStats"
-Cohesion: 0.22
-Nodes (5): Test get_learning_stats, Empty system should return zero counts, Stats should reflect recorded data, recent_experiences should show at most 5, TestLearningSystemStats
+### Community 68 - ".analyze_cognitive_patterns"
+Cohesion: 0.29
+Nodes (4): Any, Analyze patterns across multiple cognitive processes, Suggest thinking strategies based on meta-cognitive insights, Get statistics about meta-cognitive performance
 
 ### Community 69 - "FirebaseAuth"
 Cohesion: 0.14
@@ -443,13 +451,13 @@ Nodes (8): FirebaseAuth, Firebase authentication wrapper using pyrebase4., Build
 Cohesion: 0.15
 Nodes (9): Conversation, Message, Represents a conversation with a specific outsider, Add a new message to the conversation, Get the most recent messages from the conversation, Get all messages of a specific type, Get conversation history with a specific outsider, Get all conversations (+1 more)
 
-### Community 71 - "make_mock_llm"
-Cohesion: 0.30
-Nodes (4): make_experience(), make_mock_llm(), TestGoalSystemMilestone, TestGoalSystemProgress
+### Community 71 - "Inner Life Surfacing via Prompt Engineering"
+Cohesion: 0.60
+Nodes (6): Deep Emotional Mirror Design Doc, Deep Emotional Mirror (Wow Effect), LLM-Generated Greetings (first-time & returning), Inner Life Surfacing via Prompt Engineering, Insight Generation (one deep observation), Model Split: GPT-5.2 user-facing, GPT-5-nano JSON internals
 
-### Community 72 - "SimpleEmbeddings"
-Cohesion: 0.20
-Nodes (6): Initialize or load the Chroma vector store, Simple hash-based embeddings for when OpenAI is not available, Generate a simple hash-based embedding, Embed multiple documents, Initialize Chroma-based memory manager Args: embeddings_provider: Which…, SimpleEmbeddings
+### Community 72 - "Design"
+Cohesion: 0.11
+Nodes (18): 10. Code changes, 1. Pages, 2. Shell, 3. Left column: the timeline, 4. The event log, 5. Right column: the status rail, 6. The runner, 7. Bug fixes in scope (+10 more)
 
 ### Community 73 - "TestConversation"
 Cohesion: 0.13
@@ -459,13 +467,9 @@ Nodes (8): Test that last_interaction updates when adding messages, Test Convers
 Cohesion: 0.20
 Nodes (8): Initialize social interaction tracker., Return interactions from today (or since *day_start_ts*)., Return unique person names encountered today., How many distinct people Jenbina interacted with today., Produce a first-person summary Jenbina can use to describe her social day.…, Short context block suitable for injection into LLM prompts., Tracks all of Jenbina's social interactions during the session. Only the…, SocialInteractionTracker
 
-### Community 75 - "MaslowNeedsSystem"
-Cohesion: 0.05
-Nodes (43): Jenbina AGI System - Core Module This is the main core module for the Jenbina…, Needs Management Submodule This submodule handles all aspects of the AI's needs…, analyze_maslow_progress(), create_maslow_action_executor(), create_maslow_decision_chain(), create_maslow_goal_setter(), Create an action executor that can satisfy needs based on actions taken Args:…, Create a goal-setting system based on current needs and growth stage Args:… (+35 more)
-
 ### Community 76 - "test_simulation.py"
-Cohesion: 0.18
-Nodes (10): fixture, Page, Playwright E2E test — run a single simulation iteration and verify each stage…, Navigate to the Streamlit app and wait for it to be ready., Run one iteration via the UI and check that each simulation stage renders non-…, Sanity check — the simulation page loads and shows controls., Click 'Run Single Iteration' and verify key Tamagotchi UI elements appear…, After running, the simulation summary section should appear. (+2 more)
+Cohesion: 0.20
+Nodes (9): fixture, Page, Playwright E2E test — run a single simulation iteration on the home screen and…, Navigate to the Streamlit app and wait for it to be ready., Run one iteration via the UI and check that each simulation stage renders non-…, Sanity check — the home screen loads with the timeline and the controls., Click 'Step once' and verify the rail and the timeline fill in., sim_page() (+1 more)
 
 ### Community 77 - "File Structure"
 Cohesion: 0.13
@@ -491,33 +495,21 @@ Nodes (15): Conversation, Message, Represents a single message in a conversation
 Cohesion: 0.17
 Nodes (6): Tests for the working memory system., Needs can be plain floats (no level info) — defaults to level 1., Simulate multiple cycles and verify working memory evolves., TestIntegration, TestSimpleNeeds, TestStats
 
-### Community 83 - "CLAUDE.md Project Instructions"
-Cohesion: 0.18
-Nodes (15): .coveragerc coverage config, GitHub Actions Workflows README, Run Unit Tests Workflow (PR gate), Codecov Coverage Upload, Pytest Coverage PR Comment (MishaKav action), Test Suite Workflow (push/manual), CLAUDE.md Project Instructions, Code Conventions (PascalCase classes, snake_case funcs, dataclasses, LangChain chains, factory functions, type hints) (+7 more)
-
-### Community 84 - "TestLearningSystemDecay"
-Cohesion: 0.18
-Nodes (6): Test lesson decay and pruning, All lessons should lose confidence, Lessons at or below threshold are removed, Heavy decay should prune all low-confidence lessons, Zero hours decay should not change anything, TestLearningSystemDecay
-
-### Community 85 - "test_pixel_ui.py"
-Cohesion: 0.09
-Nodes (19): display_jenbina_image(), _portrait_path(), Render Maslow needs as ten-segment pixel bars with 8x8 icons., The portrait file for ``state``, the ``base`` portrait if that is missing, else…, Show the painterly portrait for the state named by ``image_path`` in a game…, render_needs_bars(), FakeEmotions, FakeNeeds (+11 more)
+### Community 83 - "NullRail"
+Cohesion: 0.16
+Nodes (10): NullRail, A rail that draws nothing: headless runs and tests., build_env(), _plan_fixture(), Two plans: one finished earlier, one whose last step completes this iteration;…, A real Person with mock-LLM subsystems, a mock meta-cognitive system, and a…, _session(), TestHeadlessRunnerEvents (+2 more)
 
 ### Community 86 - "test_person.py"
 Cohesion: 0.17
 Nodes (6): Test Message functionality, Conversations must survive serialize/deserialize (regression: used to be…, Test message initialization, Test message with default values, TestMessage, TestPersonSerializeConversations
 
-### Community 87 - ".store_memory"
-Cohesion: 0.20
-Nodes (5): Store a memory event across all three databases Args: event: MemoryEvent object…, Generate a unique event ID, Store event in ChromaDB for semantic search, Store event relationships in Neo4j, Store event in SQLite for chronological tracking
-
 ### Community 88 - "Emotion"
 Cohesion: 0.25
 Nodes (4): Emotion, Decay intensity toward base_intensity over time., Spike (or reduce) this emotion's intensity., Represents a single emotion with intensity that decays toward a baseline.
 
-### Community 89 - "sprite_html"
-Cohesion: 0.23
-Nodes (6): The animated sprite for ``state`` with an optional caption. ``scale`` 4 is the…, sprite_html(), Pixel sprite assets for the Jenbina UI. Only paths and constants live here;…, Path of the 96x48 sheet for ``state``; unknown states get the ``base`` sheet., sprite_path(), TestSpriteHtml
+### Community 89 - "test_pixel_ui.py"
+Cohesion: 0.05
+Nodes (30): action_icon(), _data_uri(), delta_badge_html(), dialog_html(), event_html(), The icon name for an action's row, by keyword; the star when none fits., One timeline row for a life event. ``details`` is ``(summary, body)`` rendered…, The satisfaction badge ``83% → 85% (+1.7%)`` with data attributes for tests. (+22 more)
 
 ### Community 90 - ".record_social_action"
 Cohesion: 0.25
@@ -527,37 +519,61 @@ Nodes (4): Record a chat-based interaction. Only the tone is stored — no messa
 Cohesion: 0.28
 Nodes (8): _free_port(), fixture, Shared fixtures for Playwright E2E tests., Return an available TCP port on localhost., Block until Streamlit is accepting connections., Launch Streamlit for the test session and tear it down afterwards. Yields the…, streamlit_server(), _wait_for_server()
 
-### Community 92 - "test_goal_system.py"
-Cohesion: 0.22
-Nodes (4): Tests for the goal system., Test: generate → advance → decay → abandon., TestGoalSystemIntegration, TestGoalSystemStats
-
 ### Community 93 - "SocialInteraction"
 Cohesion: 0.29
 Nodes (4): Any, A single recorded social interaction. Only stores *who* Jenbina talked to,…, SocialInteraction, TestSocialInteraction
 
-### Community 94 - "Any"
-Cohesion: 0.18
-Nodes (7): Any, datetime, Retrieve memories based on semantic similarity, Get all relationships and interactions for a person, Get memories within a time range, Get needs satisfaction history over time, Get statistics about the memory system
+### Community 94 - "HybridMemorySystem"
+Cohesion: 0.08
+Nodes (19): HybridMemorySystem, Any, datetime, OpenAI embeddings client, built lazily so an API key is only needed once…, Initialize ChromaDB for semantic memory storage, Initialize Neo4j for relationship tracking, Initialize SQLite for chronological/time-series data, Store a memory event across all three databases Args: event: MemoryEvent object… (+11 more)
+
+### Community 96 - "Review Focus"
+Cohesion: 0.12
+Nodes (15): Global Constraints, Review Focus, Task 10: The headless runner records the same events, Task 11: The home screen, and removal of the Chat page and dead renderers, Task 12: E2E tests, docs and the knowledge graph, Task 1: Events table in UserDatabase, Task 2: Event vocabulary, title builders and EventLog, Task 3: Recording helpers shared by both runners (+7 more)
+
+### Community 97 - "timedelta"
+Cohesion: 0.12
+Nodes (9): Update need satisfaction over time, Test temporal memory retrieval, Test temporal memory retrieval with event type filter, Test needs history retrieval, Test getting history for all needs, Test storing action memory with people and location, Test storing need change memory with current needs state, Test storing conversation memory with needs state (+1 more)
 
 ### Community 98 - ".get_current_step"
 Cohesion: 0.25
 Nodes (3): Return (plan, step) for the highest-priority active plan., Evaluate current step after a cycle. Returns status string or None., Mark current step completed and move to next.
 
-### Community 100 - ".__init__"
+### Community 99 - "check"
 Cohesion: 0.29
-Nodes (3): Initialize ChromaDB for semantic memory storage, Initialize Neo4j for relationship tracking, Initialize SQLite for chronological/time-series data
+Nodes (9): check(), main(), Every output image, keyed by path relative to ``assets/sprites``., Write every sheet, the avatar and the icons under ``out_dir``. When ``favicon``…, Relative paths under ``out_dir`` (plus the favicon) that are missing, differ…, render_all(), write_all(), Path (+1 more)
 
 ### Community 101 - "make_needs"
 Cohesion: 0.39
 Nodes (3): make_needs(), Create needs dict with level info., TestFocusCalculation
 
+### Community 103 - "test_user_db.py"
+Cohesion: 0.18
+Nodes (4): get_all_users_with_message_counts splits by message_type, not sender., Same-second writes must be deterministic by id tiebreaker., TestAdminMessageCounts, TestMessageOrdering
+
 ### Community 107 - ".from_dict"
 Cohesion: 0.33
 Nodes (3): Deserialize from dictionary., to_dict -> from_dict should preserve state, from_dict with empty data should produce system with no emotions
 
-### Community 114 - "chat.py"
-Cohesion: 0.08
-Nodes (41): analyze_emotion_impact(), Analyze a situation and return emotion adjustments. Args: llm: Language model…, _chat_avatar(), Pixel avatar path for a chat row. Imported lazily: ``core.ui`` imports this…, check_proactive_message(), check_return_greeting(), display_communication_stats(), display_conversation_history() (+33 more)
+### Community 109 - "compose"
+Cohesion: 0.36
+Nodes (3): compose(), Draw ``layers`` in order onto a transparent RGBA canvas. A ``"."`` pixel leaves…, TestCompose
+
+### Community 110 - "render_frame"
+Cohesion: 0.25
+Nodes (6): frame_layers(), FrameSpec, Body, hair, face, props, effects — in drawing order., render_frame(), Layer, TestActionSheets
+
+### Community 111 - "TestChainRealWorldScenarios"
+Cohesion: 0.29
+Nodes (4): Test chains with realistic scenarios, Test chains in a stressful situation, Test chains in a creative work scenario, TestChainRealWorldScenarios
+
+### Community 113 - "build.py"
+Cohesion: 0.36
+Nodes (6): _file_matches(), _pixels(), png_bytes(), Pillow compositor and build CLI for the pixel sprites. Run ``python -m…, PNG encoding with fixed settings and no timestamps. Bytes are stable for one…, Image
+
+### Community 114 - "shared_init.py"
+Cohesion: 0.05
+Nodes (73): _latest_world(), main(), Jenbina - AGI Simulation Streamlit App Main entry point — the home screen: the…, ``(world_summary, chosen_action)`` of the last iteration this session, or…, _top_goal(), SQLite user database for authentication and conversation persistence., Jenbina — Environment & Debug page., Jenbina — Console Log page. (+65 more)
 
 ### Community 115 - "Jenbina Blob Character"
 Cohesion: 0.50
@@ -567,17 +583,41 @@ Nodes (5): Jenbina Favicon (assets/favicon.png), Content/Happy Expression (soft 
 Cohesion: 0.40
 Nodes (4): check_chromadb_status(), clear_chromadb(), Clear the ChromaDB database and reset collections, Check the current status of ChromaDB
 
+### Community 117 - "_build_subsystem_context"
+Cohesion: 0.43
+Nodes (3): _build_subsystem_context(), Extract formatted context from all person subsystems. Returns a list of (label,…, TestBuildSubsystemContext
+
 ### Community 118 - ".test_full_plan_lifecycle"
 Cohesion: 0.40
 Nodes (3): Test: create plan → execute steps → complete., Test: create plan → get stuck → replan → complete., TestPlanningSystemIntegration
+
+### Community 119 - "render_sheet"
+Cohesion: 0.43
+Nodes (3): The 96x48 two-frame sheet for ``state``; unknown state raises KeyError., render_sheet(), TestEmotionSheets
 
 ### Community 121 - "TestFocusNoise"
 Cohesion: 0.40
 Nodes (3): At 100% focus, noise range is 0., At low focus, salience values may vary between updates., TestFocusNoise
 
-### Community 136 - "MaslowNeed"
-Cohesion: 0.07
-Nodes (18): MaslowNeed, Check if need is critically low, Check if need is adequately met, Calculate priority score based on level, satisfaction, and importance, Initialize all needs in Maslow's hierarchy, Initialize all needs across all five levels, Get satisfaction level for a specific need, Represents a single need in Maslow's hierarchy (+10 more)
+### Community 123 - "_is_admin"
+Cohesion: 0.50
+Nodes (4): _is_admin(), _is_local_request(), Check if the request originates from localhost., Return True if the current visitor is allowed to see the admin panel.
+
+### Community 125 - ".add_conversation"
+Cohesion: 0.33
+Nodes (3): Start a new conversation with an outsider, Receive a message from an outsider, Send a message to an outsider
+
+### Community 129 - "art.py"
+Cohesion: 0.33
+Nodes (4): _frame(), FrameSpec, Pixel art for Jenbina, as palette-key strings. Every layer is ``(x, y, rows)``…, Palette for the pixel art. One character per color in the art strings. This…
+
+### Community 136 - "MaslowNeedsSystem"
+Cohesion: 0.04
+Nodes (49): Needs Management Submodule This submodule handles all aspects of the AI's needs…, analyze_maslow_progress(), create_maslow_action_executor(), create_maslow_goal_setter(), Create an action executor that can satisfy needs based on actions taken Args:…, Create a goal-setting system based on current needs and growth stage Args:…, Analyze progress through Maslow's hierarchy over time Args: person_needs:…, MaslowNeed (+41 more)
+
+### Community 137 - "sprite_path"
+Cohesion: 0.33
+Nodes (3): Path of the 96x48 sheet for ``state``; unknown states get the ``base`` sheet., sprite_path(), TestPaths
 
 ## Ambiguous Edges - Review These
 - `research_user()` → `query_llm_knowledge() (planned function)`  [AMBIGUOUS]
@@ -586,9 +626,9 @@ Nodes (18): MaslowNeed, Check if need is critically low, Check if need is adequa
   requirements.txt · relation: conceptually_related_to
 
 ## Knowledge Gaps
-- **25 isolated node(s):** `Global Constraints`, `Review Focus`, `Task 1: Palette and compositor`, `Task 2: Body, hair, faces and the emotion states`, `Task 3: Props, effects and the action states` (+20 more)
+- **54 isolated node(s):** `Global Constraints`, `Review Focus`, `Task 1: Palette and compositor`, `Task 2: Body, hair, faces and the emotion states`, `Task 3: Props, effects and the action states` (+49 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **13 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **18 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -597,12 +637,12 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: calls) - confidence is low._
 - **What is the exact relationship between `run_simulation_loop()` and `APScheduler (background scheduling)`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `Person` connect `Person` to `Jenbina README`, `MetaCognitiveSystem`, `SocialCognitionSystem`, `world_state.py`, `shared_init.py`, `InsightSystem`, `CuriositySystem`, `TestPerson`, `Deep Emotional Mirror Implementation Plan`, `SelfNarrativeSystem`, `HybridMemorySystem`, `get_llm`, `GoalSystem`, `PlanningSystem`, `timedelta`, `Experience`, `WorkingMemorySystem`, `Goal`, `person/person.py`, `EmotionSystem`, `create_basic_needs_chain`, `TestChainEdgeCases`, `SocialInteractionTracker`, `MaslowNeedsSystem`, `infer_emotional_tone`, `Conversation`, `test_person.py`?**
-  _High betweenness centrality (0.144) - this node is a cross-community bridge._
-- **Why does `CLAUDE.md Project Instructions` connect `CLAUDE.md Project Instructions` to `InnerMonologueSystem`, `Jenbina README`, `simulation.py`, `MaslowNeedsSystem`, `shared_init.py`, `ChromaMemoryManager`, `TestCheckInjectionBlock`, `Deep Emotional Mirror Implementation Plan`, `person/person.py`, `clear_chromadb.py`, `HybridMemorySystem`, `create_basic_needs_chain`, `Test Suite README`, `StreamCapture`, `requirements.txt Dependency Manifest`, `get_llm`?**
-  _High betweenness centrality (0.089) - this node is a cross-community bridge._
-- **Why does `GoalSystem` connect `GoalSystem` to `PlanningSystem`, `Jenbina README`, `TestGoalSystemFormatting`, `simulation.py`, `Experience`, `Person`, `make_mock_llm`, `MaslowNeedsSystem`, `.from_dict`, `make_goal`, `Goal`, `Deep Emotional Mirror Implementation Plan`, `person/person.py`, `Plan`, `generate_return_greeting`, `test_goal_system.py`?**
-  _High betweenness centrality (0.088) - this node is a cross-community bridge._
+- **Why does `Person` connect `Person` to `InnerMonologueSystem`, `CLAUDE.md Project Instructions`, `MaslowNeedsSystem`, `SocialCognitionSystem`, `InsightSystem`, `CuriositySystem`, `.init_planning_system`, `TestPerson`, `LearningSystem`, `Deep Emotional Mirror Implementation Plan`, `SelfNarrativeSystem`, `MemoryEvent`, `core/__init__.py`, `GoalSystem`, `PlanningSystem`, `TestMemoryIntegration`, `WorkingMemorySystem`, `MemoryIntegration`, `Goal`, `Plan`, `EmotionSystem`, `simulation_runner.py`, `get_json_llm`, `SocialInteractionTracker`, `infer_emotional_tone`, `Conversation`, `NullRail`, `test_person.py`, `TestChainRealWorldScenarios`, `shared_init.py`?**
+  _High betweenness centrality (0.143) - this node is a cross-community bridge._
+- **Why does `Deep Emotional Mirror Implementation Plan` connect `Deep Emotional Mirror Implementation Plan` to `GoalSystem`, `CLAUDE.md Project Instructions`, `generate_first_greeting`, `Person`, `Inner Life Surfacing via Prompt Engineering`, `SocialCognitionSystem`, `InsightSystem`, `CuriositySystem`, `handle_chat_interaction`, `requirements.txt Dependency Manifest`, `shared_init.py`, `SelfNarrativeSystem`, `EmotionSystem`, `generate_return_greeting`, `chat_handler.py`, `get_llm`, `get_json_llm`?**
+  _High betweenness centrality (0.081) - this node is a cross-community bridge._
+- **Why does `MaslowNeedsSystem` connect `MaslowNeedsSystem` to `GoalSystem`, `CLAUDE.md Project Instructions`, `TestMaslowNeedsSystem`, `simulation.py`, `Person`, `WorkingMemorySystem`, `Person`, `Goal`, `Conversation`, `shared_init.py`, `MemoryEvent`, `EmotionSystem`, `.get_needs_summary`, `simulation_runner.py`, `core/__init__.py`?**
+  _High betweenness centrality (0.077) - this node is a cross-community bridge._
 - **Are the 12 inferred relationships involving `GoalSystem` (e.g. with `MaslowNeedsSystem` and `Jenbina README`) actually correct?**
   _`GoalSystem` has 12 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 15 inferred relationships involving `WorkingMemorySystem` (e.g. with `EmotionSystem` and `Goal`) actually correct?**

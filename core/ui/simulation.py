@@ -18,14 +18,22 @@ from core.environment.world_state import create_world_description_system, create
 from core.environment.location_system import PaloAltoLocationSystem
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
-from core.ui.chat import update_system_stage, send_proactive_message
-from core.ui.pixel_theme import dialog_html, icon_html, inject_pixel_css, sprite_html
-
-
-def inject_tamagotchi_css():
-    """Inject the UI theme. Kept under its historical name; the theme itself
-    lives in ``core.ui.pixel_theme``."""
-    inject_pixel_css()
+from core.timeline import (
+    ACTION,
+    THOUGHT,
+    record_action,
+    record_goal_changes,
+    record_mood,
+    record_move,
+    record_plan_finished,
+    record_plan_step,
+    record_replan,
+    record_thought,
+    snapshot_goals,
+)
+from core.ui.chat import get_event_log, send_proactive_message
+from core.ui.pixel_theme import action_icon, delta_badge_html, event_html, icon_html, sprite_html
+from core.ui.timeline import action_details_text, first_sentence
 
 
 # Painterly portraits, one per state (``jenbina_<state>.png``). The pixel
@@ -95,7 +103,7 @@ def _portrait_path(state):
     return None
 
 
-def display_jenbina_image(image_path, caption=None):
+def display_jenbina_image(image_path, caption=None, width=PORTRAIT_WIDTH):
     """Show the painterly portrait for the state named by ``image_path`` in a
     game window, with the half-size animated pixel sprite and the caption in
     a status strip underneath.
@@ -110,7 +118,7 @@ def display_jenbina_image(image_path, caption=None):
         state = state[:-4]
     portrait = _portrait_path(state)
     if portrait:
-        st.image(portrait, width=PORTRAIT_WIDTH)
+        st.image(portrait, width=width)
     st.markdown(sprite_html(state, caption, scale=2), unsafe_allow_html=True)
 
 
@@ -135,24 +143,6 @@ def _weather_icon(description):
         if keyword in text:
             return icon
     return _DEFAULT_WEATHER_ICON
-
-
-def render_environment_ribbon(world_summary):
-    """Render the one-line status bar at the top of the screen."""
-    location = world_summary.get("location", {}).get("name", "Unknown")
-    time_of_day = world_summary.get("time", {}).get("time_of_day", "unknown")
-    weather = world_summary.get("weather", {}).get("description", "unknown")
-    temp = world_summary.get("weather", {}).get("temperature", 0)
-    icon = _weather_icon(weather)
-
-    st.markdown(
-        f'<div class="env-ribbon">{icon_html(icon, alt=icon)}'
-        f'<span>{html.escape(str(location))}</span><span>&middot;</span>'
-        f'<span>{html.escape(str(time_of_day).capitalize())}</span><span>&middot;</span>'
-        f'<span>{html.escape(str(weather))}</span><span>&middot;</span>'
-        f'<span>{temp:.0f}&deg;C</span></div>',
-        unsafe_allow_html=True,
-    )
 
 
 NEED_SEGMENTS = 10
@@ -244,38 +234,6 @@ def render_mood_indicator(person):
     )
 
 
-def render_action_narrative(action_response, satisfaction_before, satisfaction_after):
-    """Render the action decision as an RPG dialog box."""
-    if not isinstance(action_response, dict):
-        st.write(str(action_response))
-        return
-
-    chosen = html.escape(str(action_response.get("chosen_action", "Unknown action")))
-    reasoning = html.escape(str(action_response.get("reasoning", "") or ""))
-    lessons = html.escape(str(action_response.get("lessons_applied", "") or ""))
-
-    delta = satisfaction_after - satisfaction_before
-    if delta > 0:
-        delta_class = "delta-positive"
-    elif delta < 0:
-        delta_class = "delta-negative"
-    else:
-        delta_class = "delta-neutral"
-
-    reasoning_html = f'<div class="action-reasoning">"{reasoning}"</div>' if reasoning else ""
-    lessons_html = f'<div class="action-lessons">Lessons applied: {lessons}</div>' if lessons else ""
-
-    st.markdown(
-        f'<div class="px-dialog px-dialog-action">'
-        f'<div class="action-title">Jenbina decided to {chosen.lower()}</div>'
-        f"{reasoning_html}{lessons_html}"
-        f'<span class="satisfaction-delta {delta_class}">'
-        f"Satisfaction {satisfaction_before:.0f}% -&gt; {satisfaction_after:.0f}% ({delta:+.1f}%)"
-        f"</span></div>",
-        unsafe_allow_html=True,
-    )
-
-
 def get_person_dict(person):
     """Get person state as dictionary for display"""
     return {
@@ -292,233 +250,6 @@ def get_person_dict(person):
         },
         "emotions": person.emotion_system.get_emotional_state_summary()
     }
-
-
-def display_person_state(person):
-    """Display current person state"""
-    st.write("### Current Jenbina State:")
-    st.write(f"- Name: {person.name}")
-    st.write(f"- Overall Satisfaction: {person.maslow_needs.get_overall_satisfaction():.1f}%")
-    st.write(f"- Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
-    st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
-    st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
-
-    # Display emotional state
-    dominant = person.emotion_system.get_dominant_emotions(3)
-    st.write("**Emotional State:**")
-    for emo in dominant:
-        st.write(f"- {emo['name'].capitalize()}: {emo['intensity']}")
-    all_emotions = person.emotion_system.get_emotional_state_summary()["emotions"]
-    with st.container(border=True):
-        st.caption("All Emotions")
-        for name, val in all_emotions.items():
-            st.write(f"- {name}: {val}")
-
-
-def display_world_state(world_summary, world):
-    """Display world state information"""
-    st.write("**2. World State:**")
-    st.write(f"Location: {world_summary['location']['name']}")
-    st.write(f"Time of Day: {world_summary['time']['time_of_day']}")
-    st.write(f"Weather: {world_summary['weather']['description']}")
-    st.write(f"Temperature: {world_summary['weather']['temperature']:.1f}°C")
-    st.write(f"Humidity: {world_summary['weather']['humidity']:.1f}%")
-    st.write(f"Nearby Locations: {world_summary['environment']['nearby_locations_count']}")
-    st.write(f"Open Locations: {world_summary['environment']['open_locations_count']}")
-    st.write(f"Current Events: {world_summary['environment']['current_events_count']}")
-    
-    if world.last_descriptions:
-        st.write(f"Previous Descriptions: {len(world.last_descriptions)} items")
-    
-    st.write("**World State (JSON):**")
-    st.json(world_summary)
-
-
-def display_meta_cognitive_insights(meta_cognitive_system, iteration):
-    """Display meta-cognitive insights with expander toggle"""
-    with st.container(border=True):
-        st.caption("🧠 Meta-Cognitive Insights")
-        meta_stats = meta_cognitive_system.get_meta_cognitive_stats()
-        st.write(f"**Total Cognitive Processes:** {meta_stats['total_processes']}")
-        st.write(f"**Total Insights:** {meta_stats['total_insights']}")
-        
-        st.write("**Cognitive Biases Detected:**")
-        for bias, level in meta_stats['cognitive_biases'].items():
-            if level > 0:
-                st.write(f"- {bias}: {level:.2f}")
-        
-        if meta_stats['recent_insights']:
-            st.write("**Recent Insights:**")
-            for insight in meta_stats['recent_insights']:
-                st.write(f"- **{insight['type']}**: {insight['description']}")
-
-
-def display_learning_stats(person, iteration):
-    """Display learning system stats"""
-    if person.learning_system is None:
-        return
-    
-    stats = person.learning_system.get_learning_stats()
-    with st.container(border=True):
-        st.caption("📚 Learning Stats")
-        st.write(f"**Total Experiences:** {stats['total_experiences']}")
-        st.write(f"**Active Lessons:** {stats['active_lessons']} / {stats['total_lessons']}")
-        
-        if stats['lessons']:
-            st.write("**Learned Lessons:**")
-            for lesson in stats['lessons']:
-                confidence_bar = "█" * int(lesson['confidence'] * 10) + "░" * (10 - int(lesson['confidence'] * 10))
-                st.write(
-                    f"- [{lesson['category']}] {lesson['description']}\n"
-                    f"  Confidence: {confidence_bar} {lesson['confidence']:.0%} | "
-                    f"Confirmed: {lesson['times_confirmed']}x | "
-                    f"Action: {lesson['recommended_action']}"
-                )
-        else:
-            st.write("*No lessons learned yet. Jenbina needs more experiences.*")
-
-
-def display_goal_stats(person, iteration):
-    """Display goal system stats"""
-    if person.goal_system is None:
-        return
-
-    stats = person.goal_system.get_goal_stats()
-    with st.container(border=True):
-        st.caption("🎯 Goal Stats")
-        st.write(f"**Active Goals:** {stats['active_goals']} | **Completed:** {stats['completed_goals']} | **Abandoned:** {stats['abandoned_goals']}")
-
-        if stats['goals']:
-            st.write("**Active Goals:**")
-            for goal in stats['goals']:
-                progress_bar = "█" * int(goal['progress'] * 10) + "░" * (10 - int(goal['progress'] * 10))
-                st.write(
-                    f"- [{goal['horizon']}] {goal['description']}\n"
-                    f"  Progress: {progress_bar} {goal['progress']:.0%} | "
-                    f"Confidence: {goal['confidence']:.0%} | "
-                    f"Advanced: {goal['times_advanced']}x"
-                )
-        else:
-            st.write("*No active goals. Jenbina needs more experiences to form goals.*")
-
-        if stats['completed']:
-            st.write("**Recently Completed:**")
-            for goal in stats['completed']:
-                st.write(f"- ✅ {goal['description']}")
-
-
-def display_working_memory_stats(person, iteration):
-    """Display working memory stats"""
-    stats = person.working_memory.get_stats()
-    with st.container(border=True):
-        st.caption("🧠 Working Memory")
-        st.write(f"**Focus:** {stats['focus']:.0f}% | **Capacity:** {stats['buffer_size']}/{stats['capacity']} | **Context Switches:** {stats['context_switches']}")
-        if stats['items']:
-            for item in stats['items']:
-                bar_len = int(item['salience'] * 10)
-                bar = "█" * bar_len + "░" * (10 - bar_len)
-                st.write(f"- [{item['source']}] {item['content']} | {bar} {item['salience']:.2f}")
-        else:
-            st.write("*Mind is clear.*")
-
-
-def display_identity_stats(person, iteration):
-    """Display self-narrative and identity stats."""
-    if getattr(person, "self_narrative", None) is None:
-        return
-
-    stats = person.self_narrative.get_stats()
-    with st.container(border=True):
-        st.caption("🪞 Identity & Narrative")
-        st.write(f"**Coherence:** {stats['identity_coherence']:.2f} | **Crisis:** {stats['identity_crisis_level']:.2f}")
-        st.write("**Self Concept:**")
-        for line in stats.get("self_concept", [])[:3]:
-            st.write(f"- {line}")
-        st.write("**Life Story:**")
-        st.write(stats.get("life_story", ""))
-        values = stats.get("values", {})
-        if values:
-            top = sorted(values.items(), key=lambda kv: kv[1], reverse=True)[:5]
-            st.write("**Top Values:**")
-            for name, score in top:
-                st.write(f"- {name}: {score:.2f}")
-
-
-def display_curiosity_stats(person, iteration):
-    """Display curiosity and exploration stats."""
-    if getattr(person, "curiosity_system", None) is None:
-        return
-
-    stats = person.curiosity_system.get_stats()
-    with st.container(border=True):
-        st.caption("🔎 Curiosity & Exploration")
-        st.write(
-            f"**Curiosity:** {stats['curiosity_level']:.2f} | "
-            f"**Boredom:** {stats['boredom_level']:.2f} | "
-            f"**Novelty:** {stats['last_novelty_score']:.2f} | "
-            f"**Explore?:** {'yes' if stats['should_explore'] else 'no'}"
-        )
-        if stats.get("open_questions"):
-            st.write("**Open Questions:**")
-            for q in stats["open_questions"][:3]:
-                st.write(f"- {q}")
-        if stats.get("suggested_explorations"):
-            st.write("**Exploration Candidates:**")
-            for a in stats["suggested_explorations"][:5]:
-                st.write(f"- {a}")
-
-
-def display_social_interaction_stats(person, iteration):
-    """Display social interaction tracking stats."""
-    if getattr(person, "social_interaction_tracker", None) is None:
-        return
-
-    tracker = person.social_interaction_tracker
-    stats = tracker.get_stats()
-    with st.container(border=True):
-        st.caption("👥 Social Interactions")
-        people_today = stats.get("people_met_today", 0)
-        total = stats.get("total_interactions", 0)
-        st.write(f"**People met today:** {people_today} | **Total interactions:** {total}")
-        unique = stats.get("unique_people_today", [])
-        if unique:
-            st.write(f"**Met:** {', '.join(unique)}")
-        day_summary = tracker.describe_day()
-        if day_summary and day_summary != "I didn't really talk to anyone today.":
-            st.write(f"*{day_summary}*")
-        elif people_today == 0:
-            st.write("*No social interactions yet today.*")
-
-
-
-def display_planning_stats(person, iteration):
-    """Display planning system stats"""
-    if person.planning_system is None:
-        return
-
-    stats = person.planning_system.get_planning_stats()
-    with st.container(border=True):
-        st.caption("📋 Planning Stats")
-        st.write(f"**Active Plans:** {stats['active_plans']} | **Completed:** {stats['completed_plans']} | **Failed:** {stats['failed_plans']}")
-
-        if stats['plans']:
-            st.write("**Active Plans:**")
-            for plan_data in stats['plans']:
-                steps = plan_data.get('steps', [])
-                current_idx = plan_data.get('current_step_index', 0)
-                total = len(steps)
-                completed_count = len([s for s in steps if s['status'] == 'completed'])
-                st.write(
-                    f"- **{plan_data['goal_description']}**\n"
-                    f"  Step {current_idx + 1} of {total} | "
-                    f"Completed: {completed_count}/{total} | "
-                    f"Replanned: {plan_data.get('times_replanned', 0)}x"
-                )
-                for i, step in enumerate(steps):
-                    icon = "✅" if step['status'] == 'completed' else "▶️" if step['status'] == 'active' else "⏳" if step['status'] == 'pending' else "❌"
-                    st.write(f"  {icon} {step['description']} ({step['actual_cycles']}/{step['estimated_cycles']} cycles)")
-        else:
-            st.write("*No active plans.*")
 
 
 def _print_json(label: str, data):
@@ -581,12 +312,22 @@ def _detect_location_from_action(chosen_action: str) -> str | None:
     return None
 
 
-def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration):
-    """Run a single simulation iteration with live-updating card grid.
+def _now_hhmm() -> str:
+    return datetime.now().strftime("%H:%M")
 
-    Each card computes its data then renders immediately so the UI
-    updates progressively as each LLM call completes.
+
+def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration, rail=None, event_log=None):
+    """Run a single simulation iteration.
+
+    The computation happens here; the screen is updated through ``rail`` (a
+    ``StatusRail``: stage pill, portrait, vitals, live timeline rows) and the
+    events of the iteration are recorded in ``event_log``. Without a rail
+    nothing is drawn; without a log the session's log is used.
     """
+    from core.ui.rail import NullRail  # local import: rail.py imports this module's renderers
+    rail = rail if rail is not None else NullRail()
+    event_log = event_log if event_log is not None else get_event_log()
+
     iteration_start_time = datetime.now()
     iter_num = iteration + 1
     print(f"{'='*60}")
@@ -605,7 +346,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🌍 Stage 1: Environment")
     print(f"{'─'*40}")
-    update_system_stage("Building environment...")
+    rail.stage("looking around…")
     person_dict = get_person_dict(person)
     # Use tracked location (updated after each action) or default to home
     current_location = st.session_state.get("jenbina_location", "Jenbina's House")
@@ -616,17 +357,9 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"  🕐 Time: {world_summary['time']['time_of_day']}")
     print(f"  🌤️  Weather: {world_summary['weather']['description']} ({world_summary['weather']['temperature']:.0f}°C)")
 
-    # ── Tamagotchi Screen ─────────────────────────────────────────────
-    inject_tamagotchi_css()
-    render_environment_ribbon(world_summary)
-
-    # Centered Jenbina avatar
-    _, avatar_center, _ = st.columns([1, 2, 1])
-    with avatar_center:
-        avatar_placeholder = st.empty()
-        initial_image = get_jenbina_image_for_emotion(person)
-        with avatar_placeholder.container():
-            display_jenbina_image(initial_image, caption=f"{person.name}")
+    # ── Status rail: place and portrait ───────────────────────────────
+    rail.world_summary = world_summary
+    rail.portrait(get_jenbina_image_for_emotion(person), caption=f"{person.name}")
 
     # ==================================================================
     # Stage 2 — Perception & Context  (compute, render later)
@@ -636,7 +369,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🧠 Stage 2: Perception & Context")
     print(f"{'─'*40}")
-    update_system_stage("Analyzing needs & building context...")
+    rail.stage("thinking…")
 
     # Prepare recent actions string for world chain
     prev_actions_list = []
@@ -790,26 +523,20 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         inner_voice_text = person.inner_monologue.format_for_prompt()
         print(f"  ✅ Inner monologue generated")
 
-    # Render Tamagotchi center panel: thought bubble, needs, emotions
-    _, center_col, _ = st.columns([1, 2, 1])
-    with center_col:
-        if inner_voice_text != "No inner thoughts at the moment.":
-            thought_display = inner_voice_text.split(".")[0] + "..." if "." in inner_voice_text else inner_voice_text
-            st.markdown(dialog_html(thought_display, kind="thought"), unsafe_allow_html=True)
-
-        render_needs_bars(person)
-        render_emotion_chips(person)
+    # The thought goes to the timeline: persisted, and shown live
+    thought_event = record_thought(event_log, person.inner_monologue)
+    if thought_event is not None:
+        rail.live_row(event_html(THOUGHT, first_sentence(thought_event.title)[0], meta=_now_hhmm()))
 
     # Card 3: Action Decision (LLM call → display)
     print(f"{'─'*40}")
     print(f"  ⚡ Stage 3: Action Decision")
     print(f"{'─'*40}")
-    update_system_stage("Deciding next action...")
+    rail.stage("deciding…")
     print(f"  🤔 Running meta-cognitive action chain...")
 
     # Show thinking image while deciding
-    with avatar_placeholder.container():
-        display_jenbina_image(_get_image_path("jenbina_thinking.png"), caption=f"{person.name} is thinking...")
+    rail.portrait(_get_image_path("jenbina_thinking.png"), caption=f"{person.name} is thinking...")
 
     action_response = create_meta_cognitive_action_chain(
         llm=llm_json_mode,
@@ -826,8 +553,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     action_image = get_jenbina_image_for_action(chosen)
     if action_image is None:
         action_image = get_jenbina_image_for_emotion(person)
-    with avatar_placeholder.container():
-        display_jenbina_image(action_image, caption=f"{person.name}: {chosen}")
+    rail.portrait(action_image, caption=f"{person.name}: {chosen}")
 
     if getattr(person, "curiosity_system", None) is not None and isinstance(action_response, dict):
         person.curiosity_system.update_after_action(action_response.get("chosen_action", ""))
@@ -919,17 +645,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         if new_location != old_location:
             st.session_state["jenbina_location"] = new_location
             print(f"  📍 Location changed: {old_location} → {new_location}")
-
-    # Action narrative placeholder — updated after post-processing with satisfaction delta
-    _, action_center, _ = st.columns([1, 2, 1])
-    with action_center:
-        action_placeholder = st.empty()
-        with action_placeholder.container():
-            st.markdown(
-                f'<div class="px-dialog px-dialog-action"><div class="action-title">'
-                f'Jenbina decided to {html.escape(str(chosen)).lower()}</div></div>',
-                unsafe_allow_html=True,
-            )
+            record_move(event_log, old_location, new_location)
 
     # ==================================================================
     # Stage 4 — Checks & Analysis  (compute only, render in debug)
@@ -937,7 +653,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  🛡️  Stage 4: Checks & Analysis")
     print(f"{'─'*40}")
-    update_system_stage("Running safety & emotion checks...")
+    rail.stage("checking…")
     asimov_chain = create_asimov_check_system(llm_json_mode)
     action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
 
@@ -961,6 +677,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
 
     if emotion_adjustments:
         person.emotion_system.apply_adjustments(emotion_adjustments)
+        record_mood(event_log, emotions_before, person.get_emotions_snapshot(), "action")
         print(f"  ✅ Emotions: " + ", ".join(f"{k}: {v:+.0f}" for k, v in emotion_adjustments.items()))
         _print_json("💭 Emotion Adjustments", emotion_adjustments)
     else:
@@ -982,7 +699,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'─'*40}")
     print(f"  📝 Stage 5: Learning & Updates")
     print(f"{'─'*40}")
-    update_system_stage("Learning & updating...")
+    rail.stage("learning…")
     print(f"  🔄 Updating needs & decaying emotions...")
     person.update_all_needs()
 
@@ -992,6 +709,17 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     sat_delta = satisfaction_after - satisfaction_before
     chosen_action = action_response.get("chosen_action", "unknown") if isinstance(action_response, dict) else str(action_response)
     reasoning = action_response.get("reasoning", "") if isinstance(action_response, dict) else ""
+
+    rail.refresh(person)
+    action_event = record_action(event_log, action_response, satisfaction_before, satisfaction_after, world_summary)
+    rail.live_row(event_html(
+        ACTION,
+        action_event.title,
+        meta=_now_hhmm(),
+        badge=delta_badge_html(satisfaction_before, satisfaction_after),
+        icon=action_icon(str(chosen_action)),
+        details=("why?", action_details_text(reasoning, action_event.detail.get("lessons"))) or None,
+    ))
     world_ctx = {
         "location": world_summary.get("location", {}).get("name", "unknown"),
         "time_of_day": world_summary.get("time", {}).get("time_of_day", "unknown"),
@@ -1003,6 +731,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     plan_messages = []
     lesson_stats = {}
     experience = None
+    goals_before = snapshot_goals(person.goal_system)
 
     if person.learning_system is not None:
         print(f"  📓 Recording experience...")
@@ -1049,7 +778,13 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
 
         if person.planning_system is not None:
             print(f"  📋 Evaluating plan progress...")
+            step_before = person.planning_system.get_current_step()
             step_result = person.planning_system.evaluate_step(experience)
+            if step_before:
+                plan_before, step_obj = step_before
+                record_plan_step(event_log, step_result, plan_before.goal_description, step_obj.description)
+                if plan_before.status == "completed":
+                    record_plan_finished(event_log, plan_before)
             if step_result == "step_completed":
                 plan_messages.append("📋 Plan step completed!")
                 current = person.planning_system.get_current_step()
@@ -1072,6 +807,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                 needs=needs_after, world_context=world_ctx,
             )
             if replan_result is not None:
+                record_replan(event_log, replan_result)
                 plan_messages.append(f"📋 Replanned: {replan_result.goal_description}")
                 plan_messages.append(f"New first step: {replan_result.steps[0].description}")
 
@@ -1099,6 +835,9 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                         )
 
     # Keep identity updates independent of learning-system availability
+    # Goal events once, after plans had their say (finishing a plan advances its goal)
+    record_goal_changes(event_log, goals_before, snapshot_goals(person.goal_system))
+
     if getattr(person, "self_narrative", None) is not None:
         if experience is None:
             experience = SimpleNamespace(
@@ -1113,60 +852,10 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
             lessons_for_identity = person.learning_system.lessons if person.learning_system is not None else []
         person.self_narrative.integrate_experience(experience, lessons_for_identity)
 
-    # ==================================================================
-    # Update action narrative with final satisfaction delta
-    # ==================================================================
-    with action_placeholder.container():
-        render_action_narrative(action_response, satisfaction_before, satisfaction_after)
-
     # Final avatar update — reflect post-action emotional state
     final_image = get_jenbina_image_for_emotion(person)
-    with avatar_placeholder.container():
-        display_jenbina_image(final_image, caption=f"{person.name}")
+    rail.portrait(final_image, caption=f"{person.name}")
 
-    # ==================================================================
-    # Tier 2 — Auto-expanding sections (interesting content only)
-    # ==================================================================
-    _, tier2_center, _ = st.columns([1, 2, 1])
-    with tier2_center:
-        # Learning
-        with st.container(border=True):
-            st.caption("📚 Learning")
-            for msg in learning_messages:
-                st.write(msg)
-            if not learning_messages:
-                st.write("*No learning updates.*")
-            if goal_messages:
-                st.caption("Goals Advanced")
-                for msg in goal_messages:
-                    st.write(msg)
-            if plan_messages:
-                st.caption("Plan Updates")
-                for msg in plan_messages:
-                    st.write(msg)
-
-        # Goals
-        if person.goal_system is not None:
-            with st.container(border=True):
-                st.caption("🎯 Goals")
-                display_goal_stats(person, iteration)
-
-        # Plans
-        if person.planning_system is not None:
-            with st.container(border=True):
-                st.caption("📋 Plans")
-                display_planning_stats(person, iteration)
-
-        # Social interactions
-        if getattr(person, "social_interaction_tracker", None) is not None:
-            display_social_interaction_stats(person, iteration)
-
-
-        # Curiosity
-        if getattr(person, "curiosity_system", None) is not None:
-            with st.container(border=True):
-                st.caption("🔎 Curiosity")
-                display_curiosity_stats(person, iteration)
 
     # ==================================================================
     # Store debug data in session state for the Debug Info page
@@ -1186,6 +875,10 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         "learning_stats": person.learning_system.get_learning_stats() if person.learning_system else None,
         "person_dict": person_dict,
         "world_summary": world_summary,
+        "curiosity_stats": person.curiosity_system.get_stats() if getattr(person, "curiosity_system", None) else None,
+        "social_interaction_stats": (
+            person.social_interaction_tracker.get_stats() if getattr(person, "social_interaction_tracker", None) else None
+        ),
     }
     if "debug_iterations" not in st.session_state:
         st.session_state.debug_iterations = []
@@ -1206,8 +899,7 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     print(f"{'='*60}")
     print(f"  ✅ ITERATION {iter_num} COMPLETE — {iteration_duration:.2f}s")
     print(f"{'='*60}")
-    update_system_stage(f"Iteration {iter_num} complete ({iteration_duration:.1f}s)")
-    st.success(f"Iteration {iter_num} completed in {iteration_duration:.2f}s")
+    rail.stage(f"completed in {iteration_duration:.0f}s")
 
     return {
         "needs_response": needs_response,
@@ -1221,151 +913,43 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
     }
 
 
-def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations, delay_seconds):
-    """Run the simulation loop for specified iterations"""
-    # Progress tracking
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    # Container for all iterations
-    iterations_container = st.container()
-    
+def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations, delay_seconds,
+                        rail=None, event_log=None):
+    """Run ``iterations`` iterations back to back, ``delay_seconds`` apart.
+
+    Progress shows in the rail's stage pill. Each iteration's record is
+    appended to ``st.session_state.simulation_history`` right away so the next
+    iteration sees it among its recent actions.
+    """
+    from core.ui.rail import NullRail  # local import: rail.py imports this module's renderers
+    rail = rail if rail is not None else NullRail()
+    event_log = event_log if event_log is not None else get_event_log()
+
     results = []
-    
     for iteration in range(iterations):
-        # Update progress
-        progress = (iteration + 1) / iterations
-        progress_bar.progress(progress)
-        status_text.text(f"🔄 Running iteration {iteration + 1} of {iterations}...")
-        
-        with iterations_container:
-            # Create expander for each iteration
-            with st.expander(f"📍 Iteration {iteration + 1} of {iterations}", expanded=(iteration == iterations - 1)):
-                result = run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration)
+        if iterations > 1:
+            rail.stage(f"iteration {iteration + 1} of {iterations}")
+        result = run_single_iteration(
+            person, llm_json_mode, meta_cognitive_system, iteration, rail=rail, event_log=event_log
+        )
+        iteration_record = {
+            "iteration": iteration + 1,
+            "timestamp": datetime.now().isoformat(),
+            "duration_seconds": result["iteration_duration"],
+            "action_decision": result["action_decision"],
+            "needs_state": result["person_dict"]["maslow_needs"],
+            "emotions_state": result["person_dict"].get("emotions", {}),
+            "world_summary": result["world_summary"],
+            "satisfaction_delta": result["satisfaction_delta"],
+        }
+        results.append(iteration_record)
+        if "simulation_history" not in st.session_state:
+            st.session_state.simulation_history = []
+        st.session_state.simulation_history.append(iteration_record)
 
-                # Store iteration record and immediately update session
-                # history so the NEXT iteration sees this action in
-                # recent_actions / last_action prompts.
-                iteration_record = {
-                    "iteration": iteration + 1,
-                    "timestamp": datetime.now().isoformat(),
-                    "duration_seconds": result["iteration_duration"],
-                    "action_decision": result["action_decision"],
-                    "needs_state": result["person_dict"]["maslow_needs"],
-                    "emotions_state": result["person_dict"].get("emotions", {}),
-                    "world_summary": result["world_summary"]
-                }
-                results.append(iteration_record)
-                # Push to session history immediately so next iteration
-                # can read recent actions from it.
-                if "simulation_history" not in st.session_state:
-                    st.session_state.simulation_history = []
-                st.session_state.simulation_history.append(iteration_record)
-
-        # Wait before next iteration (except for the last one)
-        if iteration < iterations - 1:
-            status_text.text(f"⏳ Waiting {delay_seconds} seconds before next iteration...")
+        if iteration < iterations - 1 and delay_seconds:
+            rail.stage(f"waiting {delay_seconds}s…")
             time.sleep(delay_seconds)
-    
-    # Simulation completed
-    progress_bar.progress(1.0)
-    status_text.text(f"✅ Simulation completed! Ran {iterations} iteration(s).")
-    
     return results
 
 
-def display_simulation_summary(simulation_history, iterations, person=None):
-    """Display summary of simulation history"""
-    st.success(f"🎉 Completed {iterations} simulation cycles!")
-    
-    if len(simulation_history) > 0:
-        with st.expander("📊 Simulation History Summary", expanded=True):
-            st.write(f"**Total Iterations:** {len(simulation_history)}")
-            
-            # Show action decisions across iterations
-            st.write("**Action Decisions:**")
-            for record in simulation_history[-iterations:]:
-                action = record.get("action_decision", {})
-                if isinstance(action, dict):
-                    chosen = action.get("chosen_action", "Unknown")
-                    lessons_applied = action.get("lessons_applied", "")
-                else:
-                    chosen = str(action)[:100]
-                    lessons_applied = ""
-                
-                delta = record.get("satisfaction_delta", 0)
-                delta_icon = "📈" if delta >= 0 else "📉"
-                st.write(f"- Iteration {record['iteration']}: {chosen} {delta_icon} ({delta:+.1f}%)")
-                if lessons_applied:
-                    st.write(f"  *Lessons applied: {lessons_applied}*")
-            
-            # Show needs evolution
-            st.write("**Needs Evolution:**")
-            for record in simulation_history[-iterations:]:
-                needs = record.get("needs_state", {})
-                overall = needs.get("overall_satisfaction", 0)
-                st.write(f"- Iteration {record['iteration']}: Overall Satisfaction {overall:.1f}%")
-            
-            # Show learning summary
-            if person is not None and person.learning_system is not None:
-                stats = person.learning_system.get_learning_stats()
-                st.write("---")
-                st.write(f"**📚 Learning Summary:**")
-                st.write(f"- Total experiences recorded: {stats['total_experiences']}")
-                st.write(f"- Active lessons: {stats['active_lessons']}")
-                
-                if stats['lessons']:
-                    st.write("**Learned Lessons:**")
-                    for lesson in stats['lessons']:
-                        st.write(f"- **{lesson['description']}** (confidence: {lesson['confidence']:.0%}, confirmed {lesson['times_confirmed']}x)")
-
-            if person is not None and person.goal_system is not None:
-                goal_stats = person.goal_system.get_goal_stats()
-                st.write(f"**🎯 Goal Summary:**")
-                st.write(f"- Active goals: {goal_stats['active_goals']}")
-                st.write(f"- Completed goals: {goal_stats['completed_goals']}")
-                st.write(f"- Abandoned goals: {goal_stats['abandoned_goals']}")
-                if goal_stats['goals']:
-                    st.write("**Active Goals:**")
-                    for goal in goal_stats['goals']:
-                        st.write(f"- [{goal['horizon']}] **{goal['description']}** (progress: {goal['progress']:.0%}, confidence: {goal['confidence']:.0%})")
-
-            if person is not None and person.planning_system is not None:
-                plan_stats = person.planning_system.get_planning_stats()
-                st.write(f"**📋 Planning Summary:**")
-                st.write(f"- Active plans: {plan_stats['active_plans']}")
-                st.write(f"- Completed plans: {plan_stats['completed_plans']}")
-                st.write(f"- Failed plans: {plan_stats['failed_plans']}")
-                if plan_stats['plans']:
-                    st.write("**Active Plans:**")
-                    for p in plan_stats['plans']:
-                        steps = p.get('steps', [])
-                        done = len([s for s in steps if s['status'] == 'completed'])
-                        st.write(f"- **{p['goal_description']}** ({done}/{len(steps)} steps done, replanned {p.get('times_replanned', 0)}x)")
-
-            if person is not None and getattr(person, "social_interaction_tracker", None) is not None:
-                tracker = person.social_interaction_tracker
-                people_count = tracker.people_met_count()
-                st.write("---")
-                st.write(f"**👥 Social Interactions Summary:**")
-                st.write(f"- People met today: {people_count}")
-                day_description = tracker.describe_day()
-                if day_description:
-                    st.write(f"- *Jenbina says: \"{day_description}\"*")
-
-
-
-def render_simulation_controls():
-    """Render simulation control UI and return settings (designed for sidebar)"""
-    st.markdown("### Simulation Controls")
-    num_iterations = st.number_input("Iterations", min_value=1, max_value=20, value=5, step=1)
-    delay_seconds = st.number_input("Delay (seconds)", min_value=1, max_value=60, value=3, step=1)
-    run_loop = st.button("🔄 Run Simulation Loop", type="primary", use_container_width=True)
-    single_run = st.button("▶️ Run Single Iteration", use_container_width=True)
-
-    return {
-        "num_iterations": num_iterations,
-        "delay_seconds": delay_seconds,
-        "run_loop": run_loop,
-        "single_run": single_run
-    }

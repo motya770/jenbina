@@ -10,20 +10,8 @@ from core.interaction.chat_handler import (
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.auth.user_db import UserDatabase
 from core.ui.shared_init import save_person_state
-from core.ui.sprites import avatar_path, icon_path
-
-
-def display_person_state_compact(person):
-    """Display current person state in compact form"""
-    st.write("**Current State:**")
-    st.write(f"- Name: {person.name}")
-    st.write(f"- Overall Satisfaction: {person.maslow_needs.get_overall_satisfaction():.1f}%")
-    st.write(f"- Hunger: {person.maslow_needs.get_need_satisfaction('hunger'):.1f}%")
-    st.write(f"- Sleep: {person.maslow_needs.get_need_satisfaction('sleep'):.1f}%")
-    st.write(f"- Safety: {person.maslow_needs.get_need_satisfaction('security'):.1f}%")
-    dominant = person.emotion_system.get_dominant_emotions(3)
-    emotions_str = ", ".join(f"{d['name']}: {d['intensity']}" for d in dominant)
-    st.write(f"- Emotions: {emotions_str}")
+from core.timeline import EventLog, record_mood
+from core.ui.pixel_theme import stage_pill_html
 
 
 def check_proactive_message(person):
@@ -109,7 +97,7 @@ def send_proactive_message(person, llm):
             return None
 
         display_name = _get_user_display_name()
-        person.send_message(display_name, message, "text")
+        person.send_message(display_name, message, "proactive")
 
         # Store in SQLite
         user_db, user_id = _get_user_db_and_id()
@@ -184,14 +172,41 @@ def _get_user_db_and_id():
     return user_db, user["id"]
 
 
-def handle_user_input(person, llm, memory_manager, debug_mode):
-    """Handle user chat input and return result"""
+def get_event_log() -> EventLog:
+    """The session's event log, built once from the logged-in user (an
+    in-memory log when there is no user)."""
+    user_db, user_id = _get_user_db_and_id()
+    log = st.session_state.get("event_log")
+    if log is None or getattr(log, "user_id", None) != user_id:
+        log = EventLog(user_db, user_id)
+        st.session_state["event_log"] = log
+    return log
+
+
+def ensure_outreach(person, llm) -> None:
+    """Let Jenbina speak first when she should: the return greeting, and the
+    once-per-session proactive message. Both land in the conversation with
+    their own message types so the timeline can label them."""
     display_name = _get_user_display_name()
-    user_input = st.chat_input("Talk to Jenbina...")
+    greeting = check_return_greeting(person, llm)
+    if greeting:
+        person.send_message(display_name, greeting, "greeting")
+
+    if not st.session_state.get("proactive_checked"):
+        st.session_state.proactive_checked = True
+        proactive_msg = send_proactive_message(person, llm)
+        if proactive_msg:
+            save_person_state()
+
+
+def handle_user_input(person, llm, memory_manager, debug_mode, user_input):
+    """Handle one submitted chat message and return the chat result, or
+    ``None`` when there is no input. The caller reads ``st.chat_input``."""
+    display_name = _get_user_display_name()
 
     if user_input:
         print("User input:", user_input)
-        update_system_stage("Receiving message...")
+        update_system_stage("listening…")
 
         # Store the user message in person's communication history
         person.receive_message(display_name, user_input, "text")
@@ -202,7 +217,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             user_db.store_message(user_id, display_name, user_input, "user_message")
 
         # Get conversation history for context (last 200 messages from SQLite)
-        update_system_stage("Retrieving context...")
+        update_system_stage("remembering…")
         recent_context = ""
         if user_db and user_id:
             db_messages = user_db.get_messages(user_id, limit=200)
@@ -222,7 +237,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             ]
 
         # Handle chat interaction
-        update_system_stage("Generating response...")
+        update_system_stage("replying…")
         chat_result = handle_chat_interaction(
             st=st,
             llm=llm,
@@ -253,18 +268,14 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             semantic_count = chat_result.get("semantic_docs_count", 0)
             st.toast(f"Context: {recent_count} recent messages + {semantic_count} semantically relevant", icon="📚")
 
-            # Display insight as a chat message if one was generated
-            if chat_result.get("insight"):
-                with st.chat_message("assistant", avatar=avatar_path()):
-                    st.write(f"💡 *{chat_result['insight']}*")
-
             # Store Jenbina's reply in SQLite
             if user_db and user_id:
                 user_db.store_message(user_id, "Jenbina", chat_result["assistant_response"], "jenbina_response")
 
             try:
-                update_system_stage("Analyzing emotions...")
+                update_system_stage("feeling…")
                 chat_situation = f"User said: \"{user_input}\". Jenbina responded: \"{chat_result['assistant_response']}\""
+                emotions_before = person.get_emotions_snapshot()
                 emotion_adjustments = analyze_emotion_impact(
                     llm=llm,
                     situation=chat_situation,
@@ -273,6 +284,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
                 )
                 if emotion_adjustments:
                     person.emotion_system.apply_adjustments(emotion_adjustments)
+                    record_mood(get_event_log(), emotions_before, person.get_emotions_snapshot(), "chat")
             except Exception as e:
                 print(f"Emotion analysis after chat failed: {e}")
 
@@ -291,7 +303,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
             except Exception as e:
                 print(f"Chat need satisfaction failed: {e}")
 
-        update_system_stage("Ready")
+        update_system_stage("idle")
 
         # Add to action history
         if "user_message" in chat_result:
@@ -309,188 +321,11 @@ def handle_user_input(person, llm, memory_manager, debug_mode):
     return None
 
 
-def display_communication_stats(person):
-    """Display communication statistics"""
-    with st.expander("Communication Statistics", expanded=False):
-        comm_stats = person.get_communication_stats()
-        st.write(f"**Total Conversations:** {comm_stats['total_conversations']}")
-        st.write(f"**Total Messages:** {comm_stats['total_messages']}")
-        
-        if comm_stats['most_active_conversations']:
-            st.write("**Most Active Conversations:**")
-            for conv in comm_stats['most_active_conversations']:
-                st.write(f"- {conv['outsider']}: {conv['message_count']} messages")
-
-
-def display_conversation_history(person):
-    """Display recent conversation history"""
-    display_name = _get_user_display_name()
-    with st.expander("Recent Conversation History", expanded=False):
-        user_summary = person.get_conversation_summary(display_name)
-        if user_summary['message_count'] > 0:
-            st.write(f"**Messages with {display_name}:** {user_summary['message_count']}")
-            st.write(f"**Last Interaction:** {user_summary['last_interaction'].strftime('%Y-%m-%d %H:%M')}")
-
-            st.write("**Recent Messages:**")
-            for msg in user_summary['recent_messages']:
-                sender_icon = "👤" if msg['sender'] != "person" else "🤖"
-                st.write(f"{sender_icon} **{msg['sender']}** ({msg['timestamp'].strftime('%H:%M')}): {msg['content']}")
-        else:
-            st.write("No conversation history yet.")
-
-
-def display_memory_stats(memory_manager):
-    """Display memory system statistics"""
-    with st.expander("Memory System Statistics", expanded=False):
-        memory_stats = memory_manager.get_memory_stats()
-        st.write(f"**Total Conversations in Memory:** {memory_stats.get('total_conversations', 0)}")
-        st.write(f"**Unique People:** {memory_stats.get('unique_people', 0)}")
-        st.write(f"**Memory Size:** {memory_stats.get('memory_size_mb', 0)} MB")
-        
-        if memory_stats.get('people'):
-            st.write("**People in Memory:**")
-            for person_name in memory_stats['people']:
-                st.write(f"- {person_name}")
-        
-        if memory_stats.get('message_types'):
-            st.write("**Message Types:**")
-            for msg_type, count in memory_stats['message_types'].items():
-                st.write(f"- {msg_type}: {count}")
-
-
-def display_memory_debug(memory_manager):
-    """Display memory debug information"""
-    with st.expander("🐛 Memory Debug Info", expanded=False):
-        st.write("**Memory Manager Status:**")
-        st.write(f"- Memory Manager Initialized: {memory_manager is not None}")
-        st.write(f"- Chroma Client: {memory_manager.client is not None if memory_manager else False}")
-        st.write(f"- Collection: {memory_manager.collection is not None if memory_manager else False}")
-        
-        # Test memory operations
-        if st.button("🧪 Test Memory Operations"):
-            try:
-                # Test storing
-                test_id = memory_manager.store_conversation(
-                    "TestUser", "This is a test message", "test_message"
-                )
-                st.success(f"✅ Test message stored with ID: {test_id}")
-                
-                # Test retrieval
-                test_context = memory_manager.retrieve_relevant_context(
-                    "TestUser", "test message", top_k=1
-                )
-                st.success(f"✅ Test retrieval found {len(test_context)} documents")
-                
-                # Clean up test
-                memory_manager.clear_memory("TestUser")
-                st.success("✅ Test data cleaned up")
-                
-            except Exception as e:
-                st.error(f"❌ Memory test failed: {str(e)}")
-
-
-def display_social_model(person):
-    """Display social model stats for current user conversation partner."""
-    if getattr(person, "social_cognition", None) is None:
-        return
-
-    display_name = _get_user_display_name()
-    model = person.social_cognition.get_or_create_model(display_name)
-    rel = model.relationship
-    interests = sorted(model.interests.items(), key=lambda kv: kv[1], reverse=True)[:5]
-
-    with st.expander("Social Model (Theory of Mind)", expanded=False):
-        st.write(f"**User:** {display_name}")
-        st.write(f"**Inferred Emotion:** {model.inferred_emotional_state}")
-        st.write(
-            f"**Relationship:** trust={rel.trust:.1f}, closeness={rel.closeness:.1f}, conflict={rel.conflict:.1f}, interactions={rel.interactions}"
-        )
-        if interests:
-            st.write("**Top Interests:**")
-            for topic, score in interests:
-                st.write(f"- {topic}: {score:.2f}")
-        if model.beliefs:
-            st.write("**Recent Beliefs:**")
-            for belief in model.beliefs[-5:]:
-                st.write(f"- {belief}")
-
-
-def _init_stage_placeholder():
-    """Create or reuse the st.empty() placeholder for system stage."""
-    placeholder = st.empty()
-    st.session_state["_stage_placeholder"] = placeholder
-    stage = st.session_state.get("system_stage", "Idle")
-    placeholder.markdown(f"`⚙️ {stage}`")
-    return placeholder
-
-
 def update_system_stage(stage: str):
     """Update the system stage one-liner in real time."""
     st.session_state["system_stage"] = stage
     placeholder = st.session_state.get("_stage_placeholder")
     if placeholder is not None:
-        placeholder.markdown(f"`⚙️ {stage}`")
+        placeholder.markdown(stage_pill_html(stage), unsafe_allow_html=True)
 
 
-def render_chat_simple(person, llm, memory_manager, debug_mode):
-    """Render a minimal chat: message history + input only."""
-    display_name = _get_user_display_name()
-
-    # Show live-updating system stage one-liner
-    _init_stage_placeholder()
-
-    # Check for return greeting
-    greeting = check_return_greeting(person, llm)
-    if greeting:
-        person.send_message(display_name, greeting, "text")
-
-    # Check for proactive message (independent of simulation)
-    if not st.session_state.get("proactive_checked"):
-        st.session_state.proactive_checked = True
-        proactive_msg = send_proactive_message(person, llm)
-        if proactive_msg:
-            save_person_state()
-
-    conversation_history = person.get_conversation_history(display_name, count=50)
-
-    for msg in conversation_history:
-        is_user = msg.sender != "person" and msg.sender != person.name
-        with st.chat_message(
-            "user" if is_user else "assistant",
-            avatar=icon_path("player") if is_user else avatar_path(),
-        ):
-            st.write(msg.content)
-
-    handle_user_input(person, llm, memory_manager, debug_mode)
-
-
-def render_chat_interface(person, llm, memory_manager, debug_mode):
-    """Render the complete chat interface with statistics"""
-    st.write("**6. Interaction with User:**")
-    st.write("### Chat with Jenbina")
-
-    # Show live-updating system stage one-liner
-    _init_stage_placeholder()
-
-    # Check for return greeting
-    display_name = _get_user_display_name()
-    greeting = check_return_greeting(person, llm)
-    if greeting:
-        person.send_message(display_name, greeting, "text")
-
-    # Check for proactive message (independent of simulation)
-    if not st.session_state.get("proactive_checked"):
-        st.session_state.proactive_checked = True
-        proactive_msg = send_proactive_message(person, llm)
-        if proactive_msg:
-            save_person_state()
-
-    display_person_state_compact(person)
-    handle_user_input(person, llm, memory_manager, debug_mode)
-    display_communication_stats(person)
-    display_conversation_history(person)
-    display_social_model(person)
-    display_memory_stats(memory_manager)
-
-    if debug_mode:
-        display_memory_debug(memory_manager)

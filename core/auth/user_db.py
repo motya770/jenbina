@@ -62,6 +62,19 @@ class UserDatabase:
                     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 );
+
+                CREATE TABLE IF NOT EXISTS events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    kind TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    detail_json TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_events_user
+                    ON events(user_id, created_at);
             """)
             conn.commit()
         finally:
@@ -206,6 +219,66 @@ class UserDatabase:
     # ------------------------------------------------------------------
     # Admin queries
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Life events (Jenbina's timeline)
+    # ------------------------------------------------------------------
+    def store_event(
+        self,
+        user_id: int,
+        kind: str,
+        title: str,
+        detail: dict = None,
+        created_at: datetime = None,
+    ) -> int:
+        """Store one life event. ``created_at`` is written by Python (local,
+        naive ISO 8601 with microseconds) so events sort with chat messages."""
+        when = (created_at or datetime.now()).isoformat()
+        conn = self._get_conn()
+        try:
+            cur = conn.execute(
+                """INSERT INTO events (user_id, kind, title, detail_json, created_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (user_id, kind, title, json.dumps(detail) if detail else None, when),
+            )
+            conn.commit()
+            return cur.lastrowid
+        finally:
+            conn.close()
+
+    def get_events(self, user_id: int, limit: int = 200) -> list:
+        """The most recent ``limit`` events for a user, oldest first."""
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT id, kind, title, detail_json, created_at FROM events
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ?""",
+                (user_id, limit),
+            ).fetchall()
+        finally:
+            conn.close()
+        events = []
+        for row in reversed(rows):
+            try:
+                created_at = datetime.fromisoformat(row["created_at"])
+            except (TypeError, ValueError):
+                continue  # a row whose timestamp cannot be read is left out
+            try:
+                detail = json.loads(row["detail_json"]) if row["detail_json"] else {}
+                if not isinstance(detail, dict):
+                    detail = {}
+            except (TypeError, ValueError):
+                detail = {}
+            events.append({
+                "id": row["id"],
+                "kind": row["kind"],
+                "title": row["title"],
+                "detail": detail,
+                "created_at": created_at,
+            })
+        return events
 
     def get_all_users_with_message_counts(self) -> list:
         """Return all users with their total and per-sender message counts."""
