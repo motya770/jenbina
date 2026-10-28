@@ -20,10 +20,15 @@ from core.ui.simulation import (
 )
 from core.ui.pixel_theme import (
     PLACEHOLDER,
+    action_icon,
+    delta_badge_html,
     dialog_html,
+    event_html,
     icon_html,
     inject_pixel_css,
+    marker_html,
     sprite_html,
+    stage_pill_html,
 )
 
 
@@ -226,6 +231,64 @@ class TestChatHandlerAvatars(unittest.TestCase):
         self.assertEqual(len(avatars), 2)
         self.assertTrue(avatars[0].endswith("icons/player.png"))
         self.assertTrue(avatars[1].endswith("jenbina_avatar.png"))
+
+
+
+class TestWideShell(unittest.TestCase):
+    def test_wide_flag_widens_device(self):
+        with patch("core.ui.pixel_theme.st") as st:
+            inject_pixel_css(wide=True)
+            self.assertIn("max-width: 64rem", "".join(c.args[0] for c in st.markdown.call_args_list))
+        with patch("core.ui.pixel_theme.st") as st:
+            inject_pixel_css()
+            self.assertNotIn("64rem", "".join(c.args[0] for c in st.markdown.call_args_list))
+
+
+class TestEventHtml(unittest.TestCase):
+    def test_classes_icon_and_escaping(self):
+        html_ = event_html("mood", "Mood <lifted>", meta="23:41")
+        self.assertIn('class="px-event px-event-mood"', html_)
+        self.assertIn("Mood &lt;lifted&gt;", html_)
+        self.assertIn('alt="mood"', html_)
+        self.assertIn('<span class="px-event-meta">23:41</span>', html_)
+        self.assertNotIn("<details", html_)
+
+    def test_details_badge_and_icon_override(self):
+        html_ = event_html("action", "t", details=("why?", "a & b\nc"), badge="<b>B</b>", icon="hunger")
+        self.assertIn("<summary>why?</summary>", html_)
+        self.assertIn("a &amp; b<br>c", html_)
+        self.assertIn("<b>B</b>", html_)
+        self.assertIn('alt="hunger"', html_)
+
+    def test_unknown_kind_uses_generic_icon_and_safe_class(self):
+        html_ = event_html("we!rd", "t")
+        self.assertIn('px-event-werd"', html_)
+        self.assertIn('alt="act"', html_)
+
+    def test_action_icon_keywords(self):
+        self.assertEqual(action_icon("Eat breakfast"), "hunger")
+        self.assertEqual(action_icon("Attend live music at Coupa"), "love")
+        self.assertEqual(action_icon("Stroll University Avenue"), "walk")
+        self.assertEqual(action_icon("Contemplate"), "act")
+
+
+class TestDeltaBadge(unittest.TestCase):
+    def test_text_attributes_and_sign_class(self):
+        html_ = delta_badge_html(83.4, 85.1)
+        self.assertIn("83% → 85% (+1.7%)", html_)
+        self.assertIn('data-before="83.4"', html_)
+        self.assertIn('data-after="85.1"', html_)
+        self.assertIn('data-delta="1.7"', html_)
+        self.assertIn("delta-positive", html_)
+        self.assertIn("delta-negative", delta_badge_html(50, 48.2))
+        self.assertIn("delta-neutral", delta_badge_html(50, 50))
+        self.assertIn("(+0.0%)", delta_badge_html(50, 50))
+
+
+class TestMarkerAndPill(unittest.TestCase):
+    def test_marker_and_pill(self):
+        self.assertEqual(marker_html("23:38 · <home>"), '<div class="px-marker">23:38 · &lt;home&gt;</div>')
+        self.assertIn('class="px-stage"', stage_pill_html("thinking…"))
 
 
 if __name__ == "__main__":
