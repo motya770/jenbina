@@ -36,28 +36,25 @@ def _run_one_iteration(page: Page, streamlit_url: str) -> dict:
     page.goto(streamlit_url, wait_until="networkidle")
     page.wait_for_selector("text=Jenbina", timeout=30_000)
 
-    # Click "Run Single Iteration"
-    page.get_by_role(
-        "button", name=re.compile("Run Single Iteration")
-    ).click()
+    # Click "Step once"
+    page.get_by_role("button", name=re.compile("Step once")).click()
 
-    # Wait for the action card
-    action_el = page.locator(".action-title").first
+    # Wait for the action row in the timeline
+    action_el = page.locator(".px-event-action .px-event-title").first
     action_el.wait_for(state="visible", timeout=ITERATION_TIMEOUT)
     action_text = action_el.inner_text()
 
-    # Wait for iteration completion
+    # Wait for iteration completion (the stage pill)
     page.locator("text=completed in").first.wait_for(
         state="visible", timeout=ITERATION_TIMEOUT
     )
 
-    # Extract satisfaction delta from the learning messages
+    # Extract the signed satisfaction delta from the action row's badge
     sat_delta = None
-    sat_elements = page.locator("text=/Satisfaction:.*→/").all()
-    for el in sat_elements:
+    for el in page.locator(".satisfaction-delta").all():
         try:
             txt = el.inner_text()
-            # Match pattern like "Satisfaction: 42.0% → 43.4% (+1.4%)"
+            # Match pattern like "83% → 85% (+1.7%)"
             m = re.search(r"\(([+-]?\d+\.?\d*)%\)", txt)
             if m:
                 sat_delta = float(m.group(1))
@@ -67,7 +64,7 @@ def _run_one_iteration(page: Page, streamlit_url: str) -> dict:
 
     # Extract chosen action name
     action_name = re.sub(
-        r"^▶\s*Jenbina decided to\s*", "", action_text, flags=re.IGNORECASE
+        r"^Jenbina decided to\s*", "", action_text, flags=re.IGNORECASE
     ).strip()
 
     # Check that need bars are rendered

@@ -15,7 +15,7 @@ Jenbina is an open-source AGI (Artificial General Intelligence) simulation — a
 ```
 jenbina/
 ├── core/                        # Main application package
-│   ├── app.py                   # Streamlit entry point
+│   ├── app.py                   # Streamlit entry point: the home screen (timeline + status rail)
 │   ├── engine.py                # Simulation engine (experimental)
 │   ├── person.py                # Person class definition
 │   ├── connect.py               # LLM provider connections
@@ -36,12 +36,14 @@ jenbina/
 │   ├── planning/                # Action planning system
 │   ├── research/                # User research utilities
 │   ├── social/                  # Social cognition modeling
+│   ├── timeline/                # Event log of Jenbina's life: kinds, titles, EventLog, recording helpers
 │   ├── working_memory/          # Short-term context management
 │   ├── ui/                      # Streamlit UI components
-│   │   ├── pixel_theme.py       # Pixel-art device shell CSS + sprite/icon/dialog HTML helpers
+│   │   ├── timeline.py          # The chat timeline: messages and life events merged, markers, rows
+│   │   ├── rail.py              # The status rail: Now card (StatusRail handles), run controls, mind card
+│   │   ├── pixel_theme.py       # Pixel-art device shell CSS + sprite/icon/event-row HTML helpers
 │   │   └── sprites/             # Pixel art strings, palette, Pillow builder (art.py, build.py)
 │   └── pages/                   # Streamlit multi-page navigation
-│       ├── 2_Chat.py
 │       ├── 3_Environment.py
 │       ├── 4_Console.py
 │       └── 5_Debug_Info.py
@@ -270,6 +272,8 @@ git commit -m "<conventional commit message>"
 | `2026-02-18-llm-knowledge-enriched-dossier.md` | LLM knowledge-enriched dossiers — parallel web search + GPT knowledge query |
 | `2026-10-27-pixel-art-ui-redesign.md` | Pixel art UI spec — handheld device shell, 48x48 animated sprite sheets, 8x8 icons, palette and states; revision 2 restores the portraits and switches to the candy arcade palette |
 | `2026-10-27-pixel-art-ui-implementation.md` | Pixel art UI implementation — sprite pipeline, `core/ui/pixel_theme.py`, pixel markup in the simulation renderers |
+| `2026-10-28-timeline-ui-redesign.md` | Timeline home screen spec — the chat timeline interleaved with Jenbina's persisted life events beside a live status rail; the Simulation and Chat pages merge |
+| `2026-10-28-timeline-ui-implementation.md` | Timeline home screen implementation — `core/timeline/` event log, `core/ui/timeline.py`, `core/ui/rail.py`, runner refactor, home screen |
 
 ## graphify
 
