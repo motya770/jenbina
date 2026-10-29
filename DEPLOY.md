@@ -20,17 +20,54 @@ The start command binds Streamlit to Railway's `$PORT` in headless mode:
 streamlit run core/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
 ```
 
-## One-time setup
+## The existing deployment
 
-Install the CLI if needed (`brew install railway`), then from the repo root:
+Jenbina already lives on Railway. The CLI in this checkout is linked to it
+(`railway status` shows project, environment and service).
+
+| | |
+|---|---|
+| Project | `selfless-education` (shared with the `t500` service) |
+| Service | `jenbina` |
+| Environment | `production` |
+| URL | https://jenbina-production.up.railway.app |
+| Volume | `jenbina-volume` mounted at `/jenbina`, `JENBINA_DATA_DIR=/jenbina` |
+| GitHub trigger | `motya770/jenbina`, branch `main` |
+
+All variables from the table below are already set on the service, including the
+two secrets. `REDIRECT_URI` is the URL above and is registered with the Google
+OAuth client.
+
+## Deploying
+
+From the repo root, on the branch you want live:
+
+```bash
+railway up --ci
+```
+
+`railway up` uploads the working tree (honouring `.gitignore` and `.railwayignore`),
+builds it with Railpack using `railway.toml`, and streams the build logs; `--ci`
+exits when the build finishes. The first build installs ChromaDB and LangChain and
+takes a few minutes; later builds reuse the cache. Pushes to `main` deploy
+automatically through the GitHub trigger as long as the workspace has an active
+plan.
+
+Useful commands: `railway logs` (runtime logs), `railway status`, `railway open`
+(dashboard), `railway redeploy`, `railway variables` (prints values: keep it off
+screenshots).
+
+## Setting up from scratch
+
+If the service ever has to be recreated, from the repo root:
 
 ```bash
 railway login                                   # opens the browser; sign in once
 railway init --name jenbina                     # creates the project and links this directory
 railway add --service jenbina                   # the web service
 railway service jenbina                         # link the CLI to it
-railway volume add --mount-path /data           # persistent disk for her memory
-railway variables --set "JENBINA_DATA_DIR=/data/jenbina_memory" --skip-deploys
+railway volume add --mount-path /jenbina        # persistent disk for her memory
+railway variables --set "JENBINA_DATA_DIR=/jenbina" --skip-deploys
 railway domain                                  # prints the public https URL
 railway variables --set "REDIRECT_URI=https://<the printed domain>" --skip-deploys
 ```
@@ -49,17 +86,7 @@ dashboard (its raw editor) works just as well.
 Then allow the Railway URL in Google: Google Cloud Console → APIs & Services →
 Credentials → your OAuth 2.0 Client → **Authorized redirect URIs** → add exactly the
 `REDIRECT_URI` value (https, no trailing slash). Sign-in fails with `invalid_grant`
-until this matches.
-
-Finally, deploy and watch the build:
-
-```bash
-railway up
-```
-
-`railway up` uploads the working tree (honouring `.gitignore` and `.railwayignore`),
-builds it with Railpack, and streams the logs. The first build installs ChromaDB and
-LangChain and takes a few minutes; later builds reuse the cache.
+until this matches. Finish with `railway up --ci`.
 
 ## Environment variables
 
@@ -68,29 +95,15 @@ LangChain and takes a few minutes; later builds reuse the cache.
 | `OPENAI_API_KEY` | yes | Chat, embeddings, insights |
 | `GOOGLE_CREDENTIALS_JSON` | yes | OAuth client JSON for Google sign-in |
 | `REDIRECT_URI` | yes | The app's public URL, no trailing slash |
-| `JENBINA_DATA_DIR` | yes | `/data/jenbina_memory` on the volume |
+| `JENBINA_DATA_DIR` | yes | The volume mount path, `/jenbina` on the current service |
 | `OPENAI_CHAT_MODEL` | no | Defaults from `core/connect.py` |
-| `SERPAPI_API_KEY` | no | Web search for the user dossier |
+| `SERPAPI_API_KEY`, `SERPER_API_KEY` | no | Web search for the user dossier |
+| `FIREBASE_*` | no | Set on the current service; the login page uses Google OAuth, not Firebase |
 | `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | no | Graph memory; the app runs without Neo4j |
 | `LANGSMITH_API_KEY`, `LANGSMITH_TRACING`, `LANGSMITH_PROJECT` | no | LLM tracing |
 | `JENBINA_SKIP_AUTH` | no | `1` bypasses Google sign-in. **Never set it on a public URL**: anyone who finds the app could spend your OpenAI credit. |
 
 Railway injects `PORT`; do not set it.
-
-## Redeploying
-
-From the repo root, on the branch you want live:
-
-```bash
-railway up
-```
-
-To deploy on every push instead, open the service in the Railway dashboard →
-Settings → Source → connect the GitHub repo `motya770/jenbina` and pick the branch.
-Railway then builds each push with the same `railway.toml`.
-
-Useful commands: `railway logs` (runtime logs), `railway status`, `railway open`
-(dashboard), `railway redeploy`.
 
 ## Optional: Neo4j
 
