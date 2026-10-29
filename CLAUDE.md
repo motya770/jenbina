@@ -59,6 +59,8 @@ jenbina/
 │   └── sprites/                 # Committed pixel sprite sheets and 8x8 icons (python -m core.ui.sprites.build)
 ├── old/                         # Legacy/archived code
 ├── requirements.txt             # Python dependencies
+├── railway.toml                 # Railway service config: start command, health check (see DEPLOY.md)
+├── DEPLOY.md                    # How Jenbina is deployed to Railway: one-time setup, env vars, redeploy
 ├── run_app.py                   # Launcher script
 ├── run_jenbina.py               # Alternative launcher
 ├── clear_chromadb.py            # Utility: clear vector database
@@ -133,6 +135,10 @@ python clear_chromadb.py
 # Clear all memory
 python clear_memory.py
 ```
+
+### Deploying
+
+The app runs on Railway; `DEPLOY.md` has the one-time setup, the env var table and the redeploy command (`railway up` from the repo root).
 
 ### Installation
 

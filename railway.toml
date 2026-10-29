@@ -1,0 +1,15 @@
+# Railway service config for the Jenbina Streamlit app.
+# Docs: https://docs.railway.com/reference/config-as-code
+#
+# Secrets (OPENAI_API_KEY, GOOGLE_CREDENTIALS_JSON) and the volume are set on
+# the service, not here. See DEPLOY.md.
+
+[build]
+builder = "RAILPACK"
+
+[deploy]
+startCommand = "streamlit run core/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true"
+healthcheckPath = "/_stcore/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
