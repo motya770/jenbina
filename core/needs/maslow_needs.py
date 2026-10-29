@@ -240,21 +240,18 @@ class MaslowNeedsSystem:
                 avg_satisfaction = sum(need.satisfaction for need in level_needs) / len(level_needs)
                 level_satisfactions[level] = avg_satisfaction
         
-        # Determine growth stage based on level satisfaction
-        if level_satisfactions.get(NeedLevel.PHYSIOLOGICAL, 0) >= 70:
-            if level_satisfactions.get(NeedLevel.SAFETY, 0) >= 70:
-                if level_satisfactions.get(NeedLevel.SOCIAL, 0) >= 60:
-                    if level_satisfactions.get(NeedLevel.ESTEEM, 0) >= 50:
-                        if level_satisfactions.get(NeedLevel.SELF_ACTUALIZATION, 0) >= 30:
-                            self.growth_stage = 5  # Self-actualization
-                        else:
-                            self.growth_stage = 4  # Esteem
-                    else:
-                        self.growth_stage = 3  # Social
-                else:
-                    self.growth_stage = 2  # Safety
-            else:
-                self.growth_stage = 1  # Physiological
+        # The stage is the first level whose needs are not met: the one being
+        # worked on. It falls back whenever a lower level collapses.
+        if level_satisfactions.get(NeedLevel.PHYSIOLOGICAL, 0) < 70:
+            self.growth_stage = 1  # Survival Mode
+        elif level_satisfactions.get(NeedLevel.SAFETY, 0) < 70:
+            self.growth_stage = 2  # Safety Seeking
+        elif level_satisfactions.get(NeedLevel.SOCIAL, 0) < 60:
+            self.growth_stage = 3  # Social Connection
+        elif level_satisfactions.get(NeedLevel.ESTEEM, 0) < 50:
+            self.growth_stage = 4  # Achievement & Recognition
+        else:
+            self.growth_stage = 5  # Self-Actualization
     
     def satisfy_need(self, need_name: str, amount: float, source: str = "unknown") -> float:
         """Satisfy a specific need"""

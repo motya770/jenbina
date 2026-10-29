@@ -243,9 +243,9 @@ class TestChains(unittest.TestCase):
         
         action_chain = create_action_decision_chain(self.mock_llm)
         
-        # Should handle invalid JSON gracefully
-        with self.assertRaises(json.JSONDecodeError):
-            action_chain(self.person, invalid_world_description, self.mock_llm)
+        # Should handle invalid JSON gracefully: no actions to offer, but still a decision
+        decision = action_chain(self.person, invalid_world_description, self.mock_llm)
+        self.assertEqual(decision["chosen_action"], "eat")
 
 
 class TestChainEdgeCases(unittest.TestCase):

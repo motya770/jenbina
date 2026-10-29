@@ -102,6 +102,40 @@ def _build_subsystem_context(person, needs=None, emotions=None):
     return parts
 
 
+def _summary_field(section, key):
+    """``section[key]`` for the nested world-summary shape, the value itself
+    for a flat string, ``""`` otherwise."""
+    if isinstance(section, dict):
+        return section.get(key, "") or ""
+    return section or ""
+
+
+def history_context(sim_history, limit=6):
+    """``(recent_actions, world_context)`` read from the records the runners
+    append to ``simulation_history``: the last ``limit`` chosen actions, oldest
+    first, and the latest record's place, time of day and weather on one line
+    (``None`` when that record carries no world summary)."""
+    records = [r for r in (sim_history or []) if isinstance(r, dict)]
+    recent_actions = []
+    for record in records[-limit:]:
+        decision = record.get("action_decision")
+        action = decision.get("chosen_action") if isinstance(decision, dict) else None
+        if action:
+            recent_actions.append(str(action))
+    world_context = None
+    if records:
+        summary = records[-1].get("world_summary") or {}
+        if isinstance(summary, dict):
+            parts = [
+                _summary_field(summary.get("location"), "name"),
+                _summary_field(summary.get("time"), "time_of_day"),
+                _summary_field(summary.get("weather"), "description"),
+            ]
+            parts = [str(p) for p in parts if p]
+            world_context = ", ".join(parts) if parts else None
+    return recent_actions, world_context
+
+
 def generate_proactive_message(person, llm, triggers, display_name="User",
                                recent_actions=None, world_context=None):
     """Generate a 1-3 sentence natural message Jenbina sends on her own.

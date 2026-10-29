@@ -23,7 +23,7 @@ from core.environment.world_state import (
 from core.environment.location_system import PaloAltoLocationSystem
 from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_action_chain
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
-from core.interaction.chat_handler import generate_proactive_message
+from core.interaction.chat_handler import generate_proactive_message, history_context
 from core.connect import get_llm
 from core.timeline import (
     EventLog,
@@ -43,6 +43,10 @@ from core.timeline import (
 # Pure-Python helpers (copied from core/ui/simulation.py — no streamlit)
 # ---------------------------------------------------------------------------
 
+# One representative need per level, by its real name in MaslowNeedsSystem.
+HEADLINE_NEEDS = ("hunger", "sleep", "security", "love", "self_esteem", "personal_growth")
+
+
 def get_person_dict(person):
     """Get person state as dictionary."""
     return {
@@ -51,8 +55,7 @@ def get_person_dict(person):
             "overall_satisfaction": person.maslow_needs.get_overall_satisfaction(),
             "individual_needs": {
                 need_name: person.maslow_needs.get_need_satisfaction(need_name)
-                for need_name in ["hunger", "sleep", "security", "love", "esteem", "self_actualization"]
-                if person.maslow_needs.get_need_satisfaction(need_name) > 0
+                for need_name in HEADLINE_NEEDS
             },
             "critical_needs": person.maslow_needs.get_critical_needs(),
             "low_needs": person.maslow_needs.get_low_needs()
@@ -204,6 +207,54 @@ _ACTION_KEY_MAP = {
     "think": "explore_meaning", "contemplate": "explore_meaning",
     "philosoph": "philosophical_exploration",
 }
+
+# Keywords kept as stems so every inflection matches ("exploring", "meditation").
+_STEM_KEYWORDS = {"explor", "observ", "investigat", "meditat", "philosoph"}
+# Endings a whole-word keyword may carry: plurals, tenses, agent nouns and a
+# few derived forms ("visitor", "readers", "chatty", "meaningful").
+_ENDINGS = r"s|es|ed|ing|er|ers|or|ors|ty|ful"
+
+
+def _keyword_pattern(keyword):
+    if keyword in _STEM_KEYWORDS:
+        return re.compile(r"\b" + re.escape(keyword))
+    if keyword.endswith("e"):
+        # keep the e for safe -> safety, purpose -> purposeful, home -> homes;
+        # drop it for exercise -> exercising, write -> writer
+        core = re.escape(keyword[:-1]) + r"(?:e(?:s|ty|ful)?|ed|ing|er|ers|or|ors)"
+    else:
+        # an optional doubled final consonant: sit -> sitting, plan -> planning
+        core = re.escape(keyword) + r"(?:" + re.escape(keyword[-1]) + r")?(?:" + _ENDINGS + r")?"
+    return re.compile(r"\b" + core + r"\b")
+
+
+_ACTION_KEY_PATTERNS = [(_keyword_pattern(k), v) for k, v in _ACTION_KEY_MAP.items()]
+
+
+def match_action_key(action_text):
+    """The need-satisfaction action key for a chosen action, or ``None``.
+
+    Keywords match as whole words with their usual inflections (sitting,
+    visitor, exercising, safety), so a restaurant is not a rest and teaching
+    is not tea; the stems in ``_STEM_KEYWORDS`` match any ending. The first
+    keyword in table order wins.
+    """
+    text = (action_text or "").lower()
+    for pattern, action_key in _ACTION_KEY_PATTERNS:
+        if pattern.search(text):
+            return action_key
+    return None
+
+
+def credit_completed_plan(plan, goal_system, amount=0.3):
+    """Finishing a plan advances the goal it was made for, once. Returns the goal."""
+    if plan is None or goal_system is None or getattr(plan, "goal_id", None) is None:
+        return None
+    for goal in getattr(goal_system, "goals", []):
+        if goal.description == plan.goal_description and goal.is_active():
+            goal.advance(amount)
+            return goal
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -439,19 +490,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         person.curiosity_system.update_after_action(action_response.get("chosen_action", ""))
     _print_json("Action Response", action_response)
 
-    # Apply action effects to needs via fuzzy matching
+    # Apply action effects to needs via keyword matching
     action_executor = create_maslow_action_executor(person.maslow_needs)
-    chosen_lower = chosen.lower()
-    matched_action = None
-    for keyword, action_key in _ACTION_KEY_MAP.items():
-        if re.search(r'\b' + re.escape(keyword), chosen_lower):
-            matched_action = action_key
-            break
-    if matched_action is None:
-        for keyword, action_key in _ACTION_KEY_MAP.items():
-            if keyword in chosen_lower:
-                matched_action = action_key
-                break
+    matched_action = match_action_key(chosen)
     if matched_action:
         effect_result = action_executor(matched_action)
         print(f"  Action effect applied: {matched_action} -> satisfied {effect_result.get('satisfied_needs', {})}")
@@ -586,21 +627,14 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
                 record_plan_step(event_log, step_result, plan_before.goal_description, step_obj.description)
                 if plan_before.status == "completed":
                     record_plan_finished(event_log, plan_before)
+                    credit_completed_plan(plan_before, person.goal_system)
+                    print(f"  Plan completed: {plan_before.goal_description}")
             if step_result == "step_completed":
                 print(f"  Plan step completed!")
                 current = person.planning_system.get_current_step()
                 if current:
                     _, next_step = current
                     print(f"  Next step: {next_step.description}")
-                else:
-                    for p in person.planning_system.plans:
-                        if p.status == "completed" and p.goal_id is not None:
-                            print(f"  Plan completed: {p.goal_description}")
-                            if person.goal_system is not None:
-                                for g in person.goal_system.goals:
-                                    if g.description == p.goal_description and g.is_active():
-                                        g.advance(0.3)
-                                        break
             elif step_result == "step_overridden":
                 print(f"  Plan step overridden by urgent needs.")
 
@@ -681,24 +715,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         display_name = context.get("display_name", "User")
         triggers = _check_proactive_triggers(person, display_name)
         if triggers:
-            # Build recent actions and world context for the message
-            recent_actions_for_msg = None
-            world_context_for_msg = None
-            sim_history = context.get("simulation_history", [])
-            if sim_history:
-                recent_actions_for_msg = [
-                    r.get("chosen_action", "")
-                    for r in sim_history[-6:]
-                    if r.get("chosen_action")
-                ]
-                latest = sim_history[-1]
-                ws = latest.get("world_summary", {})
-                if isinstance(ws, dict):
-                    loc = ws.get("location", "")
-                    tod = ws.get("time_of_day", "")
-                    weather = ws.get("weather", "")
-                    parts = [p for p in (loc, tod, weather) if p]
-                    world_context_for_msg = ", ".join(parts) if parts else None
+            recent_actions_for_msg, world_context_for_msg = history_context(
+                context.get("simulation_history", [])
+            )
 
             proactive_llm = context.get("_proactive_llm")
             if proactive_llm is None:

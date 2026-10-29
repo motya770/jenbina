@@ -39,7 +39,7 @@ def create_state_analysis_system(llm: BaseLLM, action_decision: str, compliance_
         Returns:
             Dict containing state changes or None if compliance check fails
         """
-        if not compliance_check["compliant"]:
+        if not isinstance(compliance_check, dict) or not compliance_check.get("compliant", False):
             print("\nAction not taken - failed Asimov compliance check")
             return None
 

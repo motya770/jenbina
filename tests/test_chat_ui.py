@@ -76,5 +76,45 @@ class TestEventLogPerUser(unittest.TestCase):
         self.assertIs(st.session_state["event_log"], log)
 
 
+
+RECORD = {
+    "action_decision": {"chosen_action": "Walk to Coupa Cafe"},
+    "world_summary": {
+        "location": {"name": "Jenbina's House"},
+        "time": {"time_of_day": "evening"},
+        "weather": {"description": "Clear skies"},
+    },
+}
+
+
+class TestHistoryShapedContext(unittest.TestCase):
+    @patch("core.ui.chat.generate_proactive_message", return_value="Still there?")
+    @patch("core.ui.chat.check_proactive_message", return_value={"low_social": {}})
+    @patch("core.ui.chat._get_user_db_and_id", return_value=(None, None))
+    @patch("core.ui.chat._get_user_display_name", return_value="Matt")
+    @patch("core.ui.chat.st")
+    def test_proactive_message_reads_runner_history_records(self, st, _name, _db, _check, gen):
+        st.session_state = _FakeSessionState(simulation_history=[dict(RECORD)])
+        person = MagicMock()
+        self.assertEqual(send_proactive_message(person, None), "Still there?")
+        self.assertEqual(gen.call_args.kwargs["recent_actions"], ["Walk to Coupa Cafe"])
+        self.assertEqual(gen.call_args.kwargs["world_context"], "Jenbina's House, evening, Clear skies")
+
+    @patch("core.ui.chat.analyze_emotion_impact", return_value={})
+    @patch("core.ui.chat.handle_chat_interaction", return_value={"assistant_response": "hey", "user_message": "hi"})
+    @patch("core.ui.chat._get_user_db_and_id", return_value=(None, None))
+    @patch("core.ui.chat._get_user_display_name", return_value="Matt")
+    @patch("core.ui.chat.st")
+    def test_chat_reply_sees_recent_actions(self, st, _name, _db, chat, _emotion):
+        st.session_state = _FakeSessionState(
+            event_log=EventLog(), action_history=[], needs_response=None, world_description=None,
+            action_decision=None, state_response=None, simulation_history=[dict(RECORD)],
+        )
+        person = MagicMock()
+        person.social_cognition = None
+        handle_user_input(person, None, None, False, "hi")
+        self.assertEqual(chat.call_args.kwargs["recent_actions"], ["Walk to Coupa Cafe"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -701,5 +701,43 @@ class TestGenerateFirstGreeting(unittest.TestCase):
         self.assertEqual(result, "Hey there!")
 
 
+
+class TestHistoryContext(unittest.TestCase):
+    """history_context reads the records the runners append to simulation_history."""
+
+    RECORD = {
+        "action_decision": {"chosen_action": "Walk to Coupa Cafe"},
+        "world_summary": {
+            "location": {"name": "Jenbina's House"},
+            "time": {"time_of_day": "evening"},
+            "weather": {"description": "Clear skies"},
+        },
+    }
+
+    def test_reads_runner_history_records(self):
+        from core.interaction.chat_handler import history_context
+        actions, world = history_context([self.RECORD])
+        self.assertEqual(actions, ["Walk to Coupa Cafe"])
+        self.assertEqual(world, "Jenbina's House, evening, Clear skies")
+
+    def test_empty_history(self):
+        from core.interaction.chat_handler import history_context
+        self.assertEqual(history_context([]), ([], None))
+        self.assertEqual(history_context(None), ([], None))
+
+    def test_flat_string_world_summary_is_read_as_is(self):
+        from core.interaction.chat_handler import history_context
+        record = {"action_decision": {"chosen_action": "nap"},
+                  "world_summary": {"location": "Jenbina's House", "time": {"time_of_day": "night"}, "weather": ""}}
+        self.assertEqual(history_context([record]), (["nap"], "Jenbina's House, night"))
+
+    def test_keeps_the_last_six_actions_and_tolerates_a_bare_record(self):
+        from core.interaction.chat_handler import history_context
+        records = [{"action_decision": {"chosen_action": f"a{i}"}} for i in range(8)]
+        actions, world = history_context(records)
+        self.assertEqual(actions, [f"a{i}" for i in range(2, 8)])
+        self.assertIsNone(world)
+
+
 if __name__ == "__main__":
     unittest.main()

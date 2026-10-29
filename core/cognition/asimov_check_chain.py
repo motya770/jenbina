@@ -5,6 +5,13 @@ from langchain.llms.base import BaseLLM
 from typing import Dict, Any, Callable
 from ..fix_llm_json import fix_llm_json
 
+def _as_bool(value) -> bool:
+    """JSON booleans as they come; the strings an LLM sometimes writes instead."""
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "yes", "1")
+    return bool(value)
+
+
 def create_asimov_check_system(llm: BaseLLM) -> Callable:
     """
     Creates and returns a function that checks if actions comply with Asimov's Laws.
@@ -45,13 +52,15 @@ Respond in JSON format with:
         result = response.content if hasattr(response, 'content') else str(response)
         
         try:
-            fixed_result = fix_llm_json(broken_json=result, llm_json_mode=llm)
-            compliance_result = json.dumps(fixed_result, indent=2)
-            return json.loads(compliance_result)
-        except json.JSONDecodeError:
+            verdict = fix_llm_json(broken_json=result, llm_json_mode=llm)
+        except Exception:  # noqa: BLE001 - a broken verdict must not break the runner
+            verdict = None
+        if not isinstance(verdict, dict) or "compliant" not in verdict:
             return {
                 "compliant": False,
                 "explanation": "Error parsing compliance check result"
             }
+        verdict["compliant"] = _as_bool(verdict["compliant"])
+        return verdict
 
     return check_asimov_compliance

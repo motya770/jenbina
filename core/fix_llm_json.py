@@ -36,12 +36,13 @@ def fix_llm_json(broken_json: str, llm_json_mode: BaseLLM) -> Dict[str, Any]:
             template="Fix this invalid JSON and return ONLY valid JSON without any additional text:\n\n{broken_json}"
         )
         
-        fix_json_chain = LLMChain(
-            llm=llm_json_mode,
-            prompt=fix_json_prompt
-        )
-        
         try:
+            # Building the chain can fail too (an llm that is not a Runnable):
+            # that must end in the error dict below, never an exception.
+            fix_json_chain = LLMChain(
+                llm=llm_json_mode,
+                prompt=fix_json_prompt
+            )
             fixed_json = fix_json_chain.invoke({"broken_json": broken_json})
             
             # Try to parse the fixed JSON
