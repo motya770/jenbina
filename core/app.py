@@ -125,10 +125,6 @@ def main():
             rail=rail,
             event_log=event_log,
         )
-        if results:
-            last = results[-1]
-            st.session_state.action_decision = last.get("action_decision")
-            st.session_state.needs_response = last.get("needs_state")
         st.session_state.simulation_completed = True
         save_person_state()
         st.rerun()

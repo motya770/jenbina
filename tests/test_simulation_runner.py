@@ -108,6 +108,10 @@ class TestUiRunnerEvents(unittest.TestCase):
         self.assertEqual(len(st.session_state["simulation_history"]), 2)
         self.assertIn("satisfaction_delta", results[0])
         st.progress.assert_not_called()
+        # What the chat reads afterwards: the latest world, decision and state analysis
+        self.assertEqual(st.session_state["world_description"], WORLD_JSON)
+        self.assertEqual(st.session_state["action_decision"]["chosen_action"], ACTION["chosen_action"])
+        self.assertEqual(st.session_state["state_response"], {"ok": True})
 
 
 class TestHeadlessRunnerEvents(unittest.TestCase):
@@ -152,7 +156,9 @@ class TestPlanCompletionEvents(unittest.TestCase):
         finished = [e.title for e in log.recent() if e.title.startswith("Plan finished")]
         self.assertEqual(finished, ["Plan finished: new goal"])
         self.assertIn("Plan step done: call a friend", [e.title for e in log.recent()])
-        self.assertIn("Goal advanced: new goal → 30%", [e.title for e in log.recent()])
+        titles = [e.title for e in log.recent()]
+        self.assertIn("Goal advanced: new goal → 30%", titles)
+        self.assertNotIn("Goal advanced: old goal → 30%", titles)  # finished long ago: not credited again
 
     def test_ui_runner_records_plan_finished_once_and_goal_advanced(self):
         import core.ui.simulation as sim
@@ -174,6 +180,95 @@ class TestPlanCompletionEvents(unittest.TestCase):
                 patch("core.simulation_runner.get_llm", return_value=MagicMock()):
             hr.run_single_iteration_headless(person, MagicMock(), meta, 0, context)
         self._assert_events(log)
+
+
+
+RECORD = {
+    "action_decision": {"chosen_action": "Walk to Coupa Cafe"},
+    "world_summary": {
+        "location": {"name": "Jenbina's House"},
+        "time": {"time_of_day": "evening"},
+        "weather": {"description": "Clear skies"},
+    },
+}
+
+
+class TestPersonDict(unittest.TestCase):
+    def test_person_dict_reports_the_real_esteem_and_growth_needs(self):
+        import core.simulation_runner as hr
+        import core.ui.simulation as sim
+        for module in (hr, sim):
+            needs = module.get_person_dict(Person())["maslow_needs"]["individual_needs"]
+            self.assertEqual(set(needs), {"hunger", "sleep", "security", "love", "self_esteem", "personal_growth"})
+
+
+class TestActionKeywordMatch(unittest.TestCase):
+    def test_keyword_must_be_a_whole_word(self):
+        from core.simulation_runner import match_action_key
+        self.assertEqual(match_action_key("Visit the Italian restaurant on University Avenue"), "socialize")
+        self.assertIsNone(match_action_key("Teach chess at the library"))
+
+    def test_inflections_and_stems_still_match(self):
+        from core.simulation_runner import match_action_key
+        self.assertEqual(match_action_key("Resting on the couch"), "rest")
+        self.assertEqual(match_action_key("Go exploring the Baylands trails"), "learn_new_things")
+        self.assertEqual(match_action_key("Meditation by the window"), "explore_meaning")
+
+    def test_doubled_consonants_drop_e_and_agent_nouns_match(self):
+        from core.simulation_runner import match_action_key
+        self.assertEqual(match_action_key("Sitting by the bay"), "rest")
+        self.assertEqual(match_action_key("Chatting with Matt"), "socialize")
+        self.assertEqual(match_action_key("Planning the week"), "establish_routine")
+        self.assertEqual(match_action_key("Stop at the visitor center"), "socialize")
+        self.assertEqual(match_action_key("Join the readers club"), "learn_new_things")
+        self.assertEqual(match_action_key("Exercising in the courtyard"), "maintain_health")
+        self.assertEqual(match_action_key("Writing a poem"), "be_creative")
+        self.assertEqual(match_action_key("Check the safety of the back door"), "find_safety")
+        self.assertEqual(match_action_key("Look for something meaningful"), "explore_meaning")
+
+    def test_whole_word_guard_survives_the_inflection_rules(self):
+        from core.simulation_runner import match_action_key
+        self.assertIsNone(match_action_key("Tour the construction site"))   # "sit" + e is not sitting
+        self.assertIsNone(match_action_key("Plant seeds in the pot"))        # "plan" + t is not planning
+        self.assertIsNone(match_action_key("Get ready for the day"))         # "read" + y is not reading
+
+    def test_ui_runner_applies_the_shared_matcher(self):
+        import core.ui.simulation as sim
+        person, meta, patches = build_env(sim)
+        person.maslow_needs.needs["sleep"].satisfaction = 10.0
+        with patches, patch("core.ui.simulation.st") as st, patch("core.ui.simulation.send_proactive_message"), \
+                patch("core.ui.simulation.match_action_key", return_value="sleep"):
+            st.session_state = _session()
+            sim.run_single_iteration(person, MagicMock(), meta, 0, rail=NullRail(), event_log=EventLog())
+        self.assertGreater(person.maslow_needs.needs["sleep"].satisfaction, 60.0)
+
+    def test_headless_runner_applies_the_shared_matcher(self):
+        import core.simulation_runner as hr
+        person, meta, patches = build_env(hr)
+        person.maslow_needs.needs["sleep"].satisfaction = 10.0
+        context = {"simulation_history": [], "jenbina_location": "Jenbina's House", "debug_iterations": [], "event_log": EventLog()}
+        with patches, patch("core.simulation_runner.generate_proactive_message", return_value=None), \
+                patch("core.simulation_runner.get_llm", return_value=MagicMock()), \
+                patch("core.simulation_runner.match_action_key", return_value="sleep"):
+            hr.run_single_iteration_headless(person, MagicMock(), meta, 0, context)
+        self.assertGreater(person.maslow_needs.needs["sleep"].satisfaction, 60.0)
+
+
+class TestHeadlessProactiveContext(unittest.TestCase):
+    def test_proactive_message_gets_recent_actions_and_world_from_history(self):
+        import core.simulation_runner as hr
+        person, meta, patches = build_env(hr)
+        context = {"simulation_history": [dict(RECORD)], "jenbina_location": "Jenbina's House",
+                   "debug_iterations": [], "event_log": EventLog(), "display_name": "Matt"}
+        triggers = {"low_social": {"need": "love", "satisfaction": 20}}
+        with patches, patch("core.simulation_runner._check_proactive_triggers", return_value=triggers), \
+                patch("core.simulation_runner.generate_proactive_message", return_value="Still there?") as gen, \
+                patch("core.simulation_runner.get_llm", return_value=MagicMock()):
+            hr.run_single_iteration_headless(person, MagicMock(), meta, 0, context)
+        gen.assert_called_once()
+        self.assertEqual(gen.call_args.kwargs["recent_actions"], ["Walk to Coupa Cafe"])
+        self.assertEqual(gen.call_args.kwargs["world_context"], "Jenbina's House, evening, Clear skies")
+        self.assertEqual(person.conversations["Matt"].messages[-1].content, "Still there?")
 
 
 if __name__ == "__main__":

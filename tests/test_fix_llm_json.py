@@ -53,6 +53,14 @@ class TestFixLlmJson(unittest.TestCase):
         self.assertEqual(result, {"not": "valid json"})
 
     # ------------------------------------------------------------------
+    # The repair chain cannot be built from this llm -> still the error dict, never an exception
+    # ------------------------------------------------------------------
+    def test_unbuildable_repair_chain_returns_error_dict(self):
+        result = fix_llm_json("not json at all", MagicMock())
+        self.assertEqual(result["error"], "Failed to parse JSON")
+        self.assertEqual(result["original"], "not json at all")
+
+    # ------------------------------------------------------------------
     # LLM first-pass fix succeeds (lines 44-48)
     # ------------------------------------------------------------------
     @patch("core.fix_llm_json.LLMChain")

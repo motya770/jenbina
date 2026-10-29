@@ -157,7 +157,16 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
         # ==============================================================
         # Gather context (unchanged from original)
         # ==============================================================
-        description_data = json.loads(world_description)
+        if isinstance(world_description, dict):
+            description_data = world_description
+        elif world_description:
+            description_data = fix_llm_json(broken_json=str(world_description), llm_json_mode=llm)
+        else:
+            description_data = {}
+        if not isinstance(description_data, dict):
+            description_data = {}
+        if "list_of_actions" not in description_data:
+            print("    [CoT] World description unusable (no list_of_actions): deciding without a scene")
 
         maslow_needs = person.maslow_needs
         hunger_satisfaction = maslow_needs.get_need_satisfaction("hunger")
@@ -254,8 +263,8 @@ def create_action_decision_chain(llm: BaseLLM) -> callable:
             llm,
             DELIBERATE_PROMPT.format(
                 assessment=assessment_str,
-                actions=description_data["list_of_actions"],
-                descriptions=description_data["list_of_descriptions"],
+                actions=description_data.get("list_of_actions", []),
+                descriptions=description_data.get("list_of_descriptions", []),
             ),
         )
         candidates = deliberation.get("candidates", [])

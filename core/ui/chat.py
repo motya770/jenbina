@@ -6,6 +6,7 @@ from core.interaction.chat_handler import (
     generate_proactive_message,
     generate_first_greeting,
     generate_return_greeting,
+    history_context,
 )
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.auth.user_db import UserDatabase
@@ -68,24 +69,8 @@ def send_proactive_message(person, llm):
         return None
 
     try:
-        # Extract recent actions and world context from simulation history
-        recent_actions = None
-        world_context = None
-        sim_history = st.session_state.get("simulation_history", [])
-        if sim_history:
-            recent_actions = [
-                r.get("chosen_action", "")
-                for r in sim_history[-6:]
-                if r.get("chosen_action")
-            ]
-            latest = sim_history[-1]
-            ws = latest.get("world_summary", {})
-            if isinstance(ws, dict):
-                loc = ws.get("location", "")
-                tod = ws.get("time_of_day", "")
-                weather = ws.get("weather", "")
-                parts = [p for p in (loc, tod, weather) if p]
-                world_context = ", ".join(parts) if parts else None
+        # Recent actions and world context from the simulation history
+        recent_actions, world_context = history_context(st.session_state.get("simulation_history", []))
 
         message = generate_proactive_message(
             person, llm, triggers,
@@ -226,15 +211,8 @@ def handle_user_input(person, llm, memory_manager, debug_mode, user_input):
                 for msg in db_messages
             ])
 
-        # Extract recent actions from simulation history
-        recent_actions = None
-        sim_history = st.session_state.get("simulation_history", [])
-        if sim_history:
-            recent_actions = [
-                r.get("chosen_action", "")
-                for r in sim_history[-6:]
-                if r.get("chosen_action")
-            ]
+        # Recent actions from the simulation history
+        recent_actions, _ = history_context(st.session_state.get("simulation_history", []))
 
         # Handle chat interaction
         update_system_stage("replying…")
