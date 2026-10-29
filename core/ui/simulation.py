@@ -31,6 +31,7 @@ from core.timeline import (
     record_thought,
     snapshot_goals,
 )
+from core.simulation_runner import HEADLINE_NEEDS, credit_completed_plan, match_action_key
 from core.ui.chat import get_event_log, send_proactive_message
 from core.ui.pixel_theme import action_icon, delta_badge_html, event_html, icon_html, sprite_html
 from core.ui.timeline import action_details_text, first_sentence
@@ -150,18 +151,20 @@ NEED_SEGMENTS = 10
 
 def render_needs_bars(person):
     """Render Maslow needs as ten-segment pixel bars with 8x8 icons."""
+    # (css key, label, need in MaslowNeedsSystem): the css key names the row's
+    # class and icon; Esteem and Growth show one representative need of their level.
     needs_config = [
-        ("hunger", "Hunger"),
-        ("sleep", "Sleep"),
-        ("security", "Safety"),
-        ("love", "Social"),
-        ("esteem", "Esteem"),
-        ("self_actualization", "Growth"),
+        ("hunger", "Hunger", "hunger"),
+        ("sleep", "Sleep", "sleep"),
+        ("security", "Safety", "security"),
+        ("love", "Social", "love"),
+        ("esteem", "Esteem", "self_esteem"),
+        ("self_actualization", "Growth", "personal_growth"),
     ]
 
     rows = []
-    for need_name, label in needs_config:
-        satisfaction = person.maslow_needs.get_need_satisfaction(need_name)
+    for need_name, label, need_key in needs_config:
+        satisfaction = person.maslow_needs.get_need_satisfaction(need_key)
         if satisfaction is None or (isinstance(satisfaction, float) and math.isnan(satisfaction)):
             satisfaction = 0
         pct = max(0, min(100, satisfaction))
@@ -242,8 +245,7 @@ def get_person_dict(person):
             "overall_satisfaction": person.maslow_needs.get_overall_satisfaction(),
             "individual_needs": {
                 need_name: person.maslow_needs.get_need_satisfaction(need_name)
-                for need_name in ["hunger", "sleep", "security", "love", "esteem", "self_actualization"]
-                if person.maslow_needs.get_need_satisfaction(need_name) > 0
+                for need_name in HEADLINE_NEEDS
             },
             "critical_needs": person.maslow_needs.get_critical_needs(),
             "low_needs": person.maslow_needs.get_low_needs()
@@ -559,63 +561,9 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
         person.curiosity_system.update_after_action(action_response.get("chosen_action", ""))
     _print_json("⚡ Action Response", action_response)
 
-    # Apply action effects to needs via fuzzy matching
+    # Apply action effects to needs via keyword matching (shared with the headless runner)
     action_executor = create_maslow_action_executor(person.maslow_needs)
-    _action_key_map = {
-        # Physiological
-        "eat": "eat", "food": "eat", "cook": "eat", "meal": "eat",
-        "breakfast": "eat", "lunch": "eat", "dinner": "eat", "kitchen": "eat", "snack": "eat",
-        "drink": "drink", "water": "drink", "coffee": "drink", "tea": "drink",
-        "sleep": "sleep", "nap": "sleep", "bed": "sleep",
-        "rest": "rest", "relax": "rest", "sit": "rest", "lounge": "rest",
-        "shelter": "find_shelter", "home": "find_shelter", "house": "find_shelter", "inside": "find_shelter",
-        "health": "maintain_health", "exercise": "maintain_health", "walk": "maintain_health",
-        "outside": "maintain_health", "courtyard": "maintain_health", "stroll": "maintain_health",
-        "fresh air": "maintain_health", "stretch": "maintain_health", "garden": "maintain_health",
-        "step out": "maintain_health",
-        # Safety
-        "safe": "find_safety", "security": "find_safety", "lock": "find_safety",
-        "routine": "establish_routine", "plan": "establish_routine", "schedule": "establish_routine",
-        "order": "create_order", "clean": "create_order", "organize": "create_order", "tidy": "create_order",
-        "protect": "seek_protection", "check": "seek_protection",
-        # Social
-        "socialize": "socialize", "talk": "socialize", "chat": "socialize",
-        "conversation": "socialize", "greet": "socialize", "visit": "socialize",
-        "neighbor": "socialize", "call": "socialize",
-        "friend": "make_friends",
-        "love": "seek_love",
-        "community": "join_community", "gather": "join_community", "market": "join_community",
-        "relationship": "build_relationships",
-        # Esteem
-        "goal": "work_on_goals", "work": "work_on_goals", "task": "work_on_goals", "chore": "work_on_goals",
-        "confidence": "build_confidence",
-        "recognition": "seek_recognition",
-        "skill": "develop_skills", "practice": "develop_skills", "study": "develop_skills", "train": "develop_skills",
-        # Self-actualization
-        "learn": "learn_new_things", "read": "learn_new_things", "book": "learn_new_things",
-        "explor": "learn_new_things", "observ": "learn_new_things", "discover": "learn_new_things",
-        "investigat": "learn_new_things", "inspect": "learn_new_things", "surround": "learn_new_things",
-        "creative": "be_creative", "paint": "be_creative", "write": "be_creative", "art": "be_creative",
-        "sing": "be_creative", "music": "be_creative", "draw": "be_creative",
-        "purpose": "find_purpose", "pray": "find_purpose",
-        "meaning": "explore_meaning", "reflect": "explore_meaning", "meditat": "explore_meaning",
-        "think": "explore_meaning", "contemplate": "explore_meaning",
-        "philosoph": "philosophical_exploration",
-    }
-    import re
-    chosen_lower = chosen.lower()
-    matched_action = None
-    # Try word-boundary match first to avoid false positives (e.g. "rest" in "restaurant")
-    for keyword, action_key in _action_key_map.items():
-        if re.search(r'\b' + re.escape(keyword), chosen_lower):
-            matched_action = action_key
-            break
-    if matched_action is None:
-        # Fall back to substring match
-        for keyword, action_key in _action_key_map.items():
-            if keyword in chosen_lower:
-                matched_action = action_key
-                break
+    matched_action = match_action_key(chosen)
     if matched_action:
         effect_result = action_executor(matched_action)
         print(f"  🎯 Action effect applied: {matched_action} → satisfied {effect_result.get('satisfied_needs', {})}")
@@ -785,21 +733,14 @@ def run_single_iteration(person, llm_json_mode, meta_cognitive_system, iteration
                 record_plan_step(event_log, step_result, plan_before.goal_description, step_obj.description)
                 if plan_before.status == "completed":
                     record_plan_finished(event_log, plan_before)
+                    credit_completed_plan(plan_before, person.goal_system)
+                    plan_messages.append(f"📋 Plan completed: {plan_before.goal_description}")
             if step_result == "step_completed":
                 plan_messages.append("📋 Plan step completed!")
                 current = person.planning_system.get_current_step()
                 if current:
                     _, next_step = current
                     plan_messages.append(f"Next step: {next_step.description}")
-                else:
-                    for p in person.planning_system.plans:
-                        if p.status == "completed" and p.goal_id is not None:
-                            plan_messages.append(f"📋 Plan completed: {p.goal_description}")
-                            if person.goal_system is not None:
-                                for g in person.goal_system.goals:
-                                    if g.description == p.goal_description and g.is_active():
-                                        g.advance(0.3)
-                                        break
             elif step_result == "step_overridden":
                 plan_messages.append("📋 Plan step overridden by urgent needs.")
 
@@ -946,6 +887,11 @@ def run_simulation_loop(person, llm_json_mode, meta_cognitive_system, iterations
         if "simulation_history" not in st.session_state:
             st.session_state.simulation_history = []
         st.session_state.simulation_history.append(iteration_record)
+        # What the chat reads afterwards: the latest world, decision, needs and state analysis
+        st.session_state.world_description = result["world_description"]
+        st.session_state.action_decision = result["action_decision"]
+        st.session_state.state_response = result["state_response"]
+        st.session_state.needs_response = iteration_record["needs_state"]
 
         if iteration < iterations - 1 and delay_seconds:
             rail.stage(f"waiting {delay_seconds}s…")

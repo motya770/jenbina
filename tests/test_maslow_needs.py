@@ -418,5 +418,32 @@ class TestLegacyNeed(unittest.TestCase):
         self.assertFalse(self.need.is_low())
 
 
+class TestGrowthStageLadder(unittest.TestCase):
+    """The growth stage names the level Jenbina is working on, and it falls
+    back when a lower level collapses."""
+
+    def _system_at(self, low_level=None, value=10.0):
+        system = MaslowNeedsSystem()
+        for need in system.needs.values():
+            need.satisfaction = value if need.level == low_level else 100.0
+        system._update_growth_stage()
+        return system
+
+    def test_stage_falls_back_to_survival_when_physiological_needs_collapse(self):
+        system = self._system_at()
+        self.assertEqual(system.growth_stage, 5)
+        for need in system.needs.values():
+            if need.level == NeedLevel.PHYSIOLOGICAL:
+                need.satisfaction = 5.0
+        system._update_growth_stage()
+        self.assertEqual(system.growth_stage, 1)
+
+    def test_stage_is_the_first_unmet_level(self):
+        self.assertEqual(self._system_at(NeedLevel.SAFETY).growth_stage, 2)
+        self.assertEqual(self._system_at(NeedLevel.SOCIAL).growth_stage, 3)
+        self.assertEqual(self._system_at(NeedLevel.ESTEEM).growth_stage, 4)
+        self.assertEqual(self._system_at(NeedLevel.SELF_ACTUALIZATION).growth_stage, 5)
+
+
 if __name__ == '__main__':
     unittest.main() 

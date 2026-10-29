@@ -123,19 +123,32 @@ def rendered(fn, *a):
         return st.markdown.call_args[0][0]
 
 
+def _row(html_, key):
+    """The markup of one needs-bar row, from its class to the next row."""
+    start = html_.index(f'need-row need-{key}')
+    end = html_.find('<div class="need-row', start + 1)
+    return html_[start:end if end != -1 else len(html_)]
+
+
 class TestNeedsBars(unittest.TestCase):
     def test_six_rows_ten_segments_and_fill_count(self):
         html_ = rendered(render_needs_bars, FakePerson(
-            {"hunger": 60, "sleep": 43, "security": 80, "love": 0, "esteem": 120, "self_actualization": -5}, {}))
+            {"hunger": 60, "sleep": 43, "security": 80, "love": 0, "self_esteem": 120, "personal_growth": -5}, {}))
         self.assertEqual(html_.count('class="need-row'), 6)
         for need in ["hunger", "sleep", "security", "love", "esteem", "self_actualization"]:
             self.assertIn(f'class="need-row need-{need}', html_)
         self.assertEqual(html_.count('<span class="need-seg'), 60)
         self.assertEqual(html_.count('need-seg on'), 6 + 4 + 8 + 0 + 10 + 0)
 
+    def test_esteem_and_growth_rows_read_the_real_needs(self):
+        from core.person.person import Person
+        html_ = rendered(render_needs_bars, Person())
+        self.assertIn('need-pct">50%', _row(html_, "esteem"))            # self_esteem starts at 50
+        self.assertIn('need-pct">30%', _row(html_, "self_actualization"))  # personal_growth starts at 30
+
     def test_half_percent_boundaries_round_up(self):
         html_ = rendered(render_needs_bars, FakePerson(
-            {"hunger": 85, "sleep": 75, "security": 45, "love": 95, "esteem": 5, "self_actualization": 55}, {}))
+            {"hunger": 85, "sleep": 75, "security": 45, "love": 95, "self_esteem": 5, "personal_growth": 55}, {}))
         self.assertEqual(html_.count('need-seg on'), 9 + 8 + 5 + 10 + 1 + 6)
 
     def test_non_finite_need_value_renders_as_empty_bar(self):
