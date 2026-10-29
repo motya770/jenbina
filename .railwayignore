@@ -1,0 +1,19 @@
+# Keep the `railway up` upload small and secret-free.
+# (Railway also honours .gitignore; the secrets are repeated here on purpose.)
+.env
+.google_credentials.json
+*credentials*.json
+jenbina_memory/
+*.db
+*.sqlite
+*.sqlite3
+.venv/
+__pycache__/
+.pytest_cache/
+.idea/
+.vscode/
+.ipynb_checkpoints/
+graphify-out/
+old/
+tests/
+docs/

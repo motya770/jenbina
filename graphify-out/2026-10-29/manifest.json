@@ -66,9 +66,9 @@
     "semantic_hash": "45a3bbb02ebc9ee2109ef0c9a54affe4"
   },
   "core/cognition/action_decision_chain.py": {
-    "mtime": 1793230966.6814618,
-    "seen": 1793231120.806859,
-    "ast_hash": "96d3197b3b6751a29eefd7fb7ea0eebd",
+    "mtime": 1793232272.7028768,
+    "seen": 1793232371.4764302,
+    "ast_hash": "46caebe9a92a72997df802a086dee412",
     "semantic_hash": ""
   },
   "core/cognition/asimov_check_chain.py": {
@@ -354,9 +354,9 @@
     "semantic_hash": "911168c2351058f5f68136c9c3628d38"
   },
   "core/simulation_runner.py": {
-    "mtime": 1793230966.6766737,
-    "seen": 1793231120.8069,
-    "ast_hash": "357922df23339419da54cbd36fc2508e",
+    "mtime": 1793232343.9485216,
+    "seen": 1793232371.476502,
+    "ast_hash": "d268c3210381d77aeeb2da3cc4660be8",
     "semantic_hash": ""
   },
   "core/social/__init__.py": {
@@ -486,9 +486,9 @@
     "semantic_hash": "76e7cfe8bc3c7e600d2f50e921038a02"
   },
   "tests/test_action_decision_chain.py": {
-    "mtime": 1793230782.5850534,
-    "seen": 1793231120.806928,
-    "ast_hash": "8c7781ede7c08dca44a7ce52c92c1951",
+    "mtime": 1793232111.469945,
+    "seen": 1793232371.476533,
+    "ast_hash": "e2bb1c6f74faa00c8d7c10f67788d203",
     "semantic_hash": ""
   },
   "tests/test_chain_integration.py": {
@@ -504,9 +504,9 @@
     "semantic_hash": ""
   },
   "tests/test_chat_handler.py": {
-    "mtime": 1793230782.5838528,
-    "seen": 1793231120.806931,
-    "ast_hash": "1c7ae69e26ce39c42f6f0c53605a84cf",
+    "mtime": 1793232111.4708745,
+    "seen": 1793232371.476536,
+    "ast_hash": "8b66f612f21c2cb4332d10fcc9515f64",
     "semantic_hash": ""
   },
   "tests/test_connect.py": {
@@ -600,9 +600,9 @@
     "semantic_hash": ""
   },
   "tests/test_maslow_needs.py": {
-    "mtime": 1793230782.5807614,
-    "seen": 1793231120.806943,
-    "ast_hash": "af574ac3a452f8f44d081e0c1be0de4f",
+    "mtime": 1793232272.7036967,
+    "seen": 1793232371.4765508,
+    "ast_hash": "69196c62a709c056850b101a28ebb0f7",
     "semantic_hash": ""
   },
   "tests/test_memory.py": {
@@ -1212,9 +1212,9 @@
     "semantic_hash": ""
   },
   "tests/test_simulation_runner.py": {
-    "mtime": 1793230782.5833035,
-    "seen": 1793231120.806953,
-    "ast_hash": "3d0a3ebdc79d589c384cc87ca3aef3e2",
+    "mtime": 1793232111.4693673,
+    "seen": 1793232371.4765608,
+    "ast_hash": "04a9a08bac818826704df1f764b8fa63",
     "semantic_hash": ""
   },
   "tests/test_timeline.py": {
@@ -1278,9 +1278,9 @@
     "semantic_hash": ""
   },
   "tests/test_safety_chains.py": {
-    "mtime": 1793230782.584483,
-    "seen": 1793231120.8069499,
-    "ast_hash": "405b21ddcdb04d05f9c8581a9eeca3e3",
+    "mtime": 1793232111.4704115,
+    "seen": 1793232371.4765592,
+    "ast_hash": "2598c86e5cd740ee5defb87048d2179c",
     "semantic_hash": ""
   }
 }
