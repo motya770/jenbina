@@ -31,7 +31,7 @@ amber haze and cold teal light.
 
 - Changing the layout, page structure, timeline logic, event log or runner.
 - Changing prompts, chains or any simulation logic.
-- Regenerating the portraits. They are graded by CSS in this revision.
+- Regenerating or recoloring the portraits. They are shown unchanged.
 - A light theme. The skin is dark only, by choice.
 
 ## Anti-goals (what would make this a failure even if it works)
@@ -88,8 +88,6 @@ roles and swaps the values. The mockup offers both looks with a switch.
 - **Background glow:** a fixed layer behind the page with four soft radial gradients:
   magenta from the top right, a fainter magenta behind the rail, violet from the left
   and blue from the bottom. Static, never animated.
-- **Portrait grade:** `grayscale(.55) sepia(.5) hue-rotate(275deg) saturate(1.9)`,
-  which turns the painterly portraits into a pink hologram projection.
 - In code, the token for Jenbina's color is renamed from `--br-amber` to `--br-her`
   so either look can fill it.
 
@@ -141,9 +139,9 @@ carry the same information in a form the new skin can hold.
 
 - **Now card:** the stage pill becomes a mono ice capsule with a small pulsing dot
   while a stage runs (`prefers-reduced-motion` turns the pulse off). The portrait
-  sits in a thin frame with a warm grade: `filter: sepia(.35) saturate(.85)
-  contrast(1.05)` plus an amber overlay at low opacity, so the painterly portraits
-  read as a memory projection.
+  sits in a thin 1px frame and is shown exactly as drawn: no filter, tint or overlay
+  in any look (user decision, 2026-11-14). The name and mood caption sits below the
+  image, not on top of it.
 - **Needs bars:** 3px tall lines on a `--br-line` track, filled in amber, with the
   percentage in mono on the right. A need below 30% turns rust.
 - **Emotion chips:** text chips with a 1px border. The dominant emotion is violet,
@@ -175,11 +173,9 @@ carry the same information in a form the new skin can hold.
 ## Mockup
 
 An interactive mockup of the home screen in this skin was published alongside the
-proposal. It uses example content and one real portrait.
+proposal. It uses example content and one real portrait, shown unchanged.
 
 ## Open questions
 
-- Should the portraits eventually be regenerated in a 2049 style (amber haze,
-  cinematic, less retro space-age)? The CSS grade is meant to be good enough for now.
 - Should the needs bars use one amber for every need, or a subtle hue per Maslow
   level? One amber is calmer; per-level hues are easier to scan.
