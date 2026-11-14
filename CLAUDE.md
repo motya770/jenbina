@@ -274,6 +274,7 @@ git commit -m "<conventional commit message>"
 | `2026-10-27-pixel-art-ui-implementation.md` | Pixel art UI implementation — sprite pipeline, `core/ui/pixel_theme.py`, pixel markup in the simulation renderers |
 | `2026-10-28-timeline-ui-redesign.md` | Timeline home screen spec — the chat timeline interleaved with Jenbina's persisted life events beside a live status rail; the Simulation and Chat pages merge |
 | `2026-10-28-timeline-ui-implementation.md` | Timeline home screen implementation — `core/timeline/` event log, `core/ui/timeline.py`, `core/ui/rail.py`, runner refactor, home screen |
+| `2026-11-14-blade-runner-theme-redesign.md` | Blade Runner 2049 skin proposal — replaces the candy arcade pixel skin with smoke, amber, ice and violet tokens, IBM Plex and Rajdhani type, kind tags instead of pixel icons; layout unchanged |
 
 ## graphify
 
