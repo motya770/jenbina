@@ -47,10 +47,13 @@ def _top_goal(person):
 
 
 def main():
-    # Use custom favicon if present, otherwise emoji
+    # Tab icon: Jenbina's face crop, else the old favicon, else Streamlit's default.
     _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    _icon = os.path.join(_root, "assets", "favicon.png")
-    page_icon = _icon if os.path.isfile(_icon) else "👧"
+    page_icon = next(
+        (path for path in (os.path.join(_root, "assets", "jenbina_nav.png"),
+                           os.path.join(_root, "assets", "favicon.png")) if os.path.isfile(path)),
+        None,
+    )
     st.set_page_config(page_title="Jenbina", page_icon=page_icon, layout="wide")
     inject_pixel_css(wide=True)
 
@@ -62,7 +65,7 @@ def main():
     meta_cognitive_system = st.session_state.meta_cognitive_system
     memory_manager = st.session_state.memory_manager
 
-    st.title("👧 Jenbina")
+    st.title("Jenbina")
 
     with st.sidebar:
         st.session_state.debug_mode = st.checkbox(

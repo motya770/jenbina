@@ -25,6 +25,7 @@ from core.ui.pixel_theme import (
     icon_html,
     inject_pixel_css,
     marker_html,
+    nav_icon_css,
     sprite_html,
     stage_pill_html,
 )
@@ -237,6 +238,19 @@ class TestChatHandlerAvatars(unittest.TestCase):
         self.assertIsNone(avatars[0])
         self.assertTrue(avatars[1].endswith(os.path.join("portraits", "jenbina_base.png")))
 
+
+
+class TestNavIcon(unittest.TestCase):
+    def test_home_link_gets_portrait_icon(self):
+        with patch("core.ui.pixel_theme.st") as st:
+            inject_pixel_css()
+            css = st.markdown.call_args[0][0]
+        self.assertIn('[data-testid="stSidebarNav"] li:first-child a::before', css)
+        self.assertIn("data:image/png;base64,", css)
+
+    def test_missing_icon_file_adds_no_rule(self):
+        with patch("core.ui.pixel_theme.NAV_ICON_PATH", "/nonexistent/jenbina_nav.png"):
+            self.assertEqual(nav_icon_css(), "")
 
 
 class TestWideShell(unittest.TestCase):

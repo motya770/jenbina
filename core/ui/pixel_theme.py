@@ -193,8 +193,28 @@ def inject_pixel_css(wide: bool = False) -> None:
 
     ``wide=True`` widens the page to 64rem for the two-column home screen.
     """
-    css = PIXEL_CSS + (WIDE_CSS if wide else "")
+    css = PIXEL_CSS + nav_icon_css() + (WIDE_CSS if wide else "")
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+
+
+#: Small face crop of the base portrait (resized only, never recolored) for
+#: the home page's sidebar link. Streamlit takes sidebar icons from page file
+#: names, and the main script ``app.py`` has none.
+NAV_ICON_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, "assets", "jenbina_nav.png")
+)
+
+
+def nav_icon_css() -> str:
+    """CSS that puts Jenbina's face before the first sidebar link, or "" when the file is missing."""
+    if not os.path.isfile(NAV_ICON_PATH):
+        return ""
+    return (
+        '.stApp [data-testid="stSidebarNav"] li:first-child a::before {'
+        ' content: ""; flex: 0 0 20px; width: 20px; height: 20px; margin-right: 8px;'
+        ' border-radius: 50%; border: 1px solid rgba(var(--her-rgb), .6);'
+        f' background: url({_data_uri(NAV_ICON_PATH)}) center / cover no-repeat; }}\n'
+    )
 
 
 WIDE_CSS = """

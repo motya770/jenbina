@@ -54,7 +54,7 @@ jenbina/
 │   └── run_chain_tests.py       # LangChain integration tests
 ├── docs/plans/                  # Design and planning documents
 ├── .github/workflows/           # CI/CD pipelines
-├── assets/                      # Static assets (favicon)
+├── assets/                      # Static assets (favicon, jenbina_nav.png face crop for the sidebar and tab icon)
 │   ├── portraits/               # Painterly Jenbina portraits, one per state (jenbina_<state>.png)
 │   └── sprites/                 # Committed pixel sprite sheets and 8x8 icons (python -m core.ui.sprites.build)
 ├── old/                         # Legacy/archived code

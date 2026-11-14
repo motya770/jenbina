@@ -170,6 +170,14 @@ carry the same information in a form the new skin can hold.
   `tests/test_rail.py` that check for icon markup or old colors. No new behavior to
   test beyond the kind tags.
 
+### 7. Sidebar and tab icon
+
+Streamlit takes sidebar icons from page file names, so the home page (`app.py`)
+had none. `assets/jenbina_nav.png` is a 64px face crop of the base portrait,
+resized only. The theme shows it as a small circle before the first sidebar link,
+and the home page uses it as the browser tab icon. The home heading reads
+"Jenbina" without the emoji.
+
 ## Mockup
 
 An interactive mockup of the home screen in this skin was published alongside the
