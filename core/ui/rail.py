@@ -13,9 +13,8 @@ import html
 import streamlit as st
 
 from core.timeline import shorten
-from core.ui.pixel_theme import icon_html, stage_pill_html
+from core.ui.pixel_theme import stage_pill_html
 from core.ui.simulation import (
-    _weather_icon,
     display_jenbina_image,
     get_jenbina_image_for_emotion,
     render_emotion_chips,
@@ -31,7 +30,7 @@ IDLE_STAGE = "idle"
 
 
 def env_line_html(world_summary: dict | None) -> str:
-    """``<icon> Jenbina's House · Night · Clear skies, 15°C``; the bare home
+    """``Jenbina's House · Night · Clear skies, 15°C``; the bare home
     name when there is no world summary yet."""
     if not world_summary:
         return HOME
@@ -48,8 +47,7 @@ def env_line_html(world_summary: dict | None) -> str:
         except (TypeError, ValueError):
             degrees = 0.0
         parts.append(f"{html.escape(weather)}, {degrees:.0f}°C")
-    icon = _weather_icon(weather)
-    return f'<div class="px-env-line">{icon_html(icon, alt=icon)} ' + " · ".join(parts) + "</div>"
+    return '<div class="px-env-line">' + " · ".join(parts) + "</div>"
 
 
 class StatusRail:

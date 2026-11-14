@@ -52,7 +52,7 @@ class TestStatusRail(unittest.TestCase):
             "weather": {"description": "light rain", "temperature": 15.1},
         }
         html_ = env_line_html(ws)
-        self.assertIn('alt="rain"', html_)
+        self.assertNotIn("px-icon", html_)
         self.assertIn("Jenbina&#x27;s House · Night · light rain, 15°C", html_)
         self.assertEqual(env_line_html(None), "Jenbina's House")
 

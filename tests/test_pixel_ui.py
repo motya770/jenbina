@@ -1,5 +1,6 @@
-"""Tests for the pixel theme helpers (core.ui.pixel_theme) and the pixel markup
-emitted by the simulation page renderers (core.ui.simulation)."""
+"""Tests for the theme helpers (core.ui.pixel_theme, now the Blade Runner 2049
+hologram skin) and the markup emitted by the simulation page renderers
+(core.ui.simulation)."""
 
 import os
 import unittest
@@ -24,6 +25,7 @@ from core.ui.pixel_theme import (
     icon_html,
     inject_pixel_css,
     marker_html,
+    nav_icon_css,
     sprite_html,
     stage_pill_html,
 )
@@ -71,21 +73,32 @@ class TestIconAndDialog(unittest.TestCase):
 
 class TestInjectCss(unittest.TestCase):
     @patch("core.ui.pixel_theme.st")
-    def test_injects_once_with_fonts_and_sprite_rules(self, st):
+    def test_injects_once_with_fonts_and_theme_rules(self, st):
         inject_pixel_css()
         st.markdown.assert_called_once()
         css, kwargs = st.markdown.call_args[0][0], st.markdown.call_args[1]
         self.assertTrue(kwargs.get("unsafe_allow_html"))
-        for needle in ["Press+Start+2P", "VT323", ".px-sprite", "image-rendering: pixelated",
-                       ".need-seg", ".px-dialog", "steps(1", ".px-sprite-2x", ".px-wrap-2x",
-                       # candy arcade palette: screen, accent, device body, panel, and the six need colors
-                       "#4FC3F7", "#FF3E8A", "#FF6B9D", "#FFF6D5",
-                       ".need-hunger", ".need-sleep", ".need-security", ".need-love", ".need-esteem",
-                       ".need-self_actualization", ".emotion-joy"]:
+        for needle in ["IBM+Plex+Sans", "IBM+Plex+Mono", "Rajdhani",
+                       # hologram palette: smoke, haze, her pink, ice, periwinkle, rust
+                       "#0A0710", "#140D1C", "#FF5FC1", "#62D2DA", "#8C96FF", "#FF7850",
+                       ".need-bar", ".need-fill", ".need-critical", ".emotion-dominant",
+                       ".px-event-tag", ".px-marker", ".px-stage", ".px-portrait-cap",
+                       "radial-gradient(", "prefers-reduced-motion",
+                       # legacy helpers keep working on pages that still use them
+                       ".px-sprite", ".px-sprite-2x", ".px-dialog", ".px-icon"]:
             self.assertIn(needle, css)
-        self.assertEqual(css.count("linear-gradient("), 1)   # only the scanline overlay
-        self.assertNotRegex(css, r"border-radius:\s*[1-9]")   # only `border-radius: 0` overrides are allowed
-        self.assertNotIn("linear-gradient(135", css)
+        for gone in ["Press+Start+2P", "VT323", "#FF6B9D", "#4FC3F7", "repeating-linear-gradient"]:
+            self.assertNotIn(gone, css)
+
+    @patch("core.ui.pixel_theme.st")
+    def test_portraits_are_never_filtered(self, st):
+        inject_pixel_css()
+        css = st.markdown.call_args[0][0]
+        image_rules = [block for block in css.split("}") if "stImage" in block or "AvatarCustom" in block]
+        self.assertTrue(image_rules)
+        for block in image_rules:
+            for word in ("filter", "mix-blend", "sepia", "hue-rotate", "opacity"):
+                self.assertNotIn(word, block)
 
 
 # --------------------------------------------------------------------------
@@ -131,14 +144,17 @@ def _row(html_, key):
 
 
 class TestNeedsBars(unittest.TestCase):
-    def test_six_rows_ten_segments_and_fill_count(self):
+    def test_six_rows_with_clamped_fill_widths(self):
         html_ = rendered(render_needs_bars, FakePerson(
             {"hunger": 60, "sleep": 43, "security": 80, "love": 0, "self_esteem": 120, "personal_growth": -5}, {}))
         self.assertEqual(html_.count('class="need-row'), 6)
         for need in ["hunger", "sleep", "security", "love", "esteem", "self_actualization"]:
             self.assertIn(f'class="need-row need-{need}', html_)
-        self.assertEqual(html_.count('<span class="need-seg'), 60)
-        self.assertEqual(html_.count('need-seg on'), 6 + 4 + 8 + 0 + 10 + 0)
+        self.assertEqual(html_.count('class="need-fill"'), 6)
+        for key, width in [("hunger", 60), ("sleep", 43), ("security", 80), ("love", 0),
+                           ("esteem", 100), ("self_actualization", 0)]:
+            self.assertIn(f'style="width:{width}%"', _row(html_, key))
+        self.assertNotIn("px-icon", html_)
 
     def test_esteem_and_growth_rows_read_the_real_needs(self):
         from core.person.person import Person
@@ -146,15 +162,11 @@ class TestNeedsBars(unittest.TestCase):
         self.assertIn('need-pct">50%', _row(html_, "esteem"))            # self_esteem starts at 50
         self.assertIn('need-pct">30%', _row(html_, "self_actualization"))  # personal_growth starts at 30
 
-    def test_half_percent_boundaries_round_up(self):
-        html_ = rendered(render_needs_bars, FakePerson(
-            {"hunger": 85, "sleep": 75, "security": 45, "love": 95, "self_esteem": 5, "personal_growth": 55}, {}))
-        self.assertEqual(html_.count('need-seg on'), 9 + 8 + 5 + 10 + 1 + 6)
-
     def test_non_finite_need_value_renders_as_empty_bar(self):
         html_ = rendered(render_needs_bars, FakePerson({"hunger": float("nan"), "sleep": float("inf")}, {}))
         self.assertEqual(html_.count('class="need-row'), 6)
-        self.assertEqual(html_.count('need-seg on'), 10)   # inf clamps to 100; nan counts as 0
+        self.assertIn('style="width:0%"', _row(html_, "hunger"))     # nan counts as 0
+        self.assertIn('style="width:100%"', _row(html_, "sleep"))    # inf clamps to 100
 
     def test_critical_only_below_thirty(self):
         html_ = rendered(render_needs_bars, FakePerson({"hunger": 29, "sleep": 30}, {}))
@@ -166,9 +178,10 @@ class TestChipsMoodRibbon(unittest.TestCase):
         html_ = rendered(render_emotion_chips, FakePerson(
             {}, {"joy": 90, "trust": 80, "fear": 70, "curiosity": 60, "anger": 50, "sadness": 15}))
         self.assertEqual(html_.count('<span class="emotion-chip'), 4)
-        self.assertIn('class="emotion-chip emotion-joy"', html_)
+        self.assertIn('class="emotion-chip emotion-joy emotion-dominant"', html_)
         self.assertIn('class="emotion-chip emotion-curiosity"', html_)
-        self.assertIn("px-icon-missing", html_)
+        self.assertEqual(html_.count("emotion-dominant"), 1)
+        self.assertNotIn("px-icon", html_)
         self.assertNotIn("Sadness", html_)
 
     def test_mood_badge_polarity(self):
@@ -178,41 +191,66 @@ class TestChipsMoodRibbon(unittest.TestCase):
 
 class TestActionAndSprite(unittest.TestCase):
     def test_display_jenbina_image_derives_state_from_any_path(self):
-        self.assertIn("px-anim-motion", rendered(display_jenbina_image, "/old/src/images/jenbina_eat.png", "Jenbina"))
-        self.assertEqual(rendered(display_jenbina_image, "whatever.png"), rendered(display_jenbina_image, "jenbina_base.png"))
+        def portrait(path):
+            with patch("core.ui.simulation.st") as st:
+                display_jenbina_image(path)
+                return st.image.call_args[0][0]
+        self.assertTrue(portrait("/old/src/images/jenbina_eat.png").endswith("jenbina_eat.png"))
+        self.assertEqual(portrait("whatever.png"), portrait("jenbina_base.png"))
 
 
 class TestPortrait(unittest.TestCase):
-    def test_display_shows_portrait_window_and_half_size_sprite(self):
+    def test_display_shows_portrait_and_caption_without_sprite(self):
         with patch("core.ui.simulation.st") as st:
-            display_jenbina_image("/old/src/images/jenbina_eat.png", "Jenbina")
+            display_jenbina_image("/old/src/images/jenbina_eat.png", "Jen <3")
             (path,), kwargs = st.image.call_args
             self.assertTrue(path.endswith(os.path.join("assets", "portraits", "jenbina_eat.png")), path)
             self.assertEqual(kwargs.get("width"), 256)
-            self.assertIn("px-sprite-2x", st.markdown.call_args[0][0])
+            caption = st.markdown.call_args[0][0]
+            self.assertIn('class="px-portrait-cap"', caption)
+            self.assertIn("Jen &lt;3", caption)
+            self.assertNotIn("px-sprite", caption)
+
+    def test_no_caption_means_no_caption_strip(self):
+        with patch("core.ui.simulation.st") as st:
+            display_jenbina_image("jenbina_base.png")
+            st.markdown.assert_not_called()
 
     def test_unknown_state_uses_base_portrait(self):
         with patch("core.ui.simulation.st") as st:
             display_jenbina_image("whatever.png")
             self.assertTrue(st.image.call_args[0][0].endswith("jenbina_base.png"))
 
-    def test_missing_portraits_fall_back_to_sprite_only(self):
+    def test_missing_portraits_fall_back_to_placeholder(self):
         with patch("core.ui.simulation.st") as st, patch("core.ui.simulation.IMAGES_DIR", "/nonexistent"):
             display_jenbina_image("jenbina_base.png")
             st.image.assert_not_called()
-            self.assertIn("px-sprite", st.markdown.call_args[0][0])
+            self.assertIn(PLACEHOLDER, st.markdown.call_args[0][0])
 
 
 class TestChatHandlerAvatars(unittest.TestCase):
     @patch("core.interaction.chat_handler.check_injection", return_value=(True, "blocked"))
-    def test_live_turn_rows_get_sprite_avatars(self, _):
+    def test_live_turn_rows_get_portrait_and_default_user_avatars(self, _):
         st = MagicMock()
         handle_chat_interaction(st, None, None, None, None, user_input="hi", memory_manager=None)
         avatars = [c.kwargs.get("avatar") for c in st.chat_message.call_args_list]
         self.assertEqual(len(avatars), 2)
-        self.assertTrue(avatars[0].endswith("icons/player.png"))
-        self.assertTrue(avatars[1].endswith("jenbina_avatar.png"))
+        self.assertIsNone(avatars[0])
+        self.assertTrue(avatars[1].endswith(os.path.join("portraits", "jenbina_base.png")))
 
+
+
+class TestNavIcon(unittest.TestCase):
+    def test_home_link_gets_portrait_icon(self):
+        with patch("core.ui.pixel_theme.st") as st:
+            inject_pixel_css()
+            css = st.markdown.call_args[0][0]
+        self.assertIn('[data-testid="stSidebarNav"] li:first-child a::before', css)
+        self.assertIn("data:image/png;base64,", css)
+
+    def test_missing_icon_file_adds_no_rule(self):
+        with patch("core.ui.pixel_theme.NAV_ICON_PATH", "/nonexistent/jenbina_nav.png"):
+            self.assertEqual(nav_icon_css(), "")
 
 
 class TestWideShell(unittest.TestCase):
@@ -226,25 +264,27 @@ class TestWideShell(unittest.TestCase):
 
 
 class TestEventHtml(unittest.TestCase):
-    def test_classes_icon_and_escaping(self):
+    def test_classes_tag_and_escaping(self):
         html_ = event_html("mood", "Mood <lifted>", meta="23:41")
         self.assertIn('class="px-event px-event-mood"', html_)
         self.assertIn("Mood &lt;lifted&gt;", html_)
-        self.assertIn('alt="mood"', html_)
+        self.assertIn('<span class="px-event-tag">MOOD</span>', html_)
+        self.assertNotIn("px-icon", html_)
         self.assertIn('<span class="px-event-meta">23:41</span>', html_)
         self.assertNotIn("<details", html_)
 
-    def test_details_badge_and_icon_override(self):
+    def test_details_badge_and_ignored_icon(self):
         html_ = event_html("action", "t", details=("why?", "a & b\nc"), badge="<b>B</b>", icon="hunger")
         self.assertIn("<summary>why?</summary>", html_)
         self.assertIn("a &amp; b<br>c", html_)
         self.assertIn("<b>B</b>", html_)
-        self.assertIn('alt="hunger"', html_)
+        self.assertIn('<span class="px-event-tag">ACT</span>', html_)
+        self.assertNotIn("hunger", html_)
 
-    def test_unknown_kind_uses_generic_icon_and_safe_class(self):
+    def test_unknown_kind_uses_generic_tag_and_safe_class(self):
         html_ = event_html("we!rd", "t")
         self.assertIn('px-event-werd"', html_)
-        self.assertIn('alt="act"', html_)
+        self.assertIn('<span class="px-event-tag">EVENT</span>', html_)
 
     def test_action_icon_keywords(self):
         self.assertEqual(action_icon("Eat breakfast"), "hunger")

@@ -35,6 +35,19 @@ def icon_path(name: str) -> str:
     return os.path.join(SPRITES_DIR, "icons", f"{name}.png")
 
 
+#: Absolute path of the committed painterly portraits.
+PORTRAITS_DIR: str = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir, "assets", "portraits")
+)
+
+#: Chat avatar for the user's rows. ``None`` lets Streamlit draw its own user
+#: icon, which the theme restyles as a teal ring.
+USER_AVATAR = None
+
+
 def avatar_path() -> str:
-    """Path of the 48x48 chat avatar (frame 0 of ``base``)."""
-    return os.path.join(SPRITES_DIR, "jenbina_avatar.png")
+    """Path of Jenbina's chat avatar: her base portrait, unaltered.
+
+    The theme crops it to a small circle in CSS.
+    """
+    return os.path.join(PORTRAITS_DIR, "jenbina_base.png")

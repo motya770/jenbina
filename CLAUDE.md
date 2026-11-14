@@ -41,7 +41,7 @@ jenbina/
 │   ├── ui/                      # Streamlit UI components
 │   │   ├── timeline.py          # The chat timeline: messages and life events merged, markers, rows
 │   │   ├── rail.py              # The status rail: Now card (StatusRail handles), run controls, mind card
-│   │   ├── pixel_theme.py       # Pixel-art device shell CSS + sprite/icon/event-row HTML helpers
+│   │   ├── pixel_theme.py       # Theme CSS (Blade Runner 2049 hologram skin) + event-row/marker/pill HTML helpers
 │   │   └── sprites/             # Pixel art strings, palette, Pillow builder (art.py, build.py)
 │   └── pages/                   # Streamlit multi-page navigation
 │       ├── 3_Environment.py
@@ -54,7 +54,7 @@ jenbina/
 │   └── run_chain_tests.py       # LangChain integration tests
 ├── docs/plans/                  # Design and planning documents
 ├── .github/workflows/           # CI/CD pipelines
-├── assets/                      # Static assets (favicon)
+├── assets/                      # Static assets (favicon, jenbina_nav.png face crop for the sidebar and tab icon)
 │   ├── portraits/               # Painterly Jenbina portraits, one per state (jenbina_<state>.png)
 │   └── sprites/                 # Committed pixel sprite sheets and 8x8 icons (python -m core.ui.sprites.build)
 ├── old/                         # Legacy/archived code
@@ -274,6 +274,7 @@ git commit -m "<conventional commit message>"
 | `2026-10-27-pixel-art-ui-implementation.md` | Pixel art UI implementation — sprite pipeline, `core/ui/pixel_theme.py`, pixel markup in the simulation renderers |
 | `2026-10-28-timeline-ui-redesign.md` | Timeline home screen spec — the chat timeline interleaved with Jenbina's persisted life events beside a live status rail; the Simulation and Chat pages merge |
 | `2026-10-28-timeline-ui-implementation.md` | Timeline home screen implementation — `core/timeline/` event log, `core/ui/timeline.py`, `core/ui/rail.py`, runner refactor, home screen |
+| `2026-11-14-blade-runner-theme-redesign.md` | Blade Runner 2049 skin proposal — replaces the candy arcade pixel skin with smoke, amber, ice and violet tokens, IBM Plex and Rajdhani type, kind tags instead of pixel icons; layout unchanged |
 
 ## graphify
 
