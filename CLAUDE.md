@@ -61,6 +61,7 @@ jenbina/
 ├── requirements.txt             # Runtime Python dependencies (what Railway installs)
 ├── requirements-dev.txt         # requirements.txt plus pytest, coverage, Playwright
 ├── railway.toml                 # Railway service config: start command, health check (see DEPLOY.md)
+├── .railway/railway.ts          # Railway Infrastructure as Code: service + volume (replaces railway.toml, see DEPLOY.md)
 ├── DEPLOY.md                    # How Jenbina is deployed to Railway: one-time setup, env vars, redeploy
 ├── run_app.py                   # Launcher script
 ├── run_jenbina.py               # Alternative launcher

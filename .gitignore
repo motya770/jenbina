@@ -95,3 +95,5 @@ dmypy.json
 graphify-out/.graphify_*
 graphify-out/cache/
 graphify-out/.needs_update
+# Railway IaC SDK (npm install --prefix .railway)
+.railway/node_modules/

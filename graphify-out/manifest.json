@@ -720,9 +720,9 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1794690353.83175,
-    "seen": 1794690406.517758,
-    "ast_hash": "3d8eb36a42ca26469f10ccff1123aee4",
+    "mtime": 1794691664.1931705,
+    "seen": 1794691669.244874,
+    "ast_hash": "484be3f5940d10a8fadf3a6aa6e7935e",
     "semantic_hash": ""
   },
   "CURRENT_ARCHITECTURE_DIAGRAMS.md": {
@@ -1284,9 +1284,9 @@
     "semantic_hash": ""
   },
   "DEPLOY.md": {
-    "mtime": 1794690353.8311834,
-    "seen": 1794690406.51776,
-    "ast_hash": "ae953b983d191b8bbacab373dfb2342f",
+    "mtime": 1794691664.192685,
+    "seen": 1794691669.244875,
+    "ast_hash": "2468dfc6812325716c0cfbb59ffde42f",
     "semantic_hash": ""
   },
   "core/auth/admin_access.py": {
@@ -1305,6 +1305,18 @@
     "mtime": 1794690333.894424,
     "seen": 1794690406.5177732,
     "ast_hash": "35b7a53b07d9935dcd6b60d8c4cb42a1",
+    "semantic_hash": ""
+  },
+  ".railway/package.json": {
+    "mtime": 1794691579.3357983,
+    "seen": 1794691669.2447429,
+    "ast_hash": "b651481524306ac13f6c54115ec35f31",
+    "semantic_hash": ""
+  },
+  ".railway/railway.ts": {
+    "mtime": 1794691640.4489076,
+    "seen": 1794691669.2447438,
+    "ast_hash": "6fda4093c0caf7813f28b77940410fe4",
     "semantic_hash": ""
   }
 }

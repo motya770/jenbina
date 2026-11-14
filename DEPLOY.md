@@ -10,7 +10,8 @@ Files that drive the deploy:
 
 | File | Purpose |
 |------|---------|
-| `railway.toml` | Builder (Railpack), start command, health check (`/_stcore/health`), restart policy |
+| `railway.toml` | Builder (Railpack), start command, health check (`/_stcore/health`), restart policy; deprecated, read until the cutover |
+| `.railway/railway.ts` | The same settings plus the volume, as Railway Infrastructure as Code |
 | `.python-version` | Pins Python 3.11 for Railpack (matches the local venv) |
 | `.railwayignore` | Keeps secrets, local databases, tests and docs out of the `railway up` upload |
 | `requirements.txt` | Runtime dependencies only; test tooling lives in `requirements-dev.txt` and is not installed in production |
@@ -23,16 +24,48 @@ streamlit run core/app.py --server.port $PORT --server.address 0.0.0.0 --server.
 
 > **`railway.toml` stops being read on 2026-12-01.** Railway has deprecated
 > config-as-code files in favour of
-> [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code)
-> (`.railway/railway.ts`, applied with `railway config apply`). After the cutoff the
-> service falls back to the settings stored on it: the Railpack builder and the start
-> command `streamlit run core/app.py --server.port=$PORT --server.address=0.0.0.0`,
-> which is how it ran before this file existed, so the app keeps starting. What is
-> lost is the health check, the headless flag and the restart policy. To keep them,
-> upgrade the CLI (`brew upgrade railway`; 4.8.0 has no `config` command), preview
-> with `railway config migrate`, then write and apply with
-> `railway config migrate --apply --delete-files`, `railway config plan` and
-> `railway config apply`.
+> [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code). The
+> replacement is already in the repo as `.railway/railway.ts`, but it is **not
+> applied yet**: until the cutover below, the service still reads `railway.toml`.
+> If the cutover is skipped, the service falls back after the deadline to the start
+> command stored on it and keeps starting, without the health check, the headless
+> flag or the restart policy.
+
+## Railway configuration (`.railway/railway.ts`)
+
+`.railway/railway.ts` declares the `jenbina` service (source repo, builder, start
+command, health check, restart policy) and its volume. It needs CLI 5.x
+(`brew install railway`) and Railway's SDK, installed inside `.railway/` so that no
+`package.json` sits at the repo root, where the builder could take the app for a
+Node project:
+
+```bash
+npm install --prefix .railway --ignore-scripts
+railway config plan --verbose      # read-only: shows what an apply would change
+```
+
+Rules for editing it:
+
+- **Keep the volume declared.** The `volume("jenbina-volume", ...)` resource and the
+  `volumeMounts: { "/jenbina": memory }` entry are what keep Jenbina's memory
+  attached. The file `railway config migrate` generates omits both, and applying it
+  that way detaches the volume. Read the plan before every apply and stop on any
+  line that touches `volumeAttachments` or `jenbina-volume`.
+- **Variables are unmanaged** (`variables: { managed: false }`): the file never reads
+  or writes them, so secrets stay on the service only.
+- The file exports `partial = "jenbina"`, so it manages this service alone and leaves
+  `t500` in the same project untouched.
+
+One-time cutover, once the workspace has an active plan (it redeploys the service):
+
+```bash
+railway config migrate cutover     # stop reading railway.toml; saves a snapshot (undo: railway config migrate undo)
+railway config plan --verbose      # expect one change: health check, timeout, start command
+railway config apply
+```
+
+After that, delete `railway.toml` and change settings by editing the file and running
+plan and apply. Railway does not read `.railway/` during deploys.
 
 ## The existing deployment
 
