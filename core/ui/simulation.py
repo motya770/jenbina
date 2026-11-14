@@ -33,12 +33,12 @@ from core.timeline import (
 )
 from core.simulation_runner import HEADLINE_NEEDS, credit_completed_plan, match_action_key
 from core.ui.chat import get_event_log, send_proactive_message
-from core.ui.pixel_theme import action_icon, delta_badge_html, event_html, icon_html, sprite_html
+from core.ui.pixel_theme import PLACEHOLDER, action_icon, delta_badge_html, event_html, portrait_caption_html
 from core.ui.timeline import action_details_text, first_sentence
 
 
-# Painterly portraits, one per state (``jenbina_<state>.png``). The pixel
-# sprite for the same state is looked up by name through ``sprite_html``.
+# Painterly portraits, one per state (``jenbina_<state>.png``). They are
+# always shown exactly as drawn: no filter, tint or overlay.
 IMAGES_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets", "portraits"
 )
@@ -105,13 +105,12 @@ def _portrait_path(state):
 
 
 def display_jenbina_image(image_path, caption=None, width=PORTRAIT_WIDTH):
-    """Show the painterly portrait for the state named by ``image_path`` in a
-    game window, with the half-size animated pixel sprite and the caption in
-    a status strip underneath.
+    """Show the painterly portrait for the state named by ``image_path``,
+    unaltered in a thin frame, with the caption in a name strip underneath.
 
     The state is the file name without ``jenbina_`` and ``.png``, so legacy
     paths keep working; unknown names fall back to ``base``. Without any
-    portrait on disk only the sprite strip is shown.
+    portrait on disk a text placeholder stands in for the image.
     """
     name = os.path.basename(str(image_path or ""))
     state = name[len("jenbina_"):] if name.startswith("jenbina_") else name
@@ -120,7 +119,10 @@ def display_jenbina_image(image_path, caption=None, width=PORTRAIT_WIDTH):
     portrait = _portrait_path(state)
     if portrait:
         st.image(portrait, width=width)
-    st.markdown(sprite_html(state, caption, scale=2), unsafe_allow_html=True)
+    else:
+        st.markdown(f'<span class="px-placeholder">{PLACEHOLDER}</span>', unsafe_allow_html=True)
+    if caption:
+        st.markdown(portrait_caption_html(caption), unsafe_allow_html=True)
 
 
 # Weather keyword -> icon name; the first match wins, so specific words come first.
@@ -146,13 +148,10 @@ def _weather_icon(description):
     return _DEFAULT_WEATHER_ICON
 
 
-NEED_SEGMENTS = 10
-
-
 def render_needs_bars(person):
-    """Render Maslow needs as ten-segment pixel bars with 8x8 icons."""
+    """Render Maslow needs as thin bars; a need below 30% is marked critical."""
     # (css key, label, need in MaslowNeedsSystem): the css key names the row's
-    # class and icon; Esteem and Growth show one representative need of their level.
+    # class; Esteem and Growth show one representative need of their level.
     needs_config = [
         ("hunger", "Hunger", "hunger"),
         ("sleep", "Sleep", "sleep"),
@@ -168,7 +167,6 @@ def render_needs_bars(person):
         if satisfaction is None or (isinstance(satisfaction, float) and math.isnan(satisfaction)):
             satisfaction = 0
         pct = max(0, min(100, satisfaction))
-        filled = int((pct + 5) // NEED_SEGMENTS)   # round half up: 85% shows 9 segments, not 8
 
         if pct < 30:
             level = " need-critical"
@@ -176,16 +174,10 @@ def render_needs_bars(person):
             level = " need-mid"
         else:
             level = ""
-        row_class = f"need-row need-{need_name}{level}"
-
-        segments = (
-            '<span class="need-seg on"></span>' * filled
-            + '<span class="need-seg"></span>' * (NEED_SEGMENTS - filled)
-        )
         rows.append(
-            f'<div class="{row_class}">{icon_html(need_name, alt=label)}'
+            f'<div class="need-row need-{need_name}{level}" data-pct="{pct:.0f}">'
             f'<span class="need-label">{label}</span>'
-            f'<div class="need-segs">{segments}</div>'
+            f'<div class="need-bar"><span class="need-fill" style="width:{pct:.0f}%"></span></div>'
             f'<span class="need-pct">{pct:.0f}%</span></div>'
         )
 
@@ -198,7 +190,8 @@ def _css_token(name):
 
 
 def render_emotion_chips(person):
-    """Render the strongest emotions (above 15, at most four) as square badges."""
+    """Render the strongest emotions (above 15, at most four) as text chips;
+    the strongest one is marked ``emotion-dominant``."""
     all_emotions = person.emotion_system.get_emotional_state_summary().get("emotions", {})
     visible = sorted(
         [(name, val) for name, val in all_emotions.items() if val > 15],
@@ -210,9 +203,9 @@ def render_emotion_chips(person):
         return
 
     chips = "".join(
-        f'<span class="emotion-chip emotion-{_css_token(name)}">{icon_html(name.lower(), alt=name)}'
+        f'<span class="emotion-chip emotion-{_css_token(name)}{" emotion-dominant" if index == 0 else ""}">'
         f'{html.escape(name.capitalize())} {intensity:.0f}</span>'
-        for name, intensity in visible
+        for index, (name, intensity) in enumerate(visible)
     )
     st.markdown(f'<div class="emotion-chips">{chips}</div>', unsafe_allow_html=True)
 
@@ -221,7 +214,7 @@ POSITIVE_EMOTIONS = {"joy", "trust", "anticipation", "surprise"}
 
 
 def render_mood_indicator(person):
-    """Render a square badge with Jenbina's dominant mood: green when positive, red otherwise."""
+    """Render a badge with Jenbina's dominant mood, styled positive or negative."""
     dominant = person.emotion_system.get_dominant_emotions(1)
     if not dominant:
         return
@@ -231,8 +224,7 @@ def render_mood_indicator(person):
     polarity = "mood-positive" if emotion_name in POSITIVE_EMOTIONS else "mood-negative"
 
     st.markdown(
-        f'<span class="mood-badge {polarity}">{icon_html(emotion_name, alt=emotion_name)}'
-        f'{html.escape(emotion_name.capitalize())} {intensity}</span>',
+        f'<span class="mood-badge {polarity}">{html.escape(emotion_name.capitalize())} {intensity}</span>',
         unsafe_allow_html=True,
     )
 

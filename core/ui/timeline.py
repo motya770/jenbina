@@ -14,7 +14,7 @@ import streamlit.components.v1 as components
 
 from core.timeline import ACTION, GOAL, MOOD, MOVE, PLAN, THOUGHT, TimelineEvent, lessons_text
 from core.ui.pixel_theme import action_icon, delta_badge_html, event_html, marker_html
-from core.ui.sprites import avatar_path, icon_path
+from core.ui.sprites import USER_AVATAR, avatar_path
 
 FILTERS = ("All", "Chat", "Her day", "Thoughts")
 TIMELINE_LIMIT = 200
@@ -167,7 +167,7 @@ def render_timeline(items: list[TimelineItem]) -> None:
         if item.kind == "marker":
             st.markdown(marker_html(item.text), unsafe_allow_html=True)
         elif item.kind == "user":
-            with st.chat_message("user", avatar=icon_path("player")):
+            with st.chat_message("user", avatar=USER_AVATAR):
                 st.write(item.text)
                 st.caption(item.meta)
         elif item.kind == "jenbina":

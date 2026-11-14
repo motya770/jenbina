@@ -41,7 +41,7 @@ jenbina/
 │   ├── ui/                      # Streamlit UI components
 │   │   ├── timeline.py          # The chat timeline: messages and life events merged, markers, rows
 │   │   ├── rail.py              # The status rail: Now card (StatusRail handles), run controls, mind card
-│   │   ├── pixel_theme.py       # Pixel-art device shell CSS + sprite/icon/event-row HTML helpers
+│   │   ├── pixel_theme.py       # Theme CSS (Blade Runner 2049 hologram skin) + event-row/marker/pill HTML helpers
 │   │   └── sprites/             # Pixel art strings, palette, Pillow builder (art.py, build.py)
 │   └── pages/                   # Streamlit multi-page navigation
 │       ├── 3_Environment.py

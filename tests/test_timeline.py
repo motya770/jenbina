@@ -253,13 +253,13 @@ class TestBuildTimeline(unittest.TestCase):
 
 
 class TestRenderTimeline(unittest.TestCase):
-    def test_rows_get_sprite_avatars_and_captions(self):
+    def test_rows_get_portrait_avatar_and_captions(self):
         items = build_timeline([Msg(T, "Matt", "hi", "text"), Msg(T, "person", "hello", "greeting")], [])
         with patch("core.ui.timeline.st") as st:
             render_timeline(items)
         avatars = [c.kwargs.get("avatar") for c in st.chat_message.call_args_list]
-        self.assertTrue(avatars[0].endswith("icons/player.png"))
-        self.assertTrue(avatars[1].endswith("jenbina_avatar.png"))
+        self.assertIsNone(avatars[0])
+        self.assertTrue(avatars[1].endswith(os.path.join("portraits", "jenbina_base.png")))
         self.assertIn("she reached out first", st.caption.call_args_list[-1].args[0])
 
     def test_action_row_has_badge_and_details(self):
@@ -268,7 +268,7 @@ class TestRenderTimeline(unittest.TestCase):
             render_timeline(build_timeline([], [act]))
         html_ = st.markdown.call_args_list[-1].args[0]
         for needle in ("px-event-action", "Jenbina decided to eat soup", "80% → 82% (+2.0%)",
-                       "<summary>why?</summary>", "Lessons applied: eat early", 'alt="hunger"'):
+                       "<summary>why?</summary>", "Lessons applied: eat early", ">ACT</span>"):
             self.assertIn(needle, html_)
 
     def test_thought_row_details_only_when_longer(self):

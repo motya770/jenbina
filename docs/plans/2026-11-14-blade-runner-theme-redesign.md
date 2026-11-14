@@ -1,7 +1,7 @@
 # Blade Runner 2049 Theme Redesign
 
 **Date:** 2026-11-14
-**Status:** Proposal (direction chosen in conversation on 2026-11-14; awaiting approval of this spec and the mockup)
+**Status:** Implemented 2026-11-14 with the hologram look as the only look, one color for every needs bar, and portraits shown in full and unaltered
 **Approach:** Replace the candy arcade pixel skin with a restrained Blade Runner 2049 skin. The layout from `2026-10-28-timeline-ui-redesign.md` (chat timeline on the left, status rail on the right) stays exactly as it is. Only colors, fonts, borders, icons and the portrait frame change.
 
 ## Problem

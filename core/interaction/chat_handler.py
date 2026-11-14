@@ -216,14 +216,14 @@ Write a natural 1-3 sentence message to initiate conversation. Don't explain you
 
 
 def _chat_avatar(role):
-    """Pixel avatar path for a chat row.
+    """Avatar for a chat row: Jenbina's portrait, or Streamlit's own user icon.
 
     Imported lazily: ``core.ui`` imports this module, so a top-level import
     would be circular.
     """
-    from core.ui.sprites import avatar_path, icon_path
+    from core.ui.sprites import USER_AVATAR, avatar_path
 
-    return icon_path("player") if role == "user" else avatar_path()
+    return USER_AVATAR if role == "user" else avatar_path()
 
 
 def handle_chat_interaction(
