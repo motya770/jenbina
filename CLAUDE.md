@@ -21,7 +21,7 @@ jenbina/
 │   ├── connect.py               # LLM provider connections
 │   ├── fix_llm_json.py          # JSON response fixing utility
 │   ├── log_capture.py           # Logging utilities
-│   ├── auth/                    # Authentication (Firebase, SQLite user DB)
+│   ├── auth/                    # Authentication (Firebase, SQLite user DB, admin panel gate)
 │   ├── cognition/               # Decision-making, meta-cognition, inner monologue
 │   ├── emotions/                # Emotional state management and analysis
 │   ├── environment/             # World simulation, locations, dynamic events
@@ -58,7 +58,8 @@ jenbina/
 │   ├── portraits/               # Painterly Jenbina portraits, one per state (jenbina_<state>.png)
 │   └── sprites/                 # Committed pixel sprite sheets and 8x8 icons (python -m core.ui.sprites.build)
 ├── old/                         # Legacy/archived code
-├── requirements.txt             # Python dependencies
+├── requirements.txt             # Runtime Python dependencies (what Railway installs)
+├── requirements-dev.txt         # requirements.txt plus pytest, coverage, Playwright
 ├── railway.toml                 # Railway service config: start command, health check (see DEPLOY.md)
 ├── DEPLOY.md                    # How Jenbina is deployed to Railway: one-time setup, env vars, redeploy
 ├── run_app.py                   # Launcher script
@@ -145,7 +146,7 @@ The app runs on Railway; `DEPLOY.md` has the one-time setup, the env var table a
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # app + test tooling; requirements.txt alone is the production set
 ```
 
 ## Environment Variables
@@ -191,7 +192,7 @@ GitHub Actions workflows (`.github/workflows/`):
 
 | Workflow | Trigger | What it does |
 |----------|---------|-------------|
-| `run-tests.yml` | PR to main/master/develop | Unit tests with coverage (Python 3.10, pytest) |
+| `run-tests.yml` | PR to main/master/develop | Unit tests with coverage (Python 3.10 and 3.11, pytest) |
 | `test-suite.yml` | Manual / scheduled | Full test suite execution |
 | `e2e-tests.yml` | Manual / scheduled | End-to-end tests with Playwright |
 | `feedback-loop-test.yml` | Manual / scheduled | Feedback loop testing |

@@ -17,8 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10"]
+        python-version: ["3.10", "3.11"]  # 3.11 is what Railway runs (.python-version)
     
     steps:
     - name: Checkout code
@@ -33,14 +34,14 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
           
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
         pip install pytest pytest-cov
         
     - name: Create test directory structure
@@ -64,6 +65,7 @@ jobs:
         python -m coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
 
     - name: Pytest coverage comment
+      if: matrix.python-version == '3.10'
       uses: MishaKav/pytest-coverage-comment@main
       with:
         pytest-coverage-path: ./pytest-coverage.txt
@@ -78,6 +80,7 @@ jobs:
         report-only-changed-files: false
 
     - name: Upload coverage to Codecov
+      if: matrix.python-version == '3.10'
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml

@@ -17,3 +17,9 @@ graphify-out/
 old/
 tests/
 docs/
+.env.*
+*.pem
+*.key
+.claude/
+.github/
+requirements-dev.txt

@@ -13,12 +13,26 @@ Files that drive the deploy:
 | `railway.toml` | Builder (Railpack), start command, health check (`/_stcore/health`), restart policy |
 | `.python-version` | Pins Python 3.11 for Railpack (matches the local venv) |
 | `.railwayignore` | Keeps secrets, local databases, tests and docs out of the `railway up` upload |
+| `requirements.txt` | Runtime dependencies only; test tooling lives in `requirements-dev.txt` and is not installed in production |
 
 The start command binds Streamlit to Railway's `$PORT` in headless mode:
 
 ```
 streamlit run core/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
 ```
+
+> **`railway.toml` stops being read on 2026-12-01.** Railway has deprecated
+> config-as-code files in favour of
+> [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code)
+> (`.railway/railway.ts`, applied with `railway config apply`). After the cutoff the
+> service falls back to the settings stored on it: the Railpack builder and the start
+> command `streamlit run core/app.py --server.port=$PORT --server.address=0.0.0.0`,
+> which is how it ran before this file existed, so the app keeps starting. What is
+> lost is the health check, the headless flag and the restart policy. To keep them,
+> upgrade the CLI (`brew upgrade railway`; 4.8.0 has no `config` command), preview
+> with `railway config migrate`, then write and apply with
+> `railway config migrate --apply --delete-files`, `railway config plan` and
+> `railway config apply`.
 
 ## The existing deployment
 
@@ -85,8 +99,8 @@ dashboard (its raw editor) works just as well.
 
 Then allow the Railway URL in Google: Google Cloud Console → APIs & Services →
 Credentials → your OAuth 2.0 Client → **Authorized redirect URIs** → add exactly the
-`REDIRECT_URI` value (https, no trailing slash). Sign-in fails with `invalid_grant`
-until this matches. Finish with `railway up --ci`.
+`REDIRECT_URI` value (https, no trailing slash). Until this matches, sign-in fails:
+Google shows `redirect_uri_mismatch`, or the app reports `invalid_grant`. Finish with `railway up --ci`.
 
 ## Environment variables
 
@@ -96,18 +110,21 @@ until this matches. Finish with `railway up --ci`.
 | `GOOGLE_CREDENTIALS_JSON` | yes | OAuth client JSON for Google sign-in |
 | `REDIRECT_URI` | yes | The app's public URL, no trailing slash |
 | `JENBINA_DATA_DIR` | yes | The volume mount path, `/jenbina` on the current service |
-| `OPENAI_CHAT_MODEL` | no | Defaults from `core/connect.py` |
-| `SERPAPI_API_KEY`, `SERPER_API_KEY` | no | Web search for the user dossier |
+| `OPENAI_CHAT_MODEL` | no | Defaults to `openai-advanced` (`core/ui/shared_init.py`) |
+| `SERPAPI_API_KEY` | no | Web search for the user dossier |
+| `SERPER_API_KEY` | no | Set on the current service but read by no code; safe to delete |
 | `FIREBASE_*` | no | Set on the current service; the login page uses Google OAuth, not Firebase |
-| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | no | Graph memory; the app runs without Neo4j |
+| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | no | Graph memory; the app runs without Neo4j (see below) |
 | `LANGSMITH_API_KEY`, `LANGSMITH_TRACING`, `LANGSMITH_PROJECT` | no | LLM tracing |
-| `JENBINA_SKIP_AUTH` | no | `1` bypasses Google sign-in. **Never set it on a public URL**: anyone who finds the app could spend your OpenAI credit. |
+| `JENBINA_SKIP_AUTH` | no | `1` bypasses Google sign-in and opens the admin panel. **Never set it on a public URL**: anyone who finds the app could spend your OpenAI credit and read the user list. |
 
 Railway injects `PORT`; do not set it.
 
 ## Optional: Neo4j
 
-Graph memory is optional and off until `NEO4J_URI` is set. To add it, deploy a
+Graph memory is optional. With `NEO4J_URI` unset the app still tries
+`bolt://localhost:7687` at startup, logs one connection error, and carries on with
+ChromaDB and SQLite only. To add it, deploy a
 Neo4j template from the Railway template library into the same project
 (`railway deploy -t <template code>` or the dashboard's **New → Template**), then set
 `NEO4J_URI`, `NEO4J_USER` and `NEO4J_PASSWORD` on the jenbina service as

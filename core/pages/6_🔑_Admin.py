@@ -1,8 +1,8 @@
 """Jenbina — Admin Panel.
 
 Access restricted to:
-- Local requests (localhost / 127.0.0.1) without authentication
-- Authenticated user matvei.kudelin@gmail.com
+- The signed-in admin account
+- Local development mode (``JENBINA_SKIP_AUTH=1``), never set on a public URL
 """
 
 import sys
@@ -12,41 +12,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import streamlit as st
 from core.ui.pixel_theme import inject_pixel_css
+from core.auth.admin_access import is_admin
 from core.auth.user_db import UserDatabase
 
 st.set_page_config(page_title="Jenbina — Admin", page_icon="🔑", layout="wide")
 inject_pixel_css()
 
-ADMIN_EMAIL = "matvei.kudelin@gmail.com"
-
-
-def _is_local_request() -> bool:
-    """Check if the request originates from localhost."""
-    try:
-        headers = st.context.headers
-        host = headers.get("Host", "")
-        origin = headers.get("Origin", "")
-        for local in ("localhost", "127.0.0.1", "0.0.0.0", "[::1]"):
-            if local in host or local in origin:
-                return True
-        return False
-    except Exception:
-        return False
-
-
-def _is_admin() -> bool:
-    """Return True if the current visitor is allowed to see the admin panel."""
-    if _is_local_request():
-        return True
-    user = st.session_state.get("current_user")
-    if user and user.get("email") == ADMIN_EMAIL:
-        return True
-    return False
-
 
 # --- Access gate ---
-if not _is_admin():
-    st.error("Access denied. Admin panel is only available from localhost or for the admin account.")
+if not is_admin(st.session_state.get("current_user")):
+    st.error("Access denied. Sign in with the admin account to open the admin panel.")
     st.stop()
 
 # --- Admin panel ---

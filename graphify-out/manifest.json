@@ -306,9 +306,9 @@
     "semantic_hash": ""
   },
   "core/pages/6_\ud83d\udd11_Admin.py": {
-    "mtime": 1793232768.9109657,
-    "seen": 1793233980.172936,
-    "ast_hash": "88792d12bb62039aec941d1b2c4bfdbd",
+    "mtime": 1794690333.869766,
+    "seen": 1794690406.5176802,
+    "ast_hash": "ec75401488131942c9ac86b1f38844ea",
     "semantic_hash": ""
   },
   "core/person.py": {
@@ -384,10 +384,10 @@
     "semantic_hash": ""
   },
   "core/ui/auth_page.py": {
-    "mtime": 1771587696.5648885,
-    "seen": 1793233980.17295,
-    "ast_hash": "7dd7ad5bae57bd53edd1b829487f6640",
-    "semantic_hash": "7dd7ad5bae57bd53edd1b829487f6640"
+    "mtime": 1794690333.8702385,
+    "seen": 1794690406.517694,
+    "ast_hash": "2f2e00ac44e7897811074cb9ae07105d",
+    "semantic_hash": ""
   },
   "core/ui/chat.py": {
     "mtime": 1793233957.218808,
@@ -690,39 +690,39 @@
     "semantic_hash": "76dec36efdbc0f9c1a3247d4d101056b"
   },
   ".github/README.md": {
-    "mtime": 1793232768.8359632,
-    "seen": 1793233980.173001,
-    "ast_hash": "c418f9be0ae8beecf7dc020063bad7ac",
-    "semantic_hash": "c418f9be0ae8beecf7dc020063bad7ac"
+    "mtime": 1794690353.8321195,
+    "seen": 1794690406.517754,
+    "ast_hash": "acece0e757abec4e5b363c050f1663a6",
+    "semantic_hash": ""
   },
   ".github/workflows/e2e-tests.yml": {
-    "mtime": 1793232768.836352,
-    "seen": 1793233980.173002,
-    "ast_hash": "610c230aadeaff3599155ddb9e63d668",
-    "semantic_hash": "610c230aadeaff3599155ddb9e63d668"
+    "mtime": 1794690333.9014547,
+    "seen": 1794690406.5177548,
+    "ast_hash": "54581abfce3f01a50674b984a24bb467",
+    "semantic_hash": ""
   },
   ".github/workflows/feedback-loop-test.yml": {
-    "mtime": 1771587696.5128827,
-    "seen": 1793233980.173003,
-    "ast_hash": "b4ac2d2cfd0bca3816aa40d1c86b4b00",
-    "semantic_hash": "b4ac2d2cfd0bca3816aa40d1c86b4b00"
+    "mtime": 1794690333.9021847,
+    "seen": 1794690406.517756,
+    "ast_hash": "2eedfd0522f15b51393b9b8e8cd885a7",
+    "semantic_hash": ""
   },
   ".github/workflows/run-tests.yml": {
-    "mtime": 1771589195.4348853,
-    "seen": 1793233980.173003,
-    "ast_hash": "e4ca675262048f101c6cc75e3472872f",
-    "semantic_hash": "e4ca675262048f101c6cc75e3472872f"
+    "mtime": 1794690333.901069,
+    "seen": 1794690406.517757,
+    "ast_hash": "33f92a4ec47f2371dc034a82ffc792dd",
+    "semantic_hash": ""
   },
   ".github/workflows/test-suite.yml": {
-    "mtime": 1771587696.5133526,
-    "seen": 1793233980.1730042,
-    "ast_hash": "84ecd6773e6e01508f36ca4090e042d3",
-    "semantic_hash": "84ecd6773e6e01508f36ca4090e042d3"
+    "mtime": 1794690333.9018495,
+    "seen": 1794690406.517757,
+    "ast_hash": "0c2078dc8ff775c525330b98164a380b",
+    "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1793233216.8895235,
-    "seen": 1793233980.173005,
-    "ast_hash": "f4278a8d32c1b521420f9d27ca21542d",
+    "mtime": 1794690353.83175,
+    "seen": 1794690406.517758,
+    "ast_hash": "3d8eb36a42ca26469f10ccff1123aee4",
     "semantic_hash": ""
   },
   "CURRENT_ARCHITECTURE_DIAGRAMS.md": {
@@ -792,9 +792,9 @@
     "semantic_hash": "485cb09b9e1edf34618120d9e1b714c2"
   },
   "requirements.txt": {
-    "mtime": 1793232768.9441936,
-    "seen": 1793233980.173019,
-    "ast_hash": "75d0d79d73bbb22cd652eaa1a2e1a4bd",
+    "mtime": 1794690333.8941858,
+    "seen": 1794690406.517774,
+    "ast_hash": "1b71895a6dd687caca405c13fa2d4924",
     "semantic_hash": ""
   },
   "system_design_schema.md": {
@@ -1284,9 +1284,27 @@
     "semantic_hash": ""
   },
   "DEPLOY.md": {
-    "mtime": 1793233615.0583506,
-    "seen": 1793233980.173007,
-    "ast_hash": "89b1ca3c46dee255f58b69d626079654",
+    "mtime": 1794690353.8311834,
+    "seen": 1794690406.51776,
+    "ast_hash": "ae953b983d191b8bbacab373dfb2342f",
+    "semantic_hash": ""
+  },
+  "core/auth/admin_access.py": {
+    "mtime": 1794690333.8409858,
+    "seen": 1794690406.517637,
+    "ast_hash": "8bd6901b429df4bace54f1c0fdceb863",
+    "semantic_hash": ""
+  },
+  "tests/test_admin_access.py": {
+    "mtime": 1794690333.8774567,
+    "seen": 1794690406.517717,
+    "ast_hash": "3fcd554717e9abfbbbc473cbd05fe296",
+    "semantic_hash": ""
+  },
+  "requirements-dev.txt": {
+    "mtime": 1794690333.894424,
+    "seen": 1794690406.5177732,
+    "ast_hash": "35b7a53b07d9935dcd6b60d8c4cb42a1",
     "semantic_hash": ""
   }
 }
