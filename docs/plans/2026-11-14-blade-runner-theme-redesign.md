@@ -66,6 +66,33 @@ theme module.
 Rule of thumb: amber is her, ice is the machine and you, violet is feeling. Anything
 else is a neutral.
 
+#### Hologram look (requested 2026-11-14, candidate default)
+
+After seeing the mockup, the user asked for background colors taken from the Joi
+billboard scene: magenta, violet and periwinkle light. This look keeps the same token
+roles and swaps the values. The mockup offers both looks with a switch.
+
+| Token | Hex | Role |
+|-------|-----|------|
+| `--br-smoke` | `#0A0710` | Page background, violet-black |
+| `--br-haze` | `#140D1C` | Card and timeline surface, 86% opaque with a 6px backdrop blur so the glow shows through |
+| `--br-dust` | `#21152D` | Raised surface |
+| `--br-line` | `#3A2650` | Hairline borders |
+| `--br-text` | `#F3E8F3` | Body text |
+| `--br-muted` | `#A795B3` | Captions, timestamps, thoughts |
+| `--br-her` | `#FF5FC1` | Jenbina, hologram pink (replaces amber) |
+| `--br-ice` | `#62D2DA` | The system and the user (unchanged) |
+| `--br-joi` | `#8C96FF` | Strong emotion, periwinkle like Joi's hair |
+| `--br-rust` | `#FF7850` | Warning |
+
+- **Background glow:** a fixed layer behind the page with four soft radial gradients:
+  magenta from the top right, a fainter magenta behind the rail, violet from the left
+  and blue from the bottom. Static, never animated.
+- **Portrait grade:** `grayscale(.55) sepia(.5) hue-rotate(275deg) saturate(1.9)`,
+  which turns the painterly portraits into a pink hologram projection.
+- In code, the token for Jenbina's color is renamed from `--br-amber` to `--br-her`
+  so either look can fill it.
+
 ### 2. Type
 
 | Role | Family | Use |
