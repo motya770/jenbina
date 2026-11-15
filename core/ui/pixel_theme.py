@@ -105,6 +105,9 @@ EVENT_TAGS = {
     "goal": "GOAL",
     "plan": "PLAN",
     "move": "MOVE",
+    "sleep": "SLEEP",
+    "wake": "WAKE",
+    "gap": "GAP",
 }
 GENERIC_EVENT_TAG = "EVENT"
 

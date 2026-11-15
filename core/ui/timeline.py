@@ -12,7 +12,7 @@ from typing import Optional
 import streamlit as st
 import streamlit.components.v1 as components
 
-from core.timeline import ACTION, GOAL, MOOD, MOVE, PLAN, THOUGHT, TimelineEvent, lessons_text
+from core.timeline import ACTION, GAP, GOAL, MOOD, MOVE, PLAN, SLEEP, THOUGHT, WAKE, TimelineEvent, lessons_text
 from core.ui.pixel_theme import action_icon, delta_badge_html, event_html, marker_html
 from core.ui.sprites import USER_AVATAR, avatar_path
 
@@ -24,7 +24,7 @@ EMPTY_TEXT = "Nothing yet. Say hi, or let her live."
 OUTREACH_META = "she reached out first"
 OUTREACH_TYPES = ("greeting", "proactive")
 MESSAGE_KINDS = ("user", "jenbina")
-HER_DAY_KINDS = frozenset({ACTION, MOVE, GOAL, PLAN, MOOD})
+HER_DAY_KINDS = frozenset({ACTION, MOVE, GOAL, PLAN, MOOD, SLEEP, WAKE, GAP})
 
 _SENTENCE_END = re.compile(r"[.!?…](?:\s|$)")
 
