@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for the simulation runners with every chain mocked: the Streamlit
-runner (core.ui.simulation) drives the status rail and records events; the
-headless runner (core.simulation_runner) records the same events."""
+"""Tests for the single headless simulation runner with every chain mocked."""
 
 import json
 import os
@@ -17,8 +15,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from core.person.person import Person
 from core.heartbeat.rhythm import RhythmConfig
 from core.timeline import EventLog
-from core.ui.rail import NullRail
-from tests.test_greeting_generation import _FakeSessionState
 
 WORLD_JSON = json.dumps({"list_of_descriptions": [], "list_of_actions": ["Walk to Coupa Cafe"]})
 ACTION = {"chosen_action": "Walk to Coupa Cafe for coffee", "reasoning": "social", "lessons_applied": ["go out"]}
@@ -59,61 +55,8 @@ def build_env(module):
     return person, meta, patches
 
 
-def _session():
-    return _FakeSessionState(simulation_history=[], jenbina_location="Jenbina's House", _proactive_llm=MagicMock())
 
 
-class TestUiRunnerEvents(unittest.TestCase):
-    def test_iteration_records_events_and_drives_rail(self):
-        import core.ui.simulation as sim
-        person, meta, patches = build_env(sim)
-        rail = MagicMock()
-        log = EventLog()
-        with patches, patch("core.ui.simulation.st") as st, patch("core.ui.simulation.send_proactive_message"):
-            st.session_state = _session()
-            result = sim.run_single_iteration(person, MagicMock(), meta, 0, rail=rail, event_log=log)
-        kinds = [e.kind for e in log.recent()]
-        self.assertEqual(kinds[:2], ["thought", "move"])
-        self.assertIn("action", kinds)
-        self.assertIn("mood", kinds)
-        action = next(e for e in log.recent() if e.kind == "action")
-        self.assertEqual(action.detail["location"], "Jenbina's House")
-        self.assertEqual(action.detail["lessons"], ["go out"])
-        self.assertEqual(st.session_state["jenbina_location"], "Coupa Cafe")
-        self.assertIn("satisfaction_delta", result)
-        self.assertTrue(any("completed in" in c.args[0] for c in rail.stage.call_args_list))
-        self.assertEqual(rail.live_row.call_count, 2)
-        st.success.assert_not_called()
-        st.expander.assert_not_called()
-        st.columns.assert_not_called()
-
-    def test_iteration_survives_event_log_failure(self):
-        import core.ui.simulation as sim
-        person, meta, patches = build_env(sim)
-        db = MagicMock()
-        db.store_event.side_effect = RuntimeError("disk")
-        with patches, patch("core.ui.simulation.st") as st, patch("core.ui.simulation.send_proactive_message"):
-            st.session_state = _session()
-            result = sim.run_single_iteration(person, MagicMock(), meta, 0, rail=NullRail(), event_log=EventLog(db, 1))
-        self.assertIn("action_decision", result)
-
-    def test_loop_records_delta_and_history(self):
-        import core.ui.simulation as sim
-        person, meta, patches = build_env(sim)
-        with ExitStack() as stack:
-            stack.enter_context(patches)
-            st = stack.enter_context(patch("core.ui.simulation.st"))
-            stack.enter_context(patch("core.ui.simulation.send_proactive_message"))
-            stack.enter_context(patch("core.ui.simulation.time.sleep"))
-            st.session_state = _session()
-            results = sim.run_simulation_loop(person, MagicMock(), meta, 2, 0, rail=NullRail(), event_log=EventLog())
-        self.assertEqual(len(st.session_state["simulation_history"]), 2)
-        self.assertIn("satisfaction_delta", results[0])
-        st.progress.assert_not_called()
-        # What the chat reads afterwards: the latest world, decision and state analysis
-        self.assertEqual(st.session_state["world_description"], WORLD_JSON)
-        self.assertEqual(st.session_state["action_decision"]["chosen_action"], ACTION["chosen_action"])
-        self.assertEqual(st.session_state["state_response"], {"ok": True})
 
 
 class TestHeadlessRunnerEvents(unittest.TestCase):
@@ -162,15 +105,6 @@ class TestPlanCompletionEvents(unittest.TestCase):
         self.assertIn("Goal advanced: new goal → 30%", titles)
         self.assertNotIn("Goal advanced: old goal → 30%", titles)  # finished long ago: not credited again
 
-    def test_ui_runner_records_plan_finished_once_and_goal_advanced(self):
-        import core.ui.simulation as sim
-        person, meta, patches = build_env(sim)
-        _plan_fixture(person)
-        log = EventLog()
-        with patches, patch("core.ui.simulation.st") as st, patch("core.ui.simulation.send_proactive_message"):
-            st.session_state = _session()
-            sim.run_single_iteration(person, MagicMock(), meta, 0, rail=NullRail(), event_log=log)
-        self._assert_events(log)
 
     def test_headless_runner_records_plan_finished_once_and_goal_advanced(self):
         import core.simulation_runner as hr
@@ -198,10 +132,8 @@ RECORD = {
 class TestPersonDict(unittest.TestCase):
     def test_person_dict_reports_the_real_esteem_and_growth_needs(self):
         import core.simulation_runner as hr
-        import core.ui.simulation as sim
-        for module in (hr, sim):
-            needs = module.get_person_dict(Person())["maslow_needs"]["individual_needs"]
-            self.assertEqual(set(needs), {"hunger", "sleep", "security", "love", "self_esteem", "personal_growth"})
+        needs = hr.get_person_dict(Person())["maslow_needs"]["individual_needs"]
+        self.assertEqual(set(needs), {"hunger", "sleep", "security", "love", "self_esteem", "personal_growth"})
 
 
 class TestActionKeywordMatch(unittest.TestCase):
@@ -234,15 +166,6 @@ class TestActionKeywordMatch(unittest.TestCase):
         self.assertIsNone(match_action_key("Plant seeds in the pot"))        # "plan" + t is not planning
         self.assertIsNone(match_action_key("Get ready for the day"))         # "read" + y is not reading
 
-    def test_ui_runner_applies_the_shared_matcher(self):
-        import core.ui.simulation as sim
-        person, meta, patches = build_env(sim)
-        person.maslow_needs.needs["sleep"].satisfaction = 10.0
-        with patches, patch("core.ui.simulation.st") as st, patch("core.ui.simulation.send_proactive_message"), \
-                patch("core.ui.simulation.match_action_key", return_value="sleep"):
-            st.session_state = _session()
-            sim.run_single_iteration(person, MagicMock(), meta, 0, rail=NullRail(), event_log=EventLog())
-        self.assertGreater(person.maslow_needs.needs["sleep"].satisfaction, 60.0)
 
     def test_headless_runner_applies_the_shared_matcher(self):
         import core.simulation_runner as hr

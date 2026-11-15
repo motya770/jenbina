@@ -3,7 +3,6 @@ import streamlit as st
 from datetime import datetime
 from core.interaction.chat_handler import (
     handle_chat_interaction,
-    generate_proactive_message,
     generate_first_greeting,
     generate_return_greeting,
     history_context,
@@ -11,90 +10,8 @@ from core.interaction.chat_handler import (
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.auth.user_db import UserDatabase
 from core.heartbeat.host import ChatTurn
-from core.ui.shared_init import save_person_state
-from core.timeline import EventLog, record_mood
+from core.timeline import record_mood
 from core.ui.pixel_theme import stage_pill_html
-
-
-def check_proactive_message(person):
-    """Check if Jenbina should initiate a message based on her current state.
-
-    Returns a trigger context dict or None.
-    """
-    display_name = _get_user_display_name()
-
-    # Cooldown: skip if last interaction was < 5 minutes ago
-    conv = person.conversations.get(display_name)
-    if conv and conv.messages:
-        last_msg_time = conv.messages[-1].timestamp
-        if (datetime.now() - last_msg_time).total_seconds() < 300:
-            return None
-
-    triggers = {}
-
-    # Trigger 1: Low social needs (< 40%)
-    social_needs = ["social_connection", "friendship", "belonging"]
-    for need_name in social_needs:
-        sat = person.maslow_needs.get_need_satisfaction(need_name)
-        if sat < 40:
-            triggers["low_social"] = {
-                "need": need_name,
-                "satisfaction": sat,
-            }
-            break
-
-    # Trigger 2: Dominant emotion intensity > 60
-    dominant = person.emotion_system.get_dominant_emotions(1)
-    if dominant and dominant[0]["intensity"] > 60:
-        triggers["strong_emotion"] = {
-            "emotion": dominant[0]["name"],
-            "intensity": dominant[0]["intensity"],
-        }
-
-    # Trigger 3: High curiosity/boredom
-    if getattr(person, "curiosity_system", None) is not None:
-        stats = person.curiosity_system.get_stats()
-        if stats.get("boredom_level", 0) > 0.6 or stats.get("curiosity_level", 0) > 0.7:
-            triggers["curiosity"] = {
-                "boredom": stats.get("boredom_level", 0),
-                "curiosity": stats.get("curiosity_level", 0),
-            }
-
-    return triggers if triggers else None
-
-
-def send_proactive_message(person, llm):
-    """Orchestrator: check triggers, generate message, store in history."""
-    triggers = check_proactive_message(person)
-    if not triggers:
-        return None
-
-    try:
-        # Recent actions and world context from the simulation history
-        recent_actions, world_context = history_context(st.session_state.get("simulation_history", []))
-
-        message = generate_proactive_message(
-            person, llm, triggers,
-            display_name=_get_user_display_name(),
-            recent_actions=recent_actions,
-            world_context=world_context,
-        )
-        if not message:
-            return None
-
-        display_name = _get_user_display_name()
-        person.send_message(display_name, message, "proactive")
-
-        # Store in SQLite
-        user_db, user_id = _get_user_db_and_id()
-        if user_db and user_id:
-            user_db.store_message(user_id, "Jenbina", message, "proactive_message")
-
-        print(f"Proactive message sent: {message[:80]}...")
-        return message
-    except Exception as e:
-        print(f"Proactive message failed: {e}")
-        return None
 
 
 def check_return_greeting(person, llm, person_key: str, now: datetime | None = None) -> str | None:
@@ -158,17 +75,6 @@ def _get_user_db_and_id():
     return user_db, user["id"]
 
 
-def get_event_log() -> EventLog:
-    """The session's event log, built once from the logged-in user (an
-    in-memory log when there is no user)."""
-    user_db, user_id = _get_user_db_and_id()
-    log = st.session_state.get("event_log")
-    if log is None or getattr(log, "user_id", None) != user_id:
-        log = EventLog(user_db, user_id)
-        st.session_state["event_log"] = log
-    return log
-
-
 def ensure_greeting(host, user: dict, llm) -> None:
     """Greet on an awake, available mind; retry on a later refresh otherwise."""
     if st.session_state.get("showed_return_greeting"):
@@ -180,6 +86,10 @@ def ensure_greeting(host, user: dict, llm) -> None:
         greeting = check_return_greeting(host.person, llm, turn.person_key)
         if greeting:
             host.person.send_message(turn.person_key, greeting, "greeting")
+        # Considered once per session, greeted or not. The timeline refreshes
+        # every few seconds, and each further check would take the mind lock
+        # and save her whole state again.
+        st.session_state.showed_return_greeting = True
 
 
 def handle_user_input(person, llm, memory_manager, debug_mode, user_input, turn: ChatTurn):
@@ -193,6 +103,9 @@ def handle_user_input(person, llm, memory_manager, debug_mode, user_input, turn:
 
         # Store the user message in person's communication history
         person.receive_message(person_key, user_input, "text")
+        if getattr(person, "social_cognition", None) is not None:
+            # A message is a visit: the next return greeting measures from here.
+            person.social_cognition.get_or_create_model(person_key).last_visit_time = datetime.now()
 
         # Store in SQLite
         user_db, _ = _get_user_db_and_id()

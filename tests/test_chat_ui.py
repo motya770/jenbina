@@ -16,15 +16,14 @@ from core.heartbeat.host import ChatTurn
 from core.person.person import Person
 from core.timeline import EventLog
 from core.ui import chat as chat_ui
-from core.ui.chat import get_event_log, handle_user_input, send_proactive_message
+from core.ui.chat import handle_user_input
 from tests.test_greeting_generation import _FakeSessionState
 
 
 class TestOutreachTypes(unittest.TestCase):
-    @patch("core.ui.chat.send_proactive_message")
     @patch("core.ui.chat.check_return_greeting", return_value="You're back!")
     @patch("core.ui.chat.st")
-    def test_greeting_is_stored_with_greeting_type_under_the_persons_key(self, st, check, proactive):
+    def test_greeting_is_stored_with_greeting_type_under_the_persons_key(self, st, check):
         st.session_state = _FakeSessionState()
         host = MagicMock()
         user = {"id": 2, "display_name": "Bob"}
@@ -35,7 +34,6 @@ class TestOutreachTypes(unittest.TestCase):
         host.greeting_turn.assert_called_once_with(user)
         check.assert_called_once_with(host.person, llm, "Bob (2)")
         host.person.send_message.assert_called_once_with("Bob (2)", "You're back!", "greeting")
-        proactive.assert_not_called()
 
     @patch("core.ui.chat.check_return_greeting")
     @patch("core.ui.chat.st")
@@ -86,20 +84,27 @@ class TestOutreachTypes(unittest.TestCase):
         chat_ui.ensure_greeting(host, {"id": 2, "display_name": "Bob"}, llm)
         self.assertNotIn("Bob", person.conversations)
         llm.invoke.assert_not_called()
+        # Considered once: the 5-second refreshes must not take the mind lock again.
+        self.assertTrue(st.session_state.showed_return_greeting)
+        host.greeting_turn.reset_mock()
+        chat_ui.ensure_greeting(host, {"id": 2, "display_name": "Bob"}, llm)
+        host.greeting_turn.assert_not_called()
 
-    @patch("core.ui.chat.generate_proactive_message", return_value="Still there?")
-    @patch("core.ui.chat.check_proactive_message", return_value={"low_social": {}})
-    @patch("core.ui.chat._get_user_db_and_id", return_value=(None, None))
-    @patch("core.ui.chat._get_user_display_name", return_value="Matt")
-    @patch("core.ui.chat.st")
-    def test_proactive_is_stored_with_proactive_type(self, st, *_):
-        st.session_state = _FakeSessionState()
-        person = MagicMock()
-        send_proactive_message(person, None)
-        person.send_message.assert_called_once_with("Matt", "Still there?", "proactive")
 
 
 class TestHandleUserInput(unittest.TestCase):
+    @patch("core.ui.chat.analyze_emotion_impact", return_value=None)
+    @patch("core.ui.chat.handle_chat_interaction", return_value={"assistant_response": "hi", "user_message": "hello"})
+    @patch("core.ui.chat.st")
+    def test_a_message_counts_as_a_visit(self, st, *_):
+        st.session_state = _FakeSessionState(action_history=[])
+        person = Person()
+        person.init_social_cognition()
+        turn = ChatTurn("Bob", 2, False, {}, [], EventLog())
+        before = datetime.now()
+        handle_user_input(person, None, None, False, "hello", turn)
+        self.assertGreaterEqual(person.social_cognition.models["Bob"].last_visit_time, before)
+
     @patch("core.ui.chat.st")
     def test_empty_input_returns_none_without_chat_input(self, st):
         turn = ChatTurn("Bob", 2, False, {}, [], EventLog())
@@ -132,11 +137,10 @@ class TestHandleUserInput(unittest.TestCase):
         self.assertEqual(stale_log.recent(), [])
         st.chat_message.assert_not_called()
 
-    @patch("core.ui.chat.save_person_state")
     @patch("core.ui.chat.analyze_emotion_impact", return_value={})
     @patch("core.ui.chat.handle_chat_interaction", return_value={"assistant_response": "hey", "user_message": "hi"})
     @patch("core.ui.chat.st")
-    def test_chat_passes_only_the_partners_state_and_the_last_beat(self, st, chat, _emotion, save):
+    def test_chat_passes_only_the_partners_state_and_the_last_beat(self, st, chat, _emotion):
         db = MagicMock()
         db.get_messages.return_value = [{"sender": "Bob", "content": "hi"}]
         st.session_state = _FakeSessionState(
@@ -171,7 +175,6 @@ class TestHandleUserInput(unittest.TestCase):
         db.get_messages.assert_called_once_with(2, limit=200)
         self.assertEqual(db.store_message.call_args_list[0].args, (2, "Bob", "hi", "user_message"))
         self.assertEqual(db.store_message.call_args_list[1].args, (2, "Jenbina", "hey", "jenbina_response"))
-        save.assert_not_called()
 
     @patch("core.ui.chat.analyze_emotion_impact", return_value={})
     @patch("core.ui.chat.handle_chat_interaction", return_value={"assistant_response": "hey"})
@@ -187,15 +190,6 @@ class TestHandleUserInput(unittest.TestCase):
         self.assertEqual(chat.call_args.kwargs["recent_actions"], [])
 
 
-class TestEventLogPerUser(unittest.TestCase):
-    @patch("core.ui.chat._get_user_db_and_id", return_value=(MagicMock(), 2))
-    @patch("core.ui.chat.st")
-    def test_event_log_follows_the_logged_in_user(self, st, _):
-        stale = EventLog(MagicMock(), 1)
-        st.session_state = _FakeSessionState(event_log=stale)
-        log = get_event_log()
-        self.assertEqual(log.user_id, 2)
-        self.assertIs(st.session_state["event_log"], log)
 
 
 
@@ -210,17 +204,6 @@ RECORD = {
 
 
 class TestHistoryShapedContext(unittest.TestCase):
-    @patch("core.ui.chat.generate_proactive_message", return_value="Still there?")
-    @patch("core.ui.chat.check_proactive_message", return_value={"low_social": {}})
-    @patch("core.ui.chat._get_user_db_and_id", return_value=(None, None))
-    @patch("core.ui.chat._get_user_display_name", return_value="Matt")
-    @patch("core.ui.chat.st")
-    def test_proactive_message_reads_runner_history_records(self, st, _name, _db, _check, gen):
-        st.session_state = _FakeSessionState(simulation_history=[dict(RECORD)])
-        person = MagicMock()
-        self.assertEqual(send_proactive_message(person, None), "Still there?")
-        self.assertEqual(gen.call_args.kwargs["recent_actions"], ["Walk to Coupa Cafe"])
-        self.assertEqual(gen.call_args.kwargs["world_context"], "Jenbina's House, evening, Clear skies")
 
     @patch("core.ui.chat.analyze_emotion_impact", return_value={})
     @patch("core.ui.chat.handle_chat_interaction", return_value={"assistant_response": "hey", "user_message": "hi"})

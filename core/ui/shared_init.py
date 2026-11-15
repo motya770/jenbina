@@ -13,9 +13,8 @@ if os.getenv('LANGSMITH_API_KEY'):
     os.environ.setdefault('LANGSMITH_API_KEY', os.getenv('LANGSMITH_API_KEY'))
 
 from core.connect import get_llm, get_json_llm
-from core.person.person import Person
-from core.insights.insight_system import InsightSystem
-from core.cognition.meta_cognition import MetaCognitiveSystem
+from core.heartbeat.host import JenbinaHost
+from core.heartbeat.store import BeingStore
 from core.memory.conversation_memory import ChromaMemoryManager
 from core.environment.environment_simulator import EnvironmentSimulator
 from core.auth.user_db import UserDatabase
@@ -23,168 +22,85 @@ from core.ui.auth_page import render_auth_page, render_user_header
 
 
 def init_llm():
-    """Initialize LLM instances.
-
-    Chat LLM uses GPT-5.2 (openai-advanced) for richer emotional intelligence.
-    JSON-mode LLM stays on GPT-5-nano for cost efficiency.
-    """
+    """Initialize the chat LLM and the JSON-mode LLM for cognition."""
     chat_model = os.getenv("OPENAI_CHAT_MODEL", "openai-advanced")
     llm = get_llm(provider=chat_model, temperature=1, max_tokens=600)
     llm_json_mode = get_json_llm(provider="openai", temperature=1)
     return llm, llm_json_mode
 
 
-def _load_or_create_person(user_db: UserDatabase, user_id: int) -> Person:
-    """Load a user's Person state from SQLite, or create a fresh one."""
+@st.cache_resource
+def _cached_host() -> JenbinaHost:
     llm, llm_json_mode = init_llm()
-    saved_json = user_db.load_person_state(user_id)
-    if saved_json:
-        person = Person.deserialize(saved_json, llm_json_mode)
-    else:
-        person = Person()
-        person.update_all_needs()
-    if person.learning_system is None:
-        person.init_learning_system(llm_json_mode)
-    if person.goal_system is None:
-        person.init_goal_system(llm_json_mode)
-    if person.planning_system is None:
-        person.init_planning_system(llm_json_mode)
-    if person.inner_monologue is None:
-        person.init_inner_monologue(llm)
-    if person.social_cognition is None:
-        person.init_social_cognition()
-    if person.self_narrative is None:
-        person.init_self_narrative()
-    if person.curiosity_system is None:
-        person.init_curiosity_system()
-    if person.social_interaction_tracker is None:
-        person.init_social_interaction_tracker()
-    # Always (re)init insight system with a plain LLM — deserialize passes
-    # the JSON-mode LLM which causes 400 errors because InsightSystem's
-    # prompt doesn't mention "json". Preserve each person's first impression
-    # and daily insight quota when replacing the LLM.
     insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
-    if person.insight_system is not None:
-        person.insight_system = InsightSystem.from_dict(person.insight_system.to_dict(), insight_llm)
-    else:
-        person.init_insight_system(insight_llm)
-    return person
+    return JenbinaHost(BeingStore(), UserDatabase(), llm, llm_json_mode, insight_llm)
+
+
+def get_host() -> JenbinaHost:
+    """One host per process; retry ownership on later visits if it was refused."""
+    host = _cached_host()
+    if not host.hosting:
+        host.start()
+    return host
 
 
 def save_person_state():
-    """Persist the current Person state to SQLite for the logged-in user."""
-    user = st.session_state.get("current_user")
-    person = st.session_state.get("person")
-    if user and person:
-        user_db = st.session_state.get("user_db")
-        if user_db is None:
-            user_db = UserDatabase()
-            st.session_state.user_db = user_db
-        user_db.save_person_state(user["id"], person.serialize())
+    """Persist the shared being through her owner."""
+    get_host().save()
 
 
 def init_session_state():
-    """Initialize all session state variables."""
-    if 'person' not in st.session_state:
-        user = st.session_state.get("current_user")
-        if user:
-            user_db = st.session_state.get("user_db", UserDatabase())
-            st.session_state.user_db = user_db
-            person = _load_or_create_person(user_db, user["id"])
-        else:
-            person = Person()
-            person.update_all_needs()
-            llm, llm_json_mode = init_llm()
-            person.init_learning_system(llm_json_mode)
-            person.init_goal_system(llm_json_mode)
-            person.init_planning_system(llm_json_mode)
-            person.init_inner_monologue(llm)
-            person.init_social_cognition()
-            person.init_self_narrative()
-            person.init_curiosity_system()
-            person.init_social_interaction_tracker()
-            insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
-            person.init_insight_system(insight_llm)
-        st.session_state.person = person
+    """Initialize session resources; the host owns the live mind."""
+    if 'action_history' not in st.session_state:
         st.session_state.action_history = []
-        print(person)
 
-    # Ensure systems are initialized for existing sessions
-    if st.session_state.person.learning_system is None:
-        _, llm_json_mode = init_llm()
-        st.session_state.person.init_learning_system(llm_json_mode)
-    if st.session_state.person.planning_system is None:
-        _, llm_json_mode = init_llm()
-        st.session_state.person.init_planning_system(llm_json_mode)
-    if st.session_state.person.goal_system is None:
-        _, llm_json_mode = init_llm()
-        st.session_state.person.init_goal_system(llm_json_mode)
-    if st.session_state.person.inner_monologue is None:
-        llm, _ = init_llm()
-        st.session_state.person.init_inner_monologue(llm)
-    if st.session_state.person.social_cognition is None:
-        st.session_state.person.init_social_cognition()
-    if st.session_state.person.self_narrative is None:
-        st.session_state.person.init_self_narrative()
-    if st.session_state.person.curiosity_system is None:
-        st.session_state.person.init_curiosity_system()
-    if st.session_state.person.social_interaction_tracker is None:
-        st.session_state.person.init_social_interaction_tracker()
-    if st.session_state.person.insight_system is None:
-        insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
-        st.session_state.person.init_insight_system(insight_llm)
-
-    # Deep Emotional Mirror: background research on first login
+    # Deep Emotional Mirror: background research on first login. Capture the
+    # host and account here: worker threads must never use Streamlit state.
     if "user_research_done" not in st.session_state:
         st.session_state.user_research_done = True
         user = st.session_state.get("current_user")
-        if user and st.session_state.person.social_cognition is not None:
+        host = get_host()
+        if user and host.person.social_cognition is not None:
             display_name = user.get("display_name") or user.get("email", "User")
             email = user.get("email", "")
-            model = st.session_state.person.social_cognition.get_or_create_model(display_name)
-            if not model.user_dossier:
+            person_key = host.person_key(user)
+            # Read without the mind lock: a page load must never wait for a beat.
+            known = host.person.social_cognition.models.get(person_key)
+            has_dossier = bool(known and known.user_dossier)
+            if not has_dossier:
                 import threading
+
                 def _run_research():
                     try:
                         from core.research.user_research import research_user
                         insight_llm = get_llm(provider="openai-advanced", temperature=0.5, max_tokens=1000)
                         dossier = research_user(insight_llm, display_name, email)
                         if dossier:
-                            model.user_dossier = dossier
-                            save_person_state()
+                            with host.lock:
+                                if host.hosting:
+                                    model = host.person.social_cognition.get_or_create_model(person_key)
+                                    model.user_dossier = dossier
+                                    host.save()
                             print(f"User research complete for {display_name}")
                     except Exception as e:
                         print(f"Background user research failed: {e}")
+
                 threading.Thread(target=_run_research, daemon=True).start()
 
-    if 'meta_cognitive_system' not in st.session_state:
-        _, llm_json_mode = init_llm()
-        st.session_state.meta_cognitive_system = MetaCognitiveSystem(llm_json_mode)
     if 'memory_manager' not in st.session_state:
         st.session_state.memory_manager = ChromaMemoryManager()
     if 'environment_simulator' not in st.session_state:
         st.session_state.environment_simulator = EnvironmentSimulator("Palo Alto, CA")
-
     if 'showed_return_greeting' not in st.session_state:
         st.session_state.showed_return_greeting = False
 
-    if 'simulation_completed' not in st.session_state:
-        st.session_state.simulation_completed = False
-        st.session_state.needs_response = None
-        st.session_state.world_description = None
-        st.session_state.action_decision = None
-        st.session_state.state_response = None
-        st.session_state.simulation_history = []
-        st.session_state.is_running = False
-
 
 def require_auth():
-    """Auth gate + session init. Returns False if not logged in.
+    """Authenticate, then connect the session to the hosted Jenbina.
 
     Set env var JENBINA_SKIP_AUTH=1 to bypass Google SSO (for E2E tests).
     """
     if os.environ.get("JENBINA_SKIP_AUTH") == "1":
-        # Seed minimal session state so the rest of the app works
         if "authenticated" not in st.session_state:
             user_db = UserDatabase()
             st.session_state.user_db = user_db
@@ -197,12 +113,16 @@ def require_auth():
             )
             st.session_state.authenticated = True
             st.session_state.current_user = user
-        init_session_state()
-        return True
+    else:
+        if not render_auth_page():
+            return False
+        render_user_header(st.session_state.current_user)
 
-    if not render_auth_page():
+    host = get_host()
+    if not host.hosting:
+        st.info("Jenbina is already living in another process. This window cannot reach her until that one stops.")
         return False
-    user = st.session_state.current_user
-    render_user_header(user)
+    st.session_state.person = host.person
+    st.session_state.meta_cognitive_system = host.meta_cognitive_system
     init_session_state()
     return True

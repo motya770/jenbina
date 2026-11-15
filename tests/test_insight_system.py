@@ -39,32 +39,23 @@ class TestPerPersonInsights(unittest.TestCase):
         rebuilt = InsightSystem.from_dict(system.to_dict(), other_llm)
         self._assert_rebuilt_state(rebuilt, system, other_llm, day)
 
-    def test_session_load_rebuilds_insights_without_losing_any_persons_state(self):
+    def test_host_build_rebuilds_insights_without_losing_any_persons_state(self):
         from core.person.person import Person
-        from core.ui.shared_init import _load_or_create_person
+        from core.heartbeat.being import build_person
 
         system, day = self._state_for_rebuild()
         person = Person()
         person.insight_system = system
-        user_db = MagicMock()
-        user_db.load_person_state.return_value = person.serialize()
         other_llm = _make_mock_llm()
-        with patch("core.ui.shared_init.init_llm", return_value=(_make_mock_llm(), _make_mock_llm())), \
-                patch("core.ui.shared_init.get_llm", return_value=other_llm):
-            restored = _load_or_create_person(user_db, 7)
-        user_db.load_person_state.assert_called_once_with(7)
+        restored = build_person(person.serialize(), _make_mock_llm(), _make_mock_llm(), other_llm)
         self._assert_rebuilt_state(restored.insight_system, system, other_llm, day)
 
-    def test_session_load_initializes_insights_when_none_were_saved(self):
+    def test_host_build_initializes_insights_when_none_were_saved(self):
         from core.person.person import Person
-        from core.ui.shared_init import _load_or_create_person
+        from core.heartbeat.being import build_person
 
-        user_db = MagicMock()
-        user_db.load_person_state.return_value = Person().serialize()
         other_llm = _make_mock_llm()
-        with patch("core.ui.shared_init.init_llm", return_value=(_make_mock_llm(), _make_mock_llm())), \
-                patch("core.ui.shared_init.get_llm", return_value=other_llm):
-            restored = _load_or_create_person(user_db, 7)
+        restored = build_person(Person().serialize(), _make_mock_llm(), _make_mock_llm(), other_llm)
         self.assertIs(restored.insight_system.llm, other_llm)
         self.assertEqual(restored.insight_system.people, {})
 
