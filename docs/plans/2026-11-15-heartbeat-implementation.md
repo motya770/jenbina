@@ -1148,3 +1148,18 @@ In `tests/test_simulation_runner.py`, delete `TestUiRunnerEvents`, `test_ui_runn
 - After a message wakes her, going back to sleep within the hour records no event, and the eventual wake reports the length from the original start. The timeline therefore reads: fell asleep, woken by a message, woke after N hours.
 - `JENBINA_DISABLE_SLEEP=1` exists for the end-to-end tests and for anyone who wants her awake around the clock.
 - Her first beat happens within seconds of the heart starting, rather than one interval later.
+
+## Changes made after the tasks, from review
+
+A second review, of Tasks 4 to 10, changed these points. Where they differ from the task text above, this section is what the code does.
+
+- **One host per process, whatever Streamlit does.** `get_host()` uses `process_host()` in `core/heartbeat/host.py`, which keeps the host on `sys`, not `st.cache_resource`. Clearing Streamlit's cache or hot-reloading `shared_init` no longer builds a second host that can never take the lease.
+- **`start()` is serialized** by its own lock, so two tabs reconnecting at once cannot stop the threads one of them just started.
+- **Adoption never picks the end-to-end test login by itself.** Accounts with provider `test` are adopted only when named (`--adopt-user-id`, or `JENBINA_ADOPT_USER_ID` for the app) or when no other account has a readable state. An account whose history cannot be read is skipped and reported in `AdoptionReport.failed_user_ids` instead of stopping her first start.
+- **Admin by "local request" only in development.** `is_admin()` trusts a local-looking Host header only when `JENBINA_SKIP_AUTH=1`; with login on, only the admin account. The header match is exact, not a substring.
+- **Thoughts name nobody.** The social-day line fed to the inner monologue leaves out names (`format_for_prompt(names=False)`), because thoughts are recorded on the timeline every account sees. Chat prompts still get the names.
+- **Home screen.** A message sent during a beat shows a notice in the conversation while it waits; the place line shows where she is now, not where the last beat started; `chat_turn` raises `NotHostingError`, which the page turns into a plain notice.
+- **Host.** Lost time is not counted as time awake; an adopted Jenbina's clocks start at adoption; a storage error while renewing the lease does not stop the heart; `stop(patience=...)` lets process exit abandon a beat in flight.
+- **`run_heartbeat.py --once`** prints what happened and exits 2 when the beat failed.
+- **Greeting** is considered once per session (the 5-second refresh must not re-check it), and a message counts as a visit.
+

@@ -2,7 +2,7 @@
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from core.heartbeat.being import build_person
@@ -18,6 +18,7 @@ class AdoptionReport:
     experiences: int
     imported_user_ids: list[int]
     events_copied: int
+    failed_user_ids: list[int] = field(default_factory=list)   # history could not be read; left in the old rows
 
 
 def _read_state(state_json: str) -> dict | None:
@@ -33,8 +34,14 @@ def _experience_count(data: dict) -> int:
     return len(learning.get("experiences", []))
 
 
-def choose_user_to_adopt(states: list[dict], prefer_user_id: int | None = None) -> int | None:
-    """Choose the most experienced readable state, breaking ties by user id."""
+def choose_user_to_adopt(states: list[dict], prefer_user_id: int | None = None,
+                         test_user_ids: frozenset = frozenset()) -> int | None:
+    """Choose the most experienced readable state, breaking ties by user id.
+
+    Accounts in ``test_user_ids`` (the end-to-end test login) are chosen only
+    when asked for by id or when no other account has a readable state, so a
+    busy test run can never become the one Jenbina by accident.
+    """
     candidates = {}
     for row in states:
         data = _read_state(row["person_state_json"])
@@ -46,7 +53,9 @@ def choose_user_to_adopt(states: list[dict], prefer_user_id: int | None = None) 
         return prefer_user_id
     if not candidates:
         return None
-    return min(candidates, key=lambda user_id: (-candidates[user_id], user_id))
+    real = {user_id: n for user_id, n in candidates.items() if user_id not in test_user_ids}
+    pool = real or candidates
+    return min(pool, key=lambda user_id: (-pool[user_id], user_id))
 
 
 def _import_partner(person: Person, data: dict, display_name: str, key: str) -> None:
@@ -92,7 +101,10 @@ def adopt_existing(store: BeingStore, user_db, llm, llm_json_mode, insight_llm, 
     The caller must hold ownership and have checked that no being record exists.
     """
     states = user_db.list_person_states()
-    chosen_id = choose_user_to_adopt(states, prefer_user_id)
+    test_user_ids = frozenset(
+        user["id"] for user in user_db.get_all_users() if user.get("provider") == "test"
+    )
+    chosen_id = choose_user_to_adopt(states, prefer_user_id, test_user_ids)
     situation = Situation.fresh(now)
     if chosen_id is None:
         return (build_person(None, llm, llm_json_mode, insight_llm), situation,
@@ -113,7 +125,7 @@ def adopt_existing(store: BeingStore, user_db, llm, llm_json_mode, insight_llm, 
         person.social_cognition.models.pop(source_name, None)
         person.insight_system.people.pop(source_name, None)
 
-    imported = []
+    imported, failed = [], []
     for row in states:
         user_id = row["user_id"]
         if user_id == chosen_id:
@@ -121,16 +133,24 @@ def adopt_existing(store: BeingStore, user_db, llm, llm_json_mode, insight_llm, 
         data = _read_state(row["person_state_json"])
         if data is None:
             continue
-        user = user_db.get_user_by_id(user_id)
-        display_name = user.get("display_name")
-        key = store.person_key(user_id, display_name)
-        _import_partner(person, data, display_name or user.get("email") or key, key)
+        try:
+            user = user_db.get_user_by_id(user_id)
+            display_name = user.get("display_name")
+            key = store.person_key(user_id, display_name)
+            _import_partner(person, data, display_name or user.get("email") or key, key)
+        except Exception:
+            # One account's unreadable history must not keep her from starting.
+            # Its old rows are untouched and can be imported by hand later.
+            logging.getLogger("jenbina.heartbeat").exception(
+                "Could not import user %s's history with Jenbina; skipped.", user_id)
+            failed.append(user_id)
+            continue
         imported.append(user_id)
 
     # Copy her life events last, right before the record that marks the adoption
     # as done, so a failure above cannot leave duplicates behind for a retry.
     events_copied = store.import_events(user_db.get_events(chosen_id, limit=100000))
-    report = AdoptionReport(chosen_id, _experience_count(chosen_data), imported, events_copied)
+    report = AdoptionReport(chosen_id, _experience_count(chosen_data), imported, events_copied, failed)
     store.save_state(person.serialize(), situation.to_dict())
     logging.getLogger("jenbina.heartbeat").info("Adopted existing Jenbina: %s", report)
     return person, situation, report

@@ -7,7 +7,7 @@ from contextlib import ExitStack, nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from core.heartbeat.host import ChatTurn
+from core.heartbeat.host import _PROCESS_HOST, ChatTurn, NotHostingError
 from core.ui.live import draw_guarded
 from core.ui import shared_init
 from tests.test_greeting_generation import _FakeSessionState
@@ -24,9 +24,33 @@ class TestLiveDrawing(unittest.TestCase):
 
 
 class TestSharedHost(unittest.TestCase):
+    def setUp(self):
+        # The process host is kept on sys so it survives reloads; tests start clean.
+        saved = sys.__dict__.pop(_PROCESS_HOST, None)
+        self.addCleanup(lambda: sys.__dict__.pop(_PROCESS_HOST, None) if saved is None
+                        else sys.__dict__.__setitem__(_PROCESS_HOST, saved))
+
+    def test_a_cache_clear_or_reload_never_builds_a_second_host(self):
+        first = MagicMock(hosting=True)
+        with patch.object(shared_init, "_build_host", return_value=first) as build:
+            self.assertIs(shared_init.get_host(), first)
+            # What a hot reload or "Clear cache" amounts to: the module's own
+            # references are gone, the process and the first host are not.
+            self.assertIs(shared_init.get_host(), first)
+            self.assertEqual(build.call_count, 1)
+        with patch.object(shared_init, "_build_host", return_value=MagicMock()) as rebuilt:
+            self.assertIs(shared_init.get_host(), first)
+            rebuilt.assert_not_called()
+
+    def test_adoption_override_comes_from_the_environment(self):
+        with patch.dict("os.environ", {"JENBINA_ADOPT_USER_ID": "3"}):
+            self.assertEqual(shared_init._adopt_user_id(), 3)
+        with patch.dict("os.environ", {"JENBINA_ADOPT_USER_ID": "three"}):
+            self.assertIsNone(shared_init._adopt_user_id())
+        with patch.dict("os.environ", {}, clear=True):
+            self.assertIsNone(shared_init._adopt_user_id())
+
     def test_cached_host_retries_start_after_a_refused_lease(self):
-        shared_init._cached_host.clear()
-        self.addCleanup(shared_init._cached_host.clear)
         host = MagicMock(hosting=False)
         def start():
             host.hosting = host.start.call_count > 1
@@ -44,7 +68,8 @@ class TestSharedHost(unittest.TestCase):
             self.assertIs(shared_init.get_host(), host)
         self.assertEqual(factory.call_count, 1)
         self.assertEqual(host.start.call_count, 2)
-        factory.assert_called_once_with(store.return_value, db.return_value, "chat", "json", "insight")
+        factory.assert_called_once_with(store.return_value, db.return_value, "chat", "json", "insight",
+                                        adopt_user_id=None)
 
     def test_auth_replaces_session_copies_with_host_references_on_every_run(self):
         host = MagicMock(hosting=True)
@@ -79,7 +104,7 @@ class TestSharedHost(unittest.TestCase):
 
 
 class TestHomeScreen(unittest.TestCase):
-    def run_home(self, *, message=None, clicked=False):
+    def run_home(self, *, message=None, clicked=False, chat_error=None):
         stack = ExitStack()
         self.addCleanup(stack.close)
         st = MagicMock()
@@ -111,10 +136,15 @@ class TestHomeScreen(unittest.TestCase):
         host.status.return_value.busy = bool(message)
         host.status.return_value.stage = "thinking…"
         host.situation.phase = "asleep"
-        world = {"location": {"name": "Coupa Cafe"}}
-        host.situation.history = [{"world_summary": world, "action_decision": {"chosen_action": "Read"}}]
+        # The beat's summary names where it started; she has walked on since.
+        host.situation.history = [{"world_summary": {"location": {"name": "Jenbina's House", "type": "home"}},
+                                   "action_decision": {"chosen_action": "Read"}}]
+        host.situation.location = "Coupa Cafe"
+        world = {"location": {"name": "Coupa Cafe", "type": "home"}}
         turn = ChatTurn("Bob (2)", 2, False, {}, [], host.event_log)
         host.chat_turn.return_value = nullcontext(turn)
+        if chat_error is not None:
+            host.chat_turn.side_effect = chat_error
         replacements = {
             "core.ui.shared_init.require_auth": True,
             "core.ui.shared_init.get_host": host,
@@ -166,6 +196,25 @@ class TestHomeScreen(unittest.TestCase):
             host.person, "chat llm", st.session_state.memory_manager, False, "hello", turn,
         )
         st.rerun.assert_called_once()
+
+    def test_a_message_sent_mid_beat_says_it_is_waiting(self):
+        st, _, _, _, _, _ = self.run_home(message="hello")
+        waiting = st.empty.return_value
+        waiting.info.assert_called_once_with(
+            "Jenbina is finishing what she was doing. Your message is waiting for her.")
+        waiting.empty.assert_called_once()
+
+    def test_the_place_line_shows_where_she_is_now(self):
+        _, host, mocks, _, _, _ = self.run_home()
+        shown = mocks["core.ui.rail.render_status_rail"].call_args.args[1]
+        self.assertEqual(shown["location"]["name"], "Coupa Cafe")
+        self.assertEqual(host.situation.history[0]["world_summary"]["location"]["name"], "Jenbina's House")
+
+    def test_a_message_after_she_moved_away_gets_a_plain_notice(self):
+        st, _, mocks, _, _, _ = self.run_home(message="hello", chat_error=NotHostingError("gone"))
+        mocks["core.ui.chat.handle_user_input"].assert_not_called()
+        self.assertIn("moved to another process", st.info.call_args.args[0])
+        st.rerun.assert_not_called()
 
     def test_step_once_uses_the_host_and_reruns_the_app(self):
         st, host, _, _, _, _ = self.run_home(clicked=True)

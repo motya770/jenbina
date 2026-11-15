@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import atexit
 import logging
+import sys
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -28,6 +29,30 @@ logger = logging.getLogger("jenbina.heartbeat")
 
 # How long interpreter exit waits for the mind lock before abandoning a beat.
 EXIT_PATIENCE_SECONDS = 3.0
+
+
+class NotHostingError(RuntimeError):
+    """She is not (or no longer) living in this process."""
+
+
+_PROCESS_HOST = "_jenbina_process_host"
+
+
+def process_host(build: Callable[[], "JenbinaHost"]) -> "JenbinaHost":
+    """The one host of this process, built on first use.
+
+    Kept on ``sys`` rather than in a module global or a Streamlit cache: both
+    of those are dropped by a hot reload or a cache clear while the first
+    host's threads keep running and holding the lease, which would leave the
+    replacement host locked out of its own process.
+    """
+    lock = sys.__dict__.setdefault(_PROCESS_HOST + "_lock", threading.Lock())
+    with lock:
+        host = sys.__dict__.get(_PROCESS_HOST)
+        if host is None:
+            host = build()
+            sys.__dict__[_PROCESS_HOST] = host
+        return host
 
 
 @dataclass
@@ -95,6 +120,7 @@ class JenbinaHost:
         self._people = {}
         self._stop = threading.Event()
         self._threads = []
+        self._start_lock = threading.Lock()
         self._atexit_registered = False
         # The pulse must renew even while a beat or chat owns the mind lock.
         self._alive_lock = threading.Lock()
@@ -102,6 +128,12 @@ class JenbinaHost:
         self._pending_gap = None
 
     def start(self, threads: bool = True) -> bool:
+        # One caller at a time: a second caller that read hosting == False just
+        # before the first finished would otherwise stop the threads it started.
+        with self._start_lock:
+            return self._start(threads)
+
+    def _start(self, threads: bool) -> bool:
         if not self.hosting:
             self._stop.set()
             self._join_threads()
@@ -398,7 +430,7 @@ class JenbinaHost:
     def chat_turn(self, user: dict) -> Iterator[ChatTurn]:
         with self.lock:
             if not self.hosting or not self.pulse():
-                raise RuntimeError("Jenbina is not living in this process.")
+                raise NotHostingError("Jenbina is not living in this process.")
             now = self.clock()
             self._check_lost_time(now)
             woken = self.situation.phase == ASLEEP

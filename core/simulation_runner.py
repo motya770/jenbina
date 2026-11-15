@@ -421,7 +421,8 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
             f"Weather: {world_summary.get('weather', {}).get('description', 'unknown')}"
         )
         if getattr(person, "social_interaction_tracker", None) is not None:
-            world_context_str += "\n" + person.social_interaction_tracker.format_for_prompt()
+            # Without names: her thoughts land on the timeline every account sees.
+            world_context_str += "\n" + person.social_interaction_tracker.format_for_prompt(names=False)
 
         last_action = "Nothing in particular."
         sim_history = context.get("simulation_history")

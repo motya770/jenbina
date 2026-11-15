@@ -5,6 +5,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from core.heartbeat.host import NotHostingError
 from core.ui.shared_init import require_auth, init_llm, get_host
 from core.ui.admin import is_admin
 from core.ui.pixel_theme import inject_pixel_css
@@ -25,14 +26,24 @@ MESSAGE_WINDOW = 100
 COLUMN_RATIO = [1.55, 1]
 
 
-def _latest_world(history):
-    """World and chosen action from the host's most recent moment."""
+def _latest_world(history, location=None):
+    """World and chosen action from the host's most recent moment.
+
+    The world summary is taken at the start of a beat, so after a walk it still
+    names the place she left; ``location`` (where she is now) replaces it.
+    """
     if not history:
         return None, None
     last = history[-1]
     decision = last.get("action_decision") or {}
     doing = decision.get("chosen_action") if isinstance(decision, dict) else None
-    return last.get("world_summary"), doing
+    world_summary = last.get("world_summary")
+    if location and isinstance(world_summary, dict):
+        place = world_summary.get("location")
+        place = dict(place) if isinstance(place, dict) else {}
+        place["name"] = location
+        world_summary = {**world_summary, "location": place}
+    return world_summary, doing
 
 
 def _top_goal(person):
@@ -116,7 +127,7 @@ def main():
                     st.info("Jenbina has moved to another process. Reload this page to find her.")
                     return
                 person = host.person
-                world_summary, doing = _latest_world(host.situation.history)
+                world_summary, doing = _latest_world(host.situation.history, host.situation.location)
                 status = host.status()
                 rail = render_status_rail(person, world_summary, doing, _top_goal(person))
                 rail.stage(status.stage)
@@ -133,11 +144,25 @@ def main():
         live_rail()
 
     if user_input:
+        waiting = None
         if host.status().busy:
+            # The turn below waits for the beat in flight. Say so where the
+            # person is looking, or the page seems frozen for up to a minute or two.
             update_system_stage("finishing what she was doing…")
-        with host.chat_turn(user) as turn:
             with live:
-                handle_user_input(host.person, llm, memory_manager, False, user_input, turn)
+                waiting = st.empty()
+                waiting.info("Jenbina is finishing what she was doing. Your message is waiting for her.")
+        try:
+            with host.chat_turn(user) as turn:
+                if waiting is not None:
+                    waiting.empty()
+                with live:
+                    handle_user_input(host.person, llm, memory_manager, False, user_input, turn)
+        except NotHostingError:
+            with live:
+                st.info("Jenbina has moved to another process, so your message did not reach her. "
+                        "Reload this page to find her.")
+            return
         st.rerun()
 
 

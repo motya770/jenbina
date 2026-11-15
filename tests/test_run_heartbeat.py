@@ -35,6 +35,7 @@ class TestHeartbeatMain(unittest.TestCase):
         self.host.stop.assert_not_called()
 
     def test_once_beats_once_and_stops(self):
+        self.host.step_once.return_value = "done"
         with patch.dict(os.environ, {"OPENAI_API_KEY": ""}), \
                 patch("run_heartbeat.UserDatabase") as database, \
                 patch("run_heartbeat.get_llm") as llm, \
@@ -47,6 +48,17 @@ class TestHeartbeatMain(unittest.TestCase):
         database.assert_not_called()
         llm.assert_not_called()
         json_llm.assert_not_called()
+
+    def test_once_says_what_happened_and_fails_loudly(self):
+        import contextlib
+        for result, code, text in (("done", 0, "lived one moment"), ("asleep", 0, "is asleep"),
+                                   ("daily_cap", 0, "today's limit"), ("failed", 2, "No moment was taken: failed")):
+            with self.subTest(result=result):
+                self.host.step_once.return_value = result
+                out, err = io.StringIO(), io.StringIO()
+                with contextlib.redirect_stdout(out), redirect_stderr(err):
+                    self.assertEqual(main(["--once"], host_factory=self.factory), code)
+                self.assertIn(text, out.getvalue() + err.getvalue())
 
     def test_adopt_user_id_reaches_the_host(self):
         self.assertEqual(main(["--once", "--adopt-user-id", "3"],

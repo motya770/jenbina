@@ -246,9 +246,10 @@ class TestHeadlessParity(HeadlessFixture):
         self.person.social_interaction_tracker.record_chat("Ann", "warm")
         self.run_iteration()
         world_context = self.person.inner_monologue.think.call_args.kwargs["world_context_str"]
-        self.assertIn("\nSocial interactions today", world_context)
-        self.assertIn("Ann", world_context)
+        self.assertIn("\nSocial interactions today: met 1 person.", world_context)
         self.assertIn("warm", world_context)
+        # Her thoughts are shown to every account, so nobody is named in what feeds them.
+        self.assertNotIn("Ann", world_context)
 
     def test_status_sink_gets_five_stages_and_may_fail(self):
         sink = MagicMock()

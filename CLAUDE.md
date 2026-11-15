@@ -182,6 +182,7 @@ Copy `.env.example` to `.env` and configure:
 | `JENBINA_MAX_BEATS_PER_DAY` | Daily cap on awake beat attempts, including manual steps (default: `80`) |
 | `JENBINA_LLM_TIMEOUT_SECONDS` | Timeout for each LLM call in seconds (default: `60`, with one retry) |
 | `JENBINA_DISABLE_SLEEP` | Set to `1` to keep her awake, including in E2E tests (default: `0`, sleep enabled) |
+| `JENBINA_ADOPT_USER_ID` | On the very first start only: the user id whose saved Jenbina becomes the one Jenbina (default: the real account with the most experiences; the E2E test login is never picked automatically) |
 
 ## Code Conventions
 

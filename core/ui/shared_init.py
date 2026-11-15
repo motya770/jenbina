@@ -13,7 +13,7 @@ if os.getenv('LANGSMITH_API_KEY'):
     os.environ.setdefault('LANGSMITH_API_KEY', os.getenv('LANGSMITH_API_KEY'))
 
 from core.connect import get_llm, get_json_llm
-from core.heartbeat.host import JenbinaHost
+from core.heartbeat.host import JenbinaHost, process_host
 from core.heartbeat.store import BeingStore
 from core.memory.conversation_memory import ChromaMemoryManager
 from core.environment.environment_simulator import EnvironmentSimulator
@@ -29,16 +29,28 @@ def init_llm():
     return llm, llm_json_mode
 
 
-@st.cache_resource
-def _cached_host() -> JenbinaHost:
+def _adopt_user_id() -> int | None:
+    """JENBINA_ADOPT_USER_ID: whose saved Jenbina to adopt on the very first start."""
+    try:
+        return int(os.environ["JENBINA_ADOPT_USER_ID"])
+    except (KeyError, ValueError):
+        return None
+
+
+def _build_host() -> JenbinaHost:
     llm, llm_json_mode = init_llm()
     insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
-    return JenbinaHost(BeingStore(), UserDatabase(), llm, llm_json_mode, insight_llm)
+    return JenbinaHost(BeingStore(), UserDatabase(), llm, llm_json_mode, insight_llm,
+                       adopt_user_id=_adopt_user_id())
 
 
 def get_host() -> JenbinaHost:
-    """One host per process; retry ownership on later visits if it was refused."""
-    host = _cached_host()
+    """One host per process; retry ownership on later visits if it was refused.
+
+    Not a Streamlit cache: clearing the cache or hot-reloading this module must
+    not create a second host beside the one whose heart is already beating.
+    """
+    host = process_host(_build_host)
     if not host.hosting:
         host.start()
     return host

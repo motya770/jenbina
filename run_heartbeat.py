@@ -84,6 +84,7 @@ def main(
         return 1
 
     previous_handlers = {}
+    exit_code = 0
 
     def shutdown(signum, frame):
         # Stop after the moment she is living now. Hand the signal back to its
@@ -93,7 +94,16 @@ def main(
 
     try:
         if args.once:
-            host.step_once()
+            result = host.step_once()
+            if result == "done":
+                print("Jenbina lived one moment.")
+            elif result == "asleep":
+                print("Jenbina is asleep; no moment was taken.")
+            elif result == "daily_cap":
+                print("Jenbina has reached today's limit of moments; none was taken.")
+            elif result in ("failed", "not_hosting"):
+                print(f"No moment was taken: {result}. See the log above.", file=sys.stderr)
+                exit_code = 2
         else:
             for signum in (signal.SIGINT, signal.SIGTERM):
                 previous_handlers[signum] = signal.signal(signum, shutdown)
@@ -104,7 +114,7 @@ def main(
         finally:
             for signum, handler in previous_handlers.items():
                 signal.signal(signum, handler)
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 from core.auth.user_db import UserDatabase
 from core.heartbeat.being import BeingStateError
-from core.heartbeat.host import JenbinaHost
+from core.heartbeat.host import _PROCESS_HOST, JenbinaHost, NotHostingError, process_host
 from core.heartbeat.rhythm import (
     ASLEEP, AWAKE, BEAT, FALL_ASLEEP, SLEEP_TICK, WAIT, WAKE, RhythmConfig, Step,
 )
@@ -219,6 +219,35 @@ class TestOwnership(HostCase):
         self.assertTrue(lease.acquired)
         self.assertEqual(lease.previous_renewed_at, NOW + timedelta(minutes=2))
         self.assertEqual(self.store.load_state(), saved)
+
+    def test_only_one_caller_at_a_time_is_inside_start(self):
+        # Two tabs reconnecting at once: the second caller must not be able to
+        # stop the threads the first one has just started.
+        seen = []
+        with patch.object(self.host, "_start", side_effect=lambda threads: seen.append(
+                self.host._start_lock.locked()) or True):
+            self.assertTrue(self.host.start())
+        self.assertEqual(seen, [True])
+        self.assertFalse(self.host._start_lock.locked())
+
+    def test_the_process_has_one_host_however_often_it_is_asked_for(self):
+        import sys
+        saved = sys.__dict__.pop(_PROCESS_HOST, None)
+        try:
+            build = MagicMock(side_effect=lambda: object())
+            first = process_host(build)
+            self.assertIs(process_host(build), first)
+            self.assertEqual(build.call_count, 1)
+        finally:
+            sys.__dict__.pop(_PROCESS_HOST, None)
+            if saved is not None:
+                sys.__dict__[_PROCESS_HOST] = saved
+
+    def test_a_chat_on_a_host_that_lost_her_raises_the_named_error(self):
+        self.host.stop()
+        with self.assertRaises(NotHostingError):
+            with self.host.chat_turn(ANN):
+                pass
 
     def test_start_is_idempotent_and_can_retry_after_refusal(self):
         person = self.host.person

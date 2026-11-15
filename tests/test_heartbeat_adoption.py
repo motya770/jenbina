@@ -56,6 +56,13 @@ class TestChooseUser(unittest.TestCase):
         self.assertEqual(choose_user_to_adopt(states, prefer_user_id=1), 1)
         self.assertIsNone(choose_user_to_adopt([]))
 
+    def test_a_test_account_is_never_chosen_over_a_real_one(self):
+        states = [saved_state(1, 4), saved_state(2, 30)]
+        self.assertEqual(choose_user_to_adopt(states, test_user_ids=frozenset({2})), 1)
+        self.assertEqual(choose_user_to_adopt(states, prefer_user_id=2, test_user_ids=frozenset({2})), 2)
+        # With nobody else to adopt (a fresh test database) the test account will do.
+        self.assertEqual(choose_user_to_adopt(states[1:], test_user_ids=frozenset({2})), 2)
+
     def test_unreadable_states_are_never_chosen(self):
         for broken in ("{broken", "null", "[]"):
             with self.subTest(broken=broken):
@@ -323,6 +330,33 @@ class TestAdoption(unittest.TestCase):
         self.assertFalse(person.insight_system.should_generate_first_impression({"x": 1}, "User 4"))
         self.assertNotIn(user["email"], person.conversations)
         self.assertNotIn(user["email"], person.social_cognition.models)
+
+
+
+class TestAdoptionSafety(TestAdoption):
+    def test_the_end_to_end_test_login_does_not_become_her(self):
+        self.user_db.create_or_update_user(firebase_uid="test:e2e@test.local", email="e2e@test.local",
+                                           display_name="E2E Test User", provider="test")
+        self.save(saved_state(1, 4, "Ann", "ann-hello"))
+        self.save(saved_state(4, 30, "E2E Test User", "test-hello"))
+        person, _, report = adopt_existing(self.store, self.user_db, self.llm, self.json_llm,
+                                           self.insight_llm, NOW)
+        self.assertEqual(report.adopted_user_id, 1)
+        self.assertEqual(report.imported_user_ids, [4])
+        self.assertEqual(person.conversations["E2E Test User"].messages[0].content, "test-hello")
+
+    def test_one_unreadable_history_does_not_block_her_start(self):
+        self.populate()
+        broken = json.loads(saved_state(1, 4, "Ann", "ann-hello")["person_state_json"])
+        broken["conversations"]["Ann"]["last_interaction"] = "not a timestamp"
+        self.user_db.save_person_state(1, json.dumps(broken))
+        person, _, report = adopt_existing(self.store, self.user_db, self.llm, self.json_llm,
+                                           self.insight_llm, NOW)
+        self.assertEqual(report.adopted_user_id, 2)
+        self.assertEqual(report.failed_user_ids, [1])
+        self.assertEqual(report.imported_user_ids, [3])
+        self.assertIsNotNone(self.store.load_state())
+        self.assertIsNotNone(self.user_db.load_person_state(1))       # still there to import by hand
 
 
 if __name__ == "__main__":
