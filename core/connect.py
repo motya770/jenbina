@@ -5,6 +5,7 @@ from langchain_openai import ChatOpenAI
 
 
 LLMProvider = Literal["openai", "openai-advanced"]
+LLM_TIMEOUT_SECONDS: float = float(os.getenv("JENBINA_LLM_TIMEOUT_SECONDS", "60.0"))
 
 def get_llm(provider: LLMProvider = "openai", temperature: float = 1, max_tokens: int = None):
     """
@@ -27,6 +28,8 @@ def get_llm(provider: LLMProvider = "openai", temperature: float = 1, max_tokens
             model="gpt-5-nano",
             temperature=temperature,
             api_key=os.getenv('OPENAI_API_KEY'),
+            timeout=LLM_TIMEOUT_SECONDS,
+            max_retries=1,
         )
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
@@ -38,6 +41,8 @@ def get_llm(provider: LLMProvider = "openai", temperature: float = 1, max_tokens
             model="gpt-5.2",
             temperature=temperature,
             api_key=os.getenv('OPENAI_API_KEY'),
+            timeout=LLM_TIMEOUT_SECONDS,
+            max_retries=1,
         )
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
@@ -65,7 +70,9 @@ def get_json_llm(provider: LLMProvider = "openai", temperature: float = 1):
             model=model,
             temperature=temperature,
             model_kwargs={"response_format": {"type": "json_object"}},
-            api_key=os.getenv('OPENAI_API_KEY')
+            api_key=os.getenv('OPENAI_API_KEY'),
+            timeout=LLM_TIMEOUT_SECONDS,
+            max_retries=1,
         )
 
     else:

@@ -72,18 +72,18 @@ class MaslowNeed:
     growth_rate: float = 0.0  # How much satisfaction can grow beyond 100 (for self-actualization)
     max_satisfaction: float = 100.0  # Maximum possible satisfaction
     
-    def update(self, time_delta: timedelta = None):
+    def update(self, time_delta: timedelta = None, now: datetime | None = None):
         """Update need satisfaction over time"""
         if time_delta is None:
             time_delta = timedelta(minutes=1)  # Default 1 minute update
         
         # Calculate decay based on time passed
-        hours_passed = time_delta.total_seconds() / 3600
+        hours_passed = max(0.0, time_delta.total_seconds() / 3600)
         decay_amount = self.decay_rate * hours_passed * random.uniform(0.8, 1.2)
         
         # Apply decay
         self.satisfaction = max(0, self.satisfaction - decay_amount)
-        self.last_updated = datetime.now()
+        self.last_updated = now or datetime.now()
         
         # For self-actualization needs, allow growth beyond 100
         if self.level == NeedLevel.SELF_ACTUALIZATION and self.satisfaction < self.max_satisfaction:
@@ -219,15 +219,22 @@ class MaslowNeedsSystem:
                                 decay_rate=0.4, importance=0.9, growth_rate=0.15, max_satisfaction=180.0),
         })
     
-    def update_all_needs(self, time_delta: timedelta = None):
+    def update_all_needs(
+        self, time_delta: timedelta = None, skip: tuple[str, ...] = (),
+        now: datetime | None = None,
+    ):
         """Update all needs based on time passed"""
+        now = now or datetime.now()
         if time_delta is None:
-            time_delta = datetime.now() - self.last_comprehensive_update
+            time_delta = now - self.last_comprehensive_update
         
-        for need in self.needs.values():
-            need.update(time_delta)
+        for name, need in self.needs.items():
+            if name not in skip:
+                need.update(time_delta, now=now)
+            else:
+                need.last_updated = now
         
-        self.last_comprehensive_update = datetime.now()
+        self.last_comprehensive_update = now
         self._update_growth_stage()
     
     def _update_growth_stage(self):

@@ -1,6 +1,7 @@
 """Tests for core/connect.py — LLM provider connections."""
 
 import os
+import importlib
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -23,6 +24,8 @@ class TestGetLlm(unittest.TestCase):
         call_kwargs = mock_chat.call_args
         self.assertEqual(call_kwargs.kwargs["model"], "gpt-5-nano")
         self.assertEqual(call_kwargs.kwargs["temperature"], 0.5)
+        self.assertEqual(call_kwargs.kwargs["timeout"], 60.0)
+        self.assertEqual(call_kwargs.kwargs["max_retries"], 1)
 
     @patch("core.connect.ChatOpenAI")
     def test_openai_advanced_provider(self, mock_chat):
@@ -30,6 +33,8 @@ class TestGetLlm(unittest.TestCase):
         result = get_llm(provider="openai-advanced", temperature=0)
         call_kwargs = mock_chat.call_args
         self.assertEqual(call_kwargs.kwargs["model"], "gpt-5.2")
+        self.assertEqual(call_kwargs.kwargs["timeout"], 60.0)
+        self.assertEqual(call_kwargs.kwargs["max_retries"], 1)
 
     @patch("core.connect.ChatOpenAI")
     def test_openai_with_max_tokens(self, mock_chat):
@@ -71,6 +76,8 @@ class TestGetJsonLlm(unittest.TestCase):
         get_json_llm(provider="openai", temperature=0)
         call_kwargs = mock_chat.call_args
         self.assertEqual(call_kwargs.kwargs["model"], "gpt-5-nano")
+        self.assertEqual(call_kwargs.kwargs["timeout"], 60.0)
+        self.assertEqual(call_kwargs.kwargs["max_retries"], 1)
         self.assertEqual(
             call_kwargs.kwargs["model_kwargs"],
             {"response_format": {"type": "json_object"}},
@@ -82,10 +89,30 @@ class TestGetJsonLlm(unittest.TestCase):
         get_json_llm(provider="openai-advanced")
         call_kwargs = mock_chat.call_args
         self.assertEqual(call_kwargs.kwargs["model"], "gpt-5.2")
+        self.assertEqual(call_kwargs.kwargs["timeout"], 60.0)
+        self.assertEqual(call_kwargs.kwargs["max_retries"], 1)
 
     def test_unknown_provider_raises(self):
         with self.assertRaises(ValueError):
             get_json_llm(provider="bad_provider")
+
+
+class TestLlmTimeoutConfiguration(unittest.TestCase):
+    def test_environment_timeout_reaches_every_provider_and_factory(self):
+        import core.connect as connect
+        try:
+            with patch.dict(os.environ, {"JENBINA_LLM_TIMEOUT_SECONDS": "12.5"}):
+                importlib.reload(connect)
+                self.assertEqual(connect.LLM_TIMEOUT_SECONDS, 12.5)
+                with patch("core.connect.ChatOpenAI") as chat:
+                    for factory in (connect.get_llm, connect.get_json_llm):
+                        for provider in ("openai", "openai-advanced"):
+                            with self.subTest(factory=factory.__name__, provider=provider):
+                                factory(provider=provider)
+                                self.assertEqual(chat.call_args.kwargs["timeout"], 12.5)
+                                self.assertEqual(chat.call_args.kwargs["max_retries"], 1)
+        finally:
+            importlib.reload(connect)
 
 
 class TestGetRecommendedLlm(unittest.TestCase):

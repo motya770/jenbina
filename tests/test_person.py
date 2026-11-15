@@ -5,6 +5,7 @@ Tests person functionality including needs, conversations, and state management
 """
 
 import unittest
+from unittest.mock import MagicMock
 import sys
 import os
 from datetime import datetime, timedelta
@@ -14,6 +15,93 @@ import json
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from core.person.person import Person, Message, Conversation
+
+
+class TestBeingState(unittest.TestCase):
+    def test_lessons_and_goals_decay_by_real_elapsed_hours(self):
+        person = Person()
+        person.learning_system = MagicMock()
+        person.goal_system = MagicMock()
+        start = datetime(2026, 11, 15, 12, 0)
+        for now, expected_hours in (
+            (start, 0.0),
+            (start + timedelta(hours=2), 2.0),
+            (start + timedelta(hours=2), 0.0),
+            (start + timedelta(hours=1), 0.0),
+        ):
+            with self.subTest(now=now):
+                person.update_all_needs(now=now)
+                person.learning_system.decay_all_lessons.assert_called_with(hours=expected_hours)
+                person.goal_system.decay_all_goals.assert_called_with(hours=expected_hours)
+                self.assertEqual(person.last_decay_at, now)
+
+    def test_last_decay_time_survives_serialization(self):
+        person = Person()
+        now = datetime(2026, 11, 15, 12, 0)
+        person.update_all_needs(now=now)
+        self.assertEqual(Person.deserialize(person.serialize()).last_decay_at, now)
+        legacy = json.loads(person.serialize())
+        legacy.pop("last_decay_at")
+        self.assertIsNone(Person.deserialize(json.dumps(legacy)).last_decay_at)
+        self.assertIsNone(Person.deserialize(Person().serialize()).last_decay_at)
+
+    def test_needs_and_emotions_decay_follow_the_clock_given(self):
+        person = Person()
+        start = datetime(2030, 1, 1, 12, 0)
+        person.suspend_until(start)
+        person.maslow_needs.needs["hunger"].satisfaction = 80.0
+        person.emotion_system.emotions["joy"].intensity = 75.0
+        now = start + timedelta(hours=2)
+        person.update_all_needs(now=now)
+        self.assertAlmostEqual(person.maslow_needs.get_need_satisfaction("hunger"), 64.0, delta=3.5)
+        self.assertEqual(person.maslow_needs.last_comprehensive_update, now)
+        self.assertTrue(all(need.last_updated == now for need in person.maslow_needs.needs.values()))
+        self.assertEqual(person.emotion_system.emotions["joy"].intensity, 65.0)
+        self.assertEqual(person.emotion_system.last_update, now)
+
+    def test_suspend_until_removes_the_gap_from_every_clock(self):
+        person = Person()
+        start = datetime(2030, 1, 1, 12, 0)
+        person.suspend_until(start)
+        hunger = person.maslow_needs.get_need_satisfaction("hunger")
+        person.emotion_system.emotions["joy"].intensity = 75.0
+        person.learning_system = MagicMock()
+        person.goal_system = MagicMock()
+        returned_at = start + timedelta(hours=10)
+        person.suspend_until(returned_at)
+        self.assertEqual(person.maslow_needs.last_comprehensive_update, returned_at)
+        self.assertTrue(all(need.last_updated == returned_at for need in person.maslow_needs.needs.values()))
+        self.assertEqual(person.emotion_system.last_update, returned_at)
+        self.assertEqual(person.last_decay_at, returned_at)
+        person.update_all_needs(now=returned_at)
+        self.assertEqual(person.maslow_needs.get_need_satisfaction("hunger"), hunger)
+        self.assertEqual(person.emotion_system.emotions["joy"].intensity, 75.0)
+        person.learning_system.decay_all_lessons.assert_called_once_with(hours=0.0)
+        person.goal_system.decay_all_goals.assert_called_once_with(hours=0.0)
+
+    def test_sleep_need_can_recover_without_decay(self):
+        person = Person()
+        start = datetime(2030, 1, 1, 12, 0)
+        person.suspend_until(start)
+        person.maslow_needs.needs["sleep"].satisfaction = 50.0
+        person.update_all_needs(now=start + timedelta(hours=2), skip_needs=("sleep",))
+        self.assertEqual(person.maslow_needs.get_need_satisfaction("sleep"), 50.0)
+        self.assertLess(person.maslow_needs.get_need_satisfaction("hunger"), 100.0)
+
+    def test_current_state_shows_only_the_partners_social_model(self):
+        person = Person()
+        person.init_social_cognition()
+        for name in ("Ann", "Bob"):
+            model = person.social_cognition.get_or_create_model(name)
+            model.beliefs.append(f"{name.upper()}-SECRET")
+            model.user_dossier = {"job": f"{name.upper()}-DOSSIER"}
+        state = json.dumps(person.get_current_state(partner="Bob"), default=str)
+        self.assertNotIn("ANN-SECRET", state)
+        self.assertNotIn("ANN-DOSSIER", state)
+        self.assertIn("BOB-SECRET", state)
+        self.assertIn("BOB-DOSSIER", state)
+        self.assertEqual(person.get_current_state()["social_cognition"], {"tracked_entities": 2, "entities": {}})
+        self.assertNotIn("SECRET", json.dumps(person.get_current_state(), default=str))
 
 
 class TestMessage(unittest.TestCase):
