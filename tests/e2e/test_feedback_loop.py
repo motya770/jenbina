@@ -37,12 +37,13 @@ def _run_one_iteration(page: Page, streamlit_url: str) -> dict:
     page.wait_for_selector("text=Jenbina", timeout=30_000)
 
     # Click "Step once"
+    action_count = page.locator(".px-event-action").count()
     page.get_by_role("button", name=re.compile("Step once")).click()
 
-    # Wait for iteration completion (the stage pill), then read the newest
+    # Wait for one more action row, then read the newest
     # action row: earlier iterations' rows are still in the timeline.
-    page.locator("text=completed in").first.wait_for(
-        state="visible", timeout=ITERATION_TIMEOUT
+    expect(page.locator(".px-event-action")).to_have_count(
+        action_count + 1, timeout=ITERATION_TIMEOUT
     )
     action_el = page.locator(".px-event-action .px-event-title").last
     action_el.wait_for(state="visible", timeout=ITERATION_TIMEOUT)

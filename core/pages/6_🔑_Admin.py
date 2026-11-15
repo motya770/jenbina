@@ -1,8 +1,8 @@
 """Jenbina — Admin Panel.
 
 Access restricted to:
-- The signed-in admin account
-- Local development mode (``JENBINA_SKIP_AUTH=1``), never set on a public URL
+- Local requests (localhost / 127.0.0.1) without authentication
+- Authenticated user matvei.kudelin@gmail.com
 """
 
 import sys
@@ -11,17 +11,16 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import streamlit as st
+from core.ui.admin import ADMIN_EMAIL, is_admin, is_local_request
 from core.ui.pixel_theme import inject_pixel_css
-from core.auth.admin_access import is_admin
 from core.auth.user_db import UserDatabase
 
 st.set_page_config(page_title="Jenbina — Admin", page_icon="🔑", layout="wide")
 inject_pixel_css()
 
-
 # --- Access gate ---
-if not is_admin(st.session_state.get("current_user")):
-    st.error("Access denied. Sign in with the admin account to open the admin panel.")
+if not is_admin():
+    st.error("Access denied. Admin panel is only available from localhost or for the admin account.")
     st.stop()
 
 # --- Admin panel ---

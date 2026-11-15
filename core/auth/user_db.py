@@ -333,3 +333,14 @@ class UserDatabase:
             return row["person_state_json"] if row else None
         finally:
             conn.close()
+
+    def list_person_states(self) -> list[dict]:
+        """Return every saved per-account state in stable user-id order."""
+        conn = self._get_conn()
+        try:
+            rows = conn.execute(
+                "SELECT user_id, person_state_json FROM user_state ORDER BY user_id"
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()

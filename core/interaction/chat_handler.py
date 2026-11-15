@@ -216,14 +216,14 @@ Write a natural 1-3 sentence message to initiate conversation. Don't explain you
 
 
 def _chat_avatar(role):
-    """Pixel avatar path for a chat row.
+    """Avatar for a chat row: Jenbina's portrait, or Streamlit's own user icon.
 
     Imported lazily: ``core.ui`` imports this module, so a top-level import
     would be circular.
     """
-    from core.ui.sprites import avatar_path, icon_path
+    from core.ui.sprites import USER_AVATAR, avatar_path
 
-    return icon_path("player") if role == "user" else avatar_path()
+    return USER_AVATAR if role == "user" else avatar_path()
 
 
 def handle_chat_interaction(
@@ -430,13 +430,14 @@ def handle_chat_interaction(
                 model = person.social_cognition.get_or_create_model(conversation_partner_name)
                 dossier = model.user_dossier
 
-            print(f"[insight] first_impression_delivered={person.insight_system.first_impression_delivered}, dossier_present={bool(dossier)}")
+            print(f"[insight] dossier_present={bool(dossier)}")
 
             # Mode 1: Bold first impression (fires once per user)
-            if person.insight_system.should_generate_first_impression(dossier):
+            if person.insight_system.should_generate_first_impression(dossier, person_key=conversation_partner_name):
                 insight = person.insight_system.generate_first_impression(
                     dossier=dossier,
                     first_message=user_input,
+                    person_key=conversation_partner_name,
                 )
                 if insight:
                     insight_text = insight
@@ -450,7 +451,7 @@ def handle_chat_interaction(
                 # Mode 2: Subtle insight (after 2+ messages)
                 conv = person.conversations.get(conversation_partner_name)
                 message_count = len(conv.messages) if conv else 0
-                if person.insight_system.should_generate_insight(message_count):
+                if person.insight_system.should_generate_insight(message_count, person_key=conversation_partner_name):
                     recent = []
                     if conv:
                         for msg in conv.messages[-10:]:
@@ -469,6 +470,7 @@ def handle_chat_interaction(
                         recent_messages=recent,
                         emotional_state=emotions_snap,
                         self_narrative=narrative,
+                        person_key=conversation_partner_name,
                     )
                     if insight:
                         insight_text = insight

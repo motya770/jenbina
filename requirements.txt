@@ -7,4 +7,3 @@ chromadb==1.0.15
 neo4j==5.28.2
 python-dotenv==1.1.0
 streamlit-google-auth==1.1.8
-apscheduler>=3.10.0

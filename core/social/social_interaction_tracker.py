@@ -224,8 +224,12 @@ class SocialInteractionTracker:
 
         return " ".join(parts)
 
-    def format_for_prompt(self, day_start_ts: Optional[float] = None) -> str:
-        """Short context block suitable for injection into LLM prompts."""
+    def format_for_prompt(self, day_start_ts: Optional[float] = None, names: bool = True) -> str:
+        """Short context block suitable for injection into LLM prompts.
+
+        ``names=False`` leaves out who she met: use it for prompts whose
+        output everyone can read, such as her thoughts on the shared timeline.
+        """
         count = self.people_met_count(day_start_ts)
         if count == 0:
             return "Social interactions today: none so far."
@@ -233,10 +237,11 @@ class SocialInteractionTracker:
         today = self.get_today_interactions(day_start_ts)
         tones = [i.emotional_tone for i in today]
         dominant = max(set(tones), key=tones.count) if tones else "neutral"
+        who = f" ({', '.join(people)})" if names else ""
         return (
             f"Social interactions today: met {count} "
-            f"{'person' if count == 1 else 'people'} "
-            f"({', '.join(people)}). Overall tone: {dominant}."
+            f"{'person' if count == 1 else 'people'}"
+            f"{who}. Overall tone: {dominant}."
         )
 
     # -- stats & serialization ----------------------------------------------

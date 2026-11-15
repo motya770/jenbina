@@ -63,6 +63,7 @@ class Person:
     social_interaction_tracker: Any = None  # Initialized separately
     last_visit_time: Optional[datetime] = None
     conversations: Dict[str, Conversation] = field(default_factory=dict)
+    last_decay_at: Optional[datetime] = None
 
     def __post_init__(self):
         if self.maslow_needs is None:
@@ -120,16 +121,25 @@ class Person:
         self.social_interaction_tracker = SocialInteractionTracker()
 
 
-    def update_all_needs(self):
-        """Update all needs, decay emotions, and decay lessons"""
-        self.maslow_needs.update_all_needs()
-        self.emotion_system.update_all()
-        # Decay learned lessons over time (small amount per update cycle)
+    def update_all_needs(self, now: datetime | None = None, skip_needs: tuple[str, ...] = ()):
+        """Decay needs, emotions, lessons and goals by elapsed real time."""
+        now = now or datetime.now()
+        self.maslow_needs.update_all_needs(skip=skip_needs, now=now)
+        self.emotion_system.update_all(now=now)
+        hours = max(0.0, (now - self.last_decay_at).total_seconds() / 3600) if self.last_decay_at else 0.0
         if self.learning_system is not None:
-            self.learning_system.decay_all_lessons(hours=0.5)
-        # Decay goal confidence over time
+            self.learning_system.decay_all_lessons(hours=hours)
         if self.goal_system is not None:
-            self.goal_system.decay_all_goals(hours=0.5)
+            self.goal_system.decay_all_goals(hours=hours)
+        self.last_decay_at = now
+
+    def suspend_until(self, now: datetime) -> None:
+        """Move decay clocks past time when the heart was not running."""
+        self.maslow_needs.last_comprehensive_update = now
+        for need in self.maslow_needs.needs.values():
+            need.last_updated = now
+        self.emotion_system.last_update = now
+        self.last_decay_at = now
     
     def get_needs_snapshot(self) -> Dict[str, float]:
         """Get current needs as a flat dict (for learning system)"""
@@ -215,7 +225,7 @@ class Person:
         return "I didn't really talk to anyone today."
 
 
-    def get_current_state(self):
+    def get_current_state(self, partner: str | None = None):
         """Get a summary of the person's current state"""
         state = {"name": self.name}
 
@@ -249,7 +259,10 @@ class Person:
             state["inner_monologue"] = self.inner_monologue.get_stats()
         # Add social cognition state
         if self.social_cognition is not None:
-            state["social_cognition"] = self.social_cognition.get_stats()
+            state["social_cognition"] = (
+                self.social_cognition.get_stats(only=partner) if partner is not None
+                else {"tracked_entities": len(self.social_cognition.models), "entities": {}}
+            )
         # Add self narrative state
         if self.self_narrative is not None:
             state["self_narrative"] = self.self_narrative.get_stats()
@@ -289,6 +302,7 @@ class Person:
         if self.social_interaction_tracker is not None:
             data["social_interaction_tracker"] = self.social_interaction_tracker.to_dict()
         data["last_visit_time"] = self.last_visit_time.isoformat() if self.last_visit_time else None
+        data["last_decay_at"] = self.last_decay_at.isoformat() if self.last_decay_at else None
         data["conversations"] = {
             name: {
                 "outsider_name": conv.outsider_name,
@@ -398,6 +412,8 @@ class Person:
 
         lvt = data.get("last_visit_time")
         person.last_visit_time = datetime.fromisoformat(lvt) if lvt else None
+        last_decay = data.get("last_decay_at")
+        person.last_decay_at = datetime.fromisoformat(last_decay) if last_decay else None
 
         return person
 

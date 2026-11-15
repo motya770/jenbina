@@ -1,5 +1,6 @@
 """Tests for the working memory system."""
 import pytest
+import unittest
 from unittest.mock import patch
 
 from core.working_memory.working_memory_system import (
@@ -37,6 +38,35 @@ def make_emotions(**overrides):
 # ===========================================================================
 # WorkingMemoryItem tests
 # ===========================================================================
+
+class TestWorkingMemoryNotes(unittest.TestCase):
+    def test_notes_reach_the_prompt_and_expire(self):
+        wm = WorkingMemorySystem()
+        wm.add_note("I was away for 3h 10m", cycles=2)
+        self.assertEqual(wm.format_for_prompt(), "Keep in mind: I was away for 3h 10m")
+        restored = WorkingMemorySystem.from_dict(wm.to_dict())
+        self.assertEqual(restored.format_for_prompt(), wm.format_for_prompt())
+        restored.update(needs={}, emotions={})
+        self.assertIn("I was away", restored.format_for_prompt())
+        restored.update(needs={}, emotions={})
+        self.assertNotIn("I was away", restored.format_for_prompt())
+
+    def test_notes_precede_the_buffer_and_have_independent_lifetimes(self):
+        wm = WorkingMemorySystem()
+        wm.add_note("I was away")
+        wm.add_note("A message woke me", cycles=1)
+        wm.buffer = [WorkingMemoryItem("Feeling joy", "emotion", salience=0.8)]
+        prompt = wm.format_for_prompt()
+        self.assertTrue(prompt.startswith("Keep in mind: I was away; A message woke me\n"))
+        self.assertIn("Currently thinking about: Feeling joy", prompt)
+        wm.update(needs={}, emotions={})
+        self.assertNotIn("A message woke me", wm.format_for_prompt())
+        wm.update(needs={}, emotions={})
+        self.assertIn("I was away", wm.format_for_prompt())
+        wm.update(needs={}, emotions={})
+        self.assertEqual(wm.format_for_prompt(), "Mind is clear — no particular focus.")
+        self.assertEqual(WorkingMemorySystem.from_dict({}).notes, [])
+
 
 class TestWorkingMemoryItem:
     def test_initialization(self):

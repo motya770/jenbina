@@ -14,15 +14,23 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from core.auth.user_db import UserDatabase
 from core.timeline import (
+    GAP,
+    KINDS,
+    SLEEP,
+    WAKE,
     EventLog,
     TimelineEvent,
+    format_duration,
     lessons_text,
     make_action,
     make_goal,
+    make_gap,
     make_mood,
     make_move,
     make_plan,
+    make_sleep,
     make_thought,
+    make_wake,
     mood_changes,
     shorten,
 )
@@ -49,6 +57,27 @@ T = datetime(2026, 10, 27, 23, 38)
 
 
 class TestTitles(unittest.TestCase):
+    def test_duration_formats_whole_minutes_without_negative_time(self):
+        self.assertEqual(format_duration(timedelta(hours=7, minutes=40)), "7h 40m")
+        self.assertEqual(format_duration(timedelta(minutes=40)), "40m")
+        self.assertEqual(format_duration(timedelta(seconds=-5)), "0m")
+        self.assertEqual(format_duration(timedelta()), "0m")
+        self.assertEqual(format_duration(timedelta(seconds=59)), "0m")
+
+    def test_sleep_wake_and_gap_titles_and_details(self):
+        sleep = make_sleep("night")
+        self.assertEqual((sleep.kind, sleep.title, sleep.detail),
+                         ("sleep", "Fell asleep", {"reason": "night"}))
+        slept = timedelta(hours=3, minutes=10)
+        wake = make_wake(slept, "message")
+        self.assertEqual((wake.kind, wake.title, wake.detail),
+                         ("wake", "Woken by a message after 3h 10m", {"reason": "message", "seconds": 11400}))
+        self.assertEqual(make_wake(timedelta(hours=7, minutes=40), "morning").title, "Woke after 7h 40m")
+        gap = make_gap(slept)
+        self.assertEqual((gap.kind, gap.title, gap.detail),
+                         ("gap", "Was away for 3h 10m", {"seconds": 11400}))
+        self.assertTrue({SLEEP, WAKE, GAP}.issubset(KINDS))
+
     def test_shorten_cuts_at_word_boundary_with_ellipsis(self):
         self.assertEqual(shorten("attend live music at coupa cafe tonight", 20), "attend live music…")
 
@@ -192,6 +221,11 @@ class TestRecording(unittest.TestCase):
 
 
 class TestBuildTimeline(unittest.TestCase):
+    def test_sleep_wake_and_gap_appear_in_her_day(self):
+        events = [make_sleep("night"), make_wake(timedelta(hours=8), "morning"), make_gap(timedelta(hours=3))]
+        items = build_timeline([], events, filter_name="Her day")
+        self.assertEqual([item.kind for item in items if item.kind != "marker"], ["sleep", "wake", "gap"])
+
     def test_merges_by_time_and_detects_speakers(self):
         msgs = [Msg(T, "person", "hi", "greeting"), Msg(T + timedelta(minutes=3), "Matt", "hello", "text")]
         evs = [make_thought("x", "Quiet.")]
@@ -253,13 +287,21 @@ class TestBuildTimeline(unittest.TestCase):
 
 
 class TestRenderTimeline(unittest.TestCase):
-    def test_rows_get_sprite_avatars_and_captions(self):
+    def test_sleep_wake_and_gap_have_their_own_tags(self):
+        events = [make_sleep("night"), make_wake(timedelta(hours=8), "morning"), make_gap(timedelta(hours=3))]
+        with patch("core.ui.timeline.st") as st:
+            render_timeline(build_timeline([], events))
+        rows = [call.args[0] for call in st.markdown.call_args_list]
+        for kind, tag in (("sleep", "SLEEP"), ("wake", "WAKE"), ("gap", "GAP")):
+            self.assertTrue(any(f"px-event-{kind}" in row and f">{tag}</span>" in row for row in rows))
+
+    def test_rows_get_portrait_avatar_and_captions(self):
         items = build_timeline([Msg(T, "Matt", "hi", "text"), Msg(T, "person", "hello", "greeting")], [])
         with patch("core.ui.timeline.st") as st:
             render_timeline(items)
         avatars = [c.kwargs.get("avatar") for c in st.chat_message.call_args_list]
-        self.assertTrue(avatars[0].endswith("icons/player.png"))
-        self.assertTrue(avatars[1].endswith("jenbina_avatar.png"))
+        self.assertIsNone(avatars[0])
+        self.assertTrue(avatars[1].endswith(os.path.join("portraits", "jenbina_base.png")))
         self.assertIn("she reached out first", st.caption.call_args_list[-1].args[0])
 
     def test_action_row_has_badge_and_details(self):
@@ -268,7 +310,7 @@ class TestRenderTimeline(unittest.TestCase):
             render_timeline(build_timeline([], [act]))
         html_ = st.markdown.call_args_list[-1].args[0]
         for needle in ("px-event-action", "Jenbina decided to eat soup", "80% → 82% (+2.0%)",
-                       "<summary>why?</summary>", "Lessons applied: eat early", 'alt="hunger"'):
+                       "<summary>why?</summary>", "Lessons applied: eat early", ">ACT</span>"):
             self.assertIn(needle, html_)
 
     def test_thought_row_details_only_when_longer(self):

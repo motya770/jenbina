@@ -1,5 +1,5 @@
 """The status rail beside the timeline: the Now card (stage pill, portrait,
-vitals), the run controls and the mind card.
+vitals), the heartbeat card and the mind card.
 
 ``StatusRail`` bundles the ``st.empty()`` placeholders so the simulation
 runner can update the screen without knowing the page layout; ``NullRail``
@@ -9,13 +9,14 @@ is the silent stand-in for headless runs and tests.
 from __future__ import annotations
 
 import html
+from datetime import datetime
 
 import streamlit as st
 
+from core.heartbeat.host import HeartStatus
 from core.timeline import shorten
-from core.ui.pixel_theme import icon_html, stage_pill_html
+from core.ui.pixel_theme import stage_pill_html
 from core.ui.simulation import (
-    _weather_icon,
     display_jenbina_image,
     get_jenbina_image_for_emotion,
     render_emotion_chips,
@@ -31,7 +32,7 @@ IDLE_STAGE = "idle"
 
 
 def env_line_html(world_summary: dict | None) -> str:
-    """``<icon> Jenbina's House · Night · Clear skies, 15°C``; the bare home
+    """``Jenbina's House · Night · Clear skies, 15°C``; the bare home
     name when there is no world summary yet."""
     if not world_summary:
         return HOME
@@ -48,8 +49,7 @@ def env_line_html(world_summary: dict | None) -> str:
         except (TypeError, ValueError):
             degrees = 0.0
         parts.append(f"{html.escape(weather)}, {degrees:.0f}°C")
-    icon = _weather_icon(weather)
-    return f'<div class="px-env-line">{icon_html(icon, alt=icon)} ' + " · ".join(parts) + "</div>"
+    return '<div class="px-env-line">' + " · ".join(parts) + "</div>"
 
 
 class StatusRail:
@@ -145,20 +145,40 @@ def render_status_rail(person, world_summary: dict | None, doing: str | None, go
     return rail
 
 
-def render_run_controls() -> dict:
-    """The "Let her live" card. Same keys as the old sidebar controls."""
+def heartbeat_lines(status: HeartStatus, now: datetime) -> list[str]:
+    """Describe her phase, beat timing and any pause in her rhythm."""
+    lines = [f"● {status.phase} · since {status.phase_since:%H:%M}"]
+    if status.busy:
+        lines.append(status.stage)
+    elif status.phase == "awake":
+        if status.last_beat_at is None:
+            timing = "no moment yet"
+        else:
+            minutes = max(0, int((now - status.last_beat_at).total_seconds() // 60))
+            timing = f"last moment {minutes} min ago"
+        if status.next_beat_at is not None:
+            minutes = max(0, int((status.next_beat_at - now).total_seconds() // 60))
+            timing += f" · next in {minutes} min"
+        lines.append(timing)
+    if status.note == "daily_cap":
+        lines.append("daily limit reached · resting until tomorrow")
+    elif status.note == "backoff":
+        lines.append("heart is retrying after errors")
+    return lines
+
+
+def render_heartbeat_card(status: HeartStatus, admin: bool, now: datetime | None = None) -> bool:
+    """Draw her rhythm and let admins request a moment of life."""
     with st.container(border=True):
-        _card_title("Let her live")
-        num_iterations = st.number_input("Iterations", min_value=1, max_value=20, value=5, step=1)
-        delay_seconds = st.number_input("Delay (seconds)", min_value=1, max_value=60, value=3, step=1)
-        single_run = st.button("Step once", type="primary", use_container_width=True)
-        run_loop = st.button(f"Run {int(num_iterations)}", use_container_width=True)
-    return {
-        "num_iterations": int(num_iterations),
-        "delay_seconds": int(delay_seconds),
-        "run_loop": run_loop,
-        "single_run": single_run,
-    }
+        _card_title("Heartbeat")
+        for line in heartbeat_lines(status, now or datetime.now()):
+            st.write(line)
+        if admin:
+            return st.button(
+                "Step once", type="primary", use_container_width=True,
+                disabled=status.phase == "asleep" or status.note == "daily_cap",
+            )
+    return False
 
 
 def _goal_lines(person) -> None:
@@ -202,7 +222,12 @@ def _about_you_lines(person, display_name: str) -> None:
     if getattr(person, "social_cognition", None) is None:
         st.write("Nothing known yet.")
         return
-    model = person.social_cognition.get_or_create_model(display_name)
+    # Read only: this runs outside the mind lock on every refresh, and adding
+    # a model here could collide with a beat that is saving her state.
+    model = person.social_cognition.models.get(display_name)
+    if model is None:
+        st.write("Nothing known yet.")
+        return
     relationship = model.relationship
     st.write(f"Seems: {model.inferred_emotional_state}")
     st.write(

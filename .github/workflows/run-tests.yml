@@ -77,7 +77,9 @@ jobs:
         hide-report: false
         create-new-comment: false
         hide-comment: false
-        report-only-changed-files: false
+        # The full per-file table no longer fits GitHub's 65,536-character comment
+        # limit, and an over-long report is dropped entirely. List changed files only.
+        report-only-changed-files: true
 
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.10'

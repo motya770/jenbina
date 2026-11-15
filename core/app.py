@@ -1,20 +1,18 @@
-"""
-Jenbina - AGI Simulation Streamlit App
-
-Main entry point — the home screen: the conversation with Jenbina as one
-timeline (messages and her life events), beside a live status rail.
-"""
+"""Jenbina's home screen: a private conversation beside her shared live state."""
 import streamlit as st
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.ui.shared_init import require_auth, init_llm, save_person_state
+from core.heartbeat.host import NotHostingError
+from core.ui.shared_init import require_auth, init_llm, get_host
+from core.ui.admin import is_admin
 from core.ui.pixel_theme import inject_pixel_css
-from core.ui.chat import _get_user_display_name, ensure_outreach, get_event_log, handle_user_input
-from core.ui.rail import render_mind_card, render_run_controls, render_status_rail
-from core.ui.simulation import run_simulation_loop
+from core.ui.chat import ensure_greeting, handle_user_input, update_system_stage
+from core.ui.live import REFRESH_SECONDS, draw_guarded
+from core.ui.rail import render_heartbeat_card, render_mind_card, render_status_rail
+from core.ui.simulation import _get_image_path
 from core.ui.timeline import (
     FILTERS,
     TIMELINE_HEIGHT,
@@ -28,15 +26,24 @@ MESSAGE_WINDOW = 100
 COLUMN_RATIO = [1.55, 1]
 
 
-def _latest_world(session):
-    """``(world_summary, chosen_action)`` of the last iteration this session, or ``(None, None)``."""
-    history = session.get("simulation_history") or []
+def _latest_world(history, location=None):
+    """World and chosen action from the host's most recent moment.
+
+    The world summary is taken at the start of a beat, so after a walk it still
+    names the place she left; ``location`` (where she is now) replaces it.
+    """
     if not history:
         return None, None
     last = history[-1]
     decision = last.get("action_decision") or {}
     doing = decision.get("chosen_action") if isinstance(decision, dict) else None
-    return last.get("world_summary"), doing
+    world_summary = last.get("world_summary")
+    if location and isinstance(world_summary, dict):
+        place = world_summary.get("location")
+        place = dict(place) if isinstance(place, dict) else {}
+        place["name"] = location
+        world_summary = {**world_summary, "location": place}
+    return world_summary, doing
 
 
 def _top_goal(person):
@@ -47,92 +54,116 @@ def _top_goal(person):
 
 
 def main():
-    # Use custom favicon if present, otherwise emoji
     _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    _icon = os.path.join(_root, "assets", "favicon.png")
-    page_icon = _icon if os.path.isfile(_icon) else "👧"
+    page_icon = next(
+        (path for path in (os.path.join(_root, "assets", "jenbina_nav.png"),
+                           os.path.join(_root, "assets", "favicon.png")) if os.path.isfile(path)),
+        None,
+    )
     st.set_page_config(page_title="Jenbina", page_icon=page_icon, layout="wide")
     inject_pixel_css(wide=True)
 
     if not require_auth():
         return
 
-    llm, llm_json_mode = init_llm()
-    person = st.session_state.person
-    meta_cognitive_system = st.session_state.meta_cognitive_system
+    host = get_host()
+    user = st.session_state.current_user
+    person_key = host.person_key(user)
+    llm, _ = init_llm()
     memory_manager = st.session_state.memory_manager
+    ensure_greeting(host, user, llm)
 
-    st.title("👧 Jenbina")
-
+    st.title("Jenbina")
     with st.sidebar:
         st.session_state.debug_mode = st.checkbox(
             "🔧 Debug Mode", value=True,
             help="Show debug controls on the Environment page",
         )
 
-    event_log = get_event_log()
-    display_name = _get_user_display_name()
-    ensure_outreach(person, llm)
-    world_summary, doing = _latest_world(st.session_state)
-    goal = _top_goal(person)
-
     left, rail_col = st.columns(COLUMN_RATIO, gap="medium")
 
-    # ── Left: the timeline ────────────────────────────────────────────────
     with left:
-        st.markdown("**Today with Jenbina**")
-        filter_name = st.radio("Show", FILTERS, horizontal=True, label_visibility="collapsed", key="timeline_filter")
-        timeline = st.container(height=TIMELINE_HEIGHT)
-        with timeline:
-            items = build_timeline(
-                person.get_conversation_history(display_name, count=MESSAGE_WINDOW),
-                event_log.recent(TIMELINE_LIMIT),
-                person.name,
-                filter_name,
-            )
-            render_timeline(items)
-            live_slot = st.container()
+        @st.fragment(run_every=REFRESH_SECONDS)
+        def live_timeline():
+            def draw():
+                # A busy or sleeping mind defers the greeting until a refresh.
+                ensure_greeting(host, user, llm)
+                st.markdown("**Today with Jenbina**")
+                filter_name = st.radio(
+                    "Show", FILTERS, horizontal=True,
+                    label_visibility="collapsed", key="timeline_filter",
+                )
+                # host.person, not a captured copy: the host replaces the
+                # object if it ever has to reload her.
+                person = host.person
+                with st.container(height=TIMELINE_HEIGHT):
+                    items = build_timeline(
+                        person.get_conversation_history(person_key, count=MESSAGE_WINDOW),
+                        host.event_log.recent(TIMELINE_LIMIT),
+                        person.name,
+                        filter_name,
+                    )
+                    render_timeline(items)
+                # Follow new rows, but leave the reader alone on a refresh
+                # that brought nothing new.
+                newest = (filter_name, len(items), items[-1].timestamp if items else None)
+                if st.session_state.get("_timeline_newest") != newest:
+                    st.session_state["_timeline_newest"] = newest
+                    scroll_timeline_to_bottom()
+            draw_guarded(draw)
+
+        live_timeline()
+        live = st.container()
         user_input = st.chat_input("Talk to Jenbina...")
-        scroll_timeline_to_bottom()
 
-    # ── Right: the status rail ────────────────────────────────────────────
     with rail_col:
-        rail = render_status_rail(person, world_summary, doing, goal, live_slot=live_slot)
-        controls = render_run_controls()
-        render_mind_card(person, display_name)
+        @st.fragment(run_every=REFRESH_SECONDS)
+        def live_rail():
+            step_clicked = False
 
-    # ── A message from the user ───────────────────────────────────────────
+            def draw():
+                nonlocal step_clicked
+                if not host.hosting:
+                    st.info("Jenbina has moved to another process. Reload this page to find her.")
+                    return
+                person = host.person
+                world_summary, doing = _latest_world(host.situation.history, host.situation.location)
+                status = host.status()
+                rail = render_status_rail(person, world_summary, doing, _top_goal(person))
+                rail.stage(status.stage)
+                if host.situation.phase == "asleep":
+                    rail.portrait(_get_image_path("jenbina_sleep.png"), caption=person.name)
+                step_clicked = render_heartbeat_card(status, is_admin())
+                render_mind_card(person, person_key)
+
+            if draw_guarded(draw) and step_clicked:
+                with st.spinner("Jenbina is living a moment…"):
+                    host.step_once()
+                st.rerun()
+
+        live_rail()
+
     if user_input:
-        with timeline:
-            handle_user_input(person, llm, memory_manager, False, user_input)
-        save_person_state()
+        waiting = None
+        if host.status().busy:
+            # The turn below waits for the beat in flight. Say so where the
+            # person is looking, or the page seems frozen for up to a minute or two.
+            update_system_stage("finishing what she was doing…")
+            with live:
+                waiting = st.empty()
+                waiting.info("Jenbina is finishing what she was doing. Your message is waiting for her.")
+        try:
+            with host.chat_turn(user) as turn:
+                if waiting is not None:
+                    waiting.empty()
+                with live:
+                    handle_user_input(host.person, llm, memory_manager, False, user_input, turn)
+        except NotHostingError:
+            with live:
+                st.info("Jenbina has moved to another process, so your message did not reach her. "
+                        "Reload this page to find her.")
+            return
         st.rerun()
 
-    # ── Let her live ──────────────────────────────────────────────────────
-    auto_start = False
-    if "simulation_auto_started" not in st.session_state:
-        st.session_state.simulation_auto_started = True
-        auto_start = True
 
-    if controls["run_loop"] or controls["single_run"] or auto_start:
-        iterations = controls["num_iterations"] if controls["run_loop"] else 1
-        results = run_simulation_loop(
-            person=person,
-            llm_json_mode=llm_json_mode,
-            meta_cognitive_system=meta_cognitive_system,
-            iterations=iterations,
-            delay_seconds=controls["delay_seconds"],
-            rail=rail,
-            event_log=event_log,
-        )
-        st.session_state.simulation_completed = True
-        save_person_state()
-        st.rerun()
-
-    save_person_state()
-
-
-if __name__ == "__main__":
-    main()
-else:
-    main()
+main()

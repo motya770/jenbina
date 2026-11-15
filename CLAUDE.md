@@ -21,11 +21,18 @@ jenbina/
 │   ├── connect.py               # LLM provider connections
 │   ├── fix_llm_json.py          # JSON response fixing utility
 │   ├── log_capture.py           # Logging utilities
-│   ├── auth/                    # Authentication (Firebase, SQLite user DB, admin panel gate)
+│   ├── auth/                    # Authentication (Firebase, SQLite user DB)
 │   ├── cognition/               # Decision-making, meta-cognition, inner monologue
 │   ├── emotions/                # Emotional state management and analysis
 │   ├── environment/             # World simulation, locations, dynamic events
 │   ├── goals/                   # Short/mid/long-term goal tracking
+│   ├── heartbeat/               # One shared being, owned by one process; no Streamlit imports
+│   │   ├── adoption.py          # One-time adoption of existing per-user state and history
+│   │   ├── being.py             # Build or restore Person and initialise her subsystems
+│   │   ├── host.py              # JenbinaHost: live Person, mind lock, lease, beats and chat turns
+│   │   ├── outreach.py          # Select one eligible person for a proactive message
+│   │   ├── rhythm.py            # Pure beat, sleep, wake, back-off and lost-time rules
+│   │   └── store.py             # Shared state, life events, lease and per-account person keys
 │   ├── identity/                # Self-narrative and self-concept
 │   ├── insights/                # LLM-based insight generation
 │   ├── interaction/             # Chat handling and safety guardrails
@@ -39,9 +46,11 @@ jenbina/
 │   ├── timeline/                # Event log of Jenbina's life: kinds, titles, EventLog, recording helpers
 │   ├── working_memory/          # Short-term context management
 │   ├── ui/                      # Streamlit UI components
+│   │   ├── admin.py             # Shared local-request and admin access checks
+│   │   ├── live.py              # Guarded fragment rendering and refresh interval
 │   │   ├── timeline.py          # The chat timeline: messages and life events merged, markers, rows
-│   │   ├── rail.py              # The status rail: Now card (StatusRail handles), run controls, mind card
-│   │   ├── pixel_theme.py       # Pixel-art device shell CSS + sprite/icon/event-row HTML helpers
+│   │   ├── rail.py              # The status rail: Now card, heartbeat card, mind card
+│   │   ├── pixel_theme.py       # Theme CSS (Blade Runner 2049 hologram skin) + event-row/marker/pill HTML helpers
 │   │   └── sprites/             # Pixel art strings, palette, Pillow builder (art.py, build.py)
 │   └── pages/                   # Streamlit multi-page navigation
 │       ├── 3_Environment.py
@@ -54,7 +63,7 @@ jenbina/
 │   └── run_chain_tests.py       # LangChain integration tests
 ├── docs/plans/                  # Design and planning documents
 ├── .github/workflows/           # CI/CD pipelines
-├── assets/                      # Static assets (favicon)
+├── assets/                      # Static assets (favicon, jenbina_nav.png face crop for the sidebar and tab icon)
 │   ├── portraits/               # Painterly Jenbina portraits, one per state (jenbina_<state>.png)
 │   └── sprites/                 # Committed pixel sprite sheets and 8x8 icons (python -m core.ui.sprites.build)
 ├── old/                         # Legacy/archived code
@@ -64,6 +73,7 @@ jenbina/
 ├── .railway/railway.ts          # Railway Infrastructure as Code: service + volume (replaces railway.toml, see DEPLOY.md)
 ├── DEPLOY.md                    # How Jenbina is deployed to Railway: one-time setup, env vars, redeploy
 ├── run_app.py                   # Launcher script
+├── run_heartbeat.py             # Standalone heartbeat host (alternative to the app process)
 ├── run_jenbina.py               # Alternative launcher
 ├── clear_chromadb.py            # Utility: clear vector database
 ├── clear_memory.py              # Utility: clear memory system
@@ -110,6 +120,20 @@ cd core && streamlit run app.py
 # Or use launcher scripts
 python run_app.py
 python run_jenbina.py
+```
+
+From the project root, the standalone runner can host Jenbina without a UI.
+Only one process can host her at a time; stop the app host before using it.
+
+```bash
+# Keep her heart running
+python run_heartbeat.py
+
+# Take one beat and exit
+python run_heartbeat.py --once
+
+# Choose whose saved Jenbina to adopt on the first start
+python run_heartbeat.py --adopt-user-id 3
 ```
 
 ### Running Tests
@@ -162,6 +186,11 @@ Copy `.env.example` to `.env` and configure:
 | `FIREBASE_API_KEY` | Firebase authentication |
 | `FIREBASE_AUTH_DOMAIN` | Firebase auth domain |
 | `FIREBASE_PROJECT_ID` | Firebase project ID |
+| `JENBINA_BEAT_MINUTES` | Minutes between awake beats (default: `15`) |
+| `JENBINA_MAX_BEATS_PER_DAY` | Daily cap on awake beat attempts, including manual steps (default: `80`) |
+| `JENBINA_LLM_TIMEOUT_SECONDS` | Timeout for each LLM call in seconds (default: `60`, with one retry) |
+| `JENBINA_DISABLE_SLEEP` | Set to `1` to keep her awake, including in E2E tests (default: `0`, sleep enabled) |
+| `JENBINA_ADOPT_USER_ID` | On the very first start only: the user id whose saved Jenbina becomes the one Jenbina (default: the real account with the most experiences; the E2E test login is never picked automatically) |
 
 ## Code Conventions
 
@@ -213,7 +242,7 @@ The primary CI gate is `run-tests.yml` which runs `python -m pytest tests/test_*
 - **Safety:** The system includes Asimov-check chains (`core/cognition/asimov_check_chain.py`) and guardrails (`core/interaction/guardrails.py`). Maintain safety constraints when modifying cognition or interaction code.
 - **LLM JSON Parsing:** LLM responses are parsed as JSON for structured decisions. The `fix_llm_json.py` utility handles malformed JSON from LLMs — use it when processing LLM output.
 - **Memory Databases:** The hybrid memory system uses three databases simultaneously. Changes to memory schemas affect ChromaDB collections, Neo4j nodes/relationships, and SQLite tables.
-- **Streamlit State:** The UI relies on `st.session_state` for persisting simulation state across reruns. Be careful with session state keys in `core/ui/shared_init.py`.
+- **Streamlit State:** The live `Person` belongs to the host in `core/heartbeat/host.py`. `st.session_state.person` is a reference to that shared object. Change her only inside `host.chat_turn(...)` or a beat so the mind lock protects her state; the host saves it.
 - **No `.env` in VCS:** The `.env` file contains secrets and must never be committed. Use `.env.example` as the template.
 
 ## Superpowers Plugin
@@ -282,6 +311,9 @@ git commit -m "<conventional commit message>"
 | `2026-10-27-pixel-art-ui-implementation.md` | Pixel art UI implementation — sprite pipeline, `core/ui/pixel_theme.py`, pixel markup in the simulation renderers |
 | `2026-10-28-timeline-ui-redesign.md` | Timeline home screen spec — the chat timeline interleaved with Jenbina's persisted life events beside a live status rail; the Simulation and Chat pages merge |
 | `2026-10-28-timeline-ui-implementation.md` | Timeline home screen implementation — `core/timeline/` event log, `core/ui/timeline.py`, `core/ui/rail.py`, runner refactor, home screen |
+| `2026-11-14-blade-runner-theme-redesign.md` | Blade Runner 2049 skin proposal — replaces the candy arcade pixel skin with smoke, amber, ice and violet tokens, IBM Plex and Rajdhani type, kind tags instead of pixel icons; layout unchanged |
+| `2026-11-15-heartbeat-design.md` | Heartbeat spec — one shared Jenbina, continuous beats, sleep and wake, honest lost time, private conversations and a live home screen |
+| `2026-11-15-heartbeat-implementation.md` | Heartbeat implementation — shared storage, rhythm, host, state adoption, standalone runner, per-person chat privacy and live UI |
 
 ## graphify
 

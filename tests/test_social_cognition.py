@@ -1,10 +1,37 @@
 import unittest
+from datetime import datetime
 
-from core.social.social_cognition import SocialCognitionSystem
+from core.social.social_cognition import PersonModel, SocialCognitionSystem
 from core.person.person import Person
 
 
 class TestSocialCognitionSystem(unittest.TestCase):
+    def test_visit_and_proactive_times_round_trip(self):
+        model = PersonModel()
+        model.last_visit_time = datetime(2026, 11, 15, 9, 0)
+        model.last_proactive_at = datetime(2026, 11, 15, 10, 0)
+        data = model.to_dict()
+        self.assertEqual(data["last_visit_time"], "2026-11-15T09:00:00")
+        self.assertEqual(data["last_proactive_at"], "2026-11-15T10:00:00")
+        restored = PersonModel.from_dict(data)
+        self.assertEqual(restored.last_visit_time, model.last_visit_time)
+        self.assertEqual(restored.last_proactive_at, model.last_proactive_at)
+        legacy = PersonModel.from_dict({})
+        self.assertIsNone(legacy.last_visit_time)
+        self.assertIsNone(legacy.last_proactive_at)
+        self.assertIsNone(legacy.to_dict()["last_visit_time"])
+        self.assertIsNone(legacy.to_dict()["last_proactive_at"])
+
+    def test_stats_filter_does_not_expose_other_people_or_create_unknown_models(self):
+        system = SocialCognitionSystem()
+        system.get_or_create_model("Ann").beliefs.append("ANN-SECRET")
+        system.get_or_create_model("Bob").beliefs.append("BOB-SECRET")
+        self.assertEqual(list(system.get_stats(only="Bob")["entities"]), ["Bob"])
+        self.assertEqual(system.get_stats(only="Bob")["entities"]["Bob"]["beliefs"], ["BOB-SECRET"])
+        self.assertEqual(system.get_stats(only="Unknown")["entities"], {})
+        self.assertEqual(system.get_stats()["tracked_entities"], 2)
+        self.assertEqual(set(system.get_stats()["entities"]), {"Ann", "Bob"})
+
     def test_updates_person_model_from_message(self):
         sys = SocialCognitionSystem()
         sys.observe_entity_message(

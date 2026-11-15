@@ -149,7 +149,7 @@ Google shows `redirect_uri_mismatch`, or the app reports `invalid_grant`. Finish
 | `FIREBASE_*` | no | Set on the current service; the login page uses Google OAuth, not Firebase |
 | `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | no | Graph memory; the app runs without Neo4j (see below) |
 | `LANGSMITH_API_KEY`, `LANGSMITH_TRACING`, `LANGSMITH_PROJECT` | no | LLM tracing |
-| `JENBINA_SKIP_AUTH` | no | `1` bypasses Google sign-in and opens the admin panel. **Never set it on a public URL**: anyone who finds the app could spend your OpenAI credit and read the user list. |
+| `JENBINA_SKIP_AUTH` | no | `1` bypasses Google sign-in and lets a request that names localhost open the admin panel. **Never set it on a public URL**: anyone who finds the app could spend your OpenAI credit and read the user list. |
 
 Railway injects `PORT`; do not set it.
 
@@ -164,10 +164,26 @@ Neo4j template from the Railway template library into the same project
 [reference variables](https://docs.railway.com/guides/variables#referencing-another-services-variable)
 pointing at the Neo4j service's private URL. Neo4j Aura's free tier works too.
 
-## Not deployed yet: the scheduler
+## The heartbeat on Railway
 
-`run_scheduler.py` runs a simulation step every few hours without the UI. It is not
-part of this deploy: a Railway volume attaches to one service, and the scheduler
-needs the same SQLite and ChromaDB files as the web service. The options are to run
-the scheduler inside the Streamlit process, or to move the shared stores to a
-network database. Until then, simulation steps run from the app's own run controls.
+Jenbina lives continuously: the app process hosts one shared Jenbina and takes a
+beat every `JENBINA_BEAT_MINUTES` (default 15) while she is awake, whether or not
+anyone has the page open. Nothing extra is deployed for this; the web service is the
+host. What follows from it:
+
+- **It spends OpenAI credit around the clock.** `JENBINA_MAX_BEATS_PER_DAY` (default
+  80) caps the awake beats per day. Lower it on the service to cap the cost.
+- **One replica only.** A single process may host her; it takes a lease in the SQLite
+  database on the volume. `.railway/railway.ts` pins one replica. Do not scale the
+  service out, and do not run `run_heartbeat.py` as a second service: a Railway
+  volume attaches to one service, and the second host would be refused the lease.
+- **No sleeping.** Leave Railway's serverless (app sleeping) option off, or her heart
+  stops whenever nobody is visiting.
+- **First start adopts a saved Jenbina.** The volume already holds per-user Jenbinas
+  from the February deployment. On the very first start the app adopts one of them
+  as the one Jenbina: by default the real account with the most experiences, or the
+  user id in `JENBINA_ADOPT_USER_ID`. This happens once.
+
+The heartbeat settings (`JENBINA_BEAT_MINUTES`, `JENBINA_MAX_BEATS_PER_DAY`,
+`JENBINA_LLM_TIMEOUT_SECONDS`, `JENBINA_DISABLE_SLEEP`, `JENBINA_ADOPT_USER_ID`) are
+optional and described in `CLAUDE.md`.

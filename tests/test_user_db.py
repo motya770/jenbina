@@ -208,6 +208,27 @@ class TestPersonState(unittest.TestCase):
         self.assertEqual(json.loads(loaded)["v"], 2)
 
 
+class TestListPersonStates(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.db = UserDatabase(os.path.join(self.temp.name, "users.db"))
+
+    def test_no_saved_states_returns_an_empty_list(self):
+        self.assertEqual(self.db.list_person_states(), [])
+
+    def test_lists_only_saved_states_in_user_id_order_without_parsing_them(self):
+        users = [self.db.create_or_update_user(
+            firebase_uid=f"state-{i}", email=f"state-{i}@example.test",
+        ) for i in range(3)]
+        self.db.save_person_state(users[2]["id"], "{broken")
+        self.db.save_person_state(users[0]["id"], '{"name": "Existing Jenbina"}')
+        self.assertEqual(self.db.list_person_states(), [
+            {"user_id": users[0]["id"], "person_state_json": '{"name": "Existing Jenbina"}'},
+            {"user_id": users[2]["id"], "person_state_json": "{broken"},
+        ])
+
+
 class TestIsolation(unittest.TestCase):
     """Messages from one user should not leak to another."""
 

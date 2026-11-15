@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""Tests for the status rail (core.ui.rail): the Now card handles, the run
-controls and the mind card."""
+"""Tests for the Now, heartbeat and mind cards."""
 
 import os
 import sys
 import unittest
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from core.ui.rail import NullRail, StatusRail, env_line_html, render_mind_card, render_run_controls
+from core.heartbeat.host import HeartStatus
+from core.ui.rail import (
+    NullRail, StatusRail, env_line_html, heartbeat_lines,
+    render_heartbeat_card, render_mind_card,
+)
 from tests.test_pixel_ui import FakePerson
 
 
@@ -52,19 +56,64 @@ class TestStatusRail(unittest.TestCase):
             "weather": {"description": "light rain", "temperature": 15.1},
         }
         html_ = env_line_html(ws)
-        self.assertIn('alt="rain"', html_)
+        self.assertNotIn("px-icon", html_)
         self.assertIn("Jenbina&#x27;s House · Night · light rain, 15°C", html_)
         self.assertEqual(env_line_html(None), "Jenbina's House")
 
 
-class TestControlsAndMind(unittest.TestCase):
-    def test_run_controls_keys_and_labels(self):
+NOW = datetime(2026, 11, 15, 7, 23)
+
+
+def status(**kw):
+    base = dict(
+        hosting=True, holder=None, phase="awake", phase_since=datetime(2026, 11, 15, 7, 12),
+        last_beat_at=NOW - timedelta(minutes=4), next_beat_at=NOW + timedelta(minutes=11),
+        note="", busy=False, stage="idle",
+    )
+    base.update(kw)
+    return HeartStatus(**base)
+
+
+class TestHeartbeatAndMind(unittest.TestCase):
+    def test_heartbeat_lines_awake(self):
+        self.assertEqual(heartbeat_lines(status(), NOW), [
+            "● awake · since 07:12", "last moment 4 min ago · next in 11 min",
+        ])
+
+    def test_heartbeat_lines_asleep(self):
+        self.assertEqual(heartbeat_lines(status(
+            phase="asleep", phase_since=datetime(2026, 11, 14, 23, 40), next_beat_at=None,
+        ), NOW), ["● asleep · since 23:40"])
+
+    def test_heartbeat_lines_notes(self):
+        capped = heartbeat_lines(status(note="daily_cap", next_beat_at=None), NOW)
+        self.assertEqual(capped[1], "last moment 4 min ago")
+        self.assertIn("daily limit reached · resting until tomorrow", capped)
+        self.assertIn("heart is retrying after errors", heartbeat_lines(status(note="backoff"), NOW))
+        self.assertEqual(heartbeat_lines(status(busy=True, stage="deciding…"), NOW)[1], "deciding…")
+        self.assertEqual(heartbeat_lines(status(last_beat_at=None, next_beat_at=NOW), NOW)[1],
+                         "no moment yet · next in 0 min")
+
+    def test_clock_correction_and_overdue_beat_never_show_negative_minutes(self):
+        self.assertEqual(heartbeat_lines(status(
+            last_beat_at=NOW + timedelta(minutes=2), next_beat_at=NOW - timedelta(minutes=2),
+        ), NOW)[1], "last moment 0 min ago · next in 0 min")
+
+    def test_step_once_is_for_admins_and_disabled_while_asleep(self):
         with patch("core.ui.rail.st") as st:
-            st.number_input.side_effect = [5, 3]
-            st.button.side_effect = [False, True]
-            controls = render_run_controls()
-        self.assertEqual(controls, {"num_iterations": 5, "delay_seconds": 3, "run_loop": True, "single_run": False})
-        self.assertEqual([c.args[0] for c in st.button.call_args_list], ["Step once", "Run 5"])
+            st.button.return_value = False
+            self.assertFalse(render_heartbeat_card(status(), admin=False, now=NOW))
+            st.button.assert_not_called()
+            self.assertFalse(render_heartbeat_card(status(), admin=True, now=NOW))
+            self.assertEqual(st.button.call_args.args[0], "Step once")
+            self.assertEqual(st.button.call_args.kwargs["type"], "primary")
+            self.assertFalse(st.button.call_args.kwargs["disabled"])
+            render_heartbeat_card(status(phase="asleep"), admin=True, now=NOW)
+            self.assertTrue(st.button.call_args.kwargs["disabled"])
+            render_heartbeat_card(status(note="daily_cap"), admin=True, now=NOW)
+            self.assertTrue(st.button.call_args.kwargs["disabled"])
+            st.button.return_value = True
+            self.assertTrue(render_heartbeat_card(status(), admin=True, now=NOW))
 
     def test_mind_card_lists_goals_or_empty_text(self):
         person = SimpleNamespace(
@@ -81,6 +130,18 @@ class TestControlsAndMind(unittest.TestCase):
         self.assertIn("No plan.", written)
         self.assertIn("Nothing learned yet.", written)
         self.assertIn("Nothing known yet.", written)
+
+
+class TestAboutYouIsReadOnly(unittest.TestCase):
+    def test_drawing_never_creates_a_social_model(self):
+        from core.person.person import Person
+        from core.ui.rail import _about_you_lines
+        person = Person()
+        person.init_social_cognition()
+        with patch("core.ui.rail.st") as st:
+            _about_you_lines(person, "Stranger")
+            st.write.assert_called_once_with("Nothing known yet.")
+        self.assertEqual(person.social_cognition.models, {})
 
 
 if __name__ == "__main__":

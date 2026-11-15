@@ -65,6 +65,12 @@ class WorkingMemorySystem:
         self.last_top_source: str = ""
         self.context_switches: int = 0
         self._cycles_since_experience: int = 0
+        self.notes: list[dict] = []
+
+    def add_note(self, content: str, cycles: int = 3) -> None:
+        """Keep a temporary note visible independently of the salience buffer."""
+        if cycles > 0:
+            self.notes.append({"content": content, "cycles_left": cycles})
 
     # -- main update --------------------------------------------------------
 
@@ -79,6 +85,10 @@ class WorkingMemorySystem:
         sleep_satisfaction: float = 100.0,
     ):
         """Recalculate working memory from current state. Called once per cycle."""
+        self.notes = [
+            {"content": note["content"], "cycles_left": note["cycles_left"] - 1}
+            for note in self.notes if note["cycles_left"] > 1
+        ]
         # Calculate focus from sleep
         self.focus = max(30.0, min(100.0, sleep_satisfaction * 0.8 + 20.0))
 
@@ -224,14 +234,16 @@ class WorkingMemorySystem:
     # -- formatting ---------------------------------------------------------
 
     def format_for_prompt(self) -> str:
+        note_line = "Keep in mind: " + "; ".join(note["content"] for note in self.notes) if self.notes else ""
         if not self.buffer:
-            return "Mind is clear — no particular focus."
+            return note_line or "Mind is clear — no particular focus."
 
         items_str = ", ".join(
             f"{item.content} (salience: {item.salience:.2f})"
             for item in self.buffer
         )
         return (
+            (note_line + "\n" if note_line else "") +
             f"Currently thinking about: {items_str}\n"
             f"Focus level: {self.focus:.0f}% | "
             f"Mental capacity: {len(self.buffer)}/{self._get_capacity()} slots"
@@ -263,6 +275,7 @@ class WorkingMemorySystem:
             "last_top_source": self.last_top_source,
             "context_switches": self.context_switches,
             "cycles_since_experience": self._cycles_since_experience,
+            "notes": [dict(note) for note in self.notes],
         }
 
     @classmethod
@@ -273,4 +286,5 @@ class WorkingMemorySystem:
         system.last_top_source = data.get("last_top_source", "")
         system.context_switches = data.get("context_switches", 0)
         system._cycles_since_experience = data.get("cycles_since_experience", 0)
+        system.notes = [dict(note) for note in data.get("notes", [])]
         return system

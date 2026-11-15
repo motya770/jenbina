@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
-"""Tests for the simulation runners with every chain mocked: the Streamlit
-runner (core.ui.simulation) drives the status rail and records events; the
-headless runner (core.simulation_runner) records the same events."""
+"""Tests for the single headless simulation runner with every chain mocked."""
 
 import json
 import os
 import sys
 import unittest
 from contextlib import ExitStack
+from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from core.person.person import Person
+from core.heartbeat.rhythm import RhythmConfig
 from core.timeline import EventLog
-from core.ui.rail import NullRail
-from tests.test_greeting_generation import _FakeSessionState
 
 WORLD_JSON = json.dumps({"list_of_descriptions": [], "list_of_actions": ["Walk to Coupa Cafe"]})
 ACTION = {"chosen_action": "Walk to Coupa Cafe for coffee", "reasoning": "social", "lessons_applied": ["go out"]}
@@ -57,61 +55,8 @@ def build_env(module):
     return person, meta, patches
 
 
-def _session():
-    return _FakeSessionState(simulation_history=[], jenbina_location="Jenbina's House", _proactive_llm=MagicMock())
 
 
-class TestUiRunnerEvents(unittest.TestCase):
-    def test_iteration_records_events_and_drives_rail(self):
-        import core.ui.simulation as sim
-        person, meta, patches = build_env(sim)
-        rail = MagicMock()
-        log = EventLog()
-        with patches, patch("core.ui.simulation.st") as st, patch("core.ui.simulation.send_proactive_message"):
-            st.session_state = _session()
-            result = sim.run_single_iteration(person, MagicMock(), meta, 0, rail=rail, event_log=log)
-        kinds = [e.kind for e in log.recent()]
-        self.assertEqual(kinds[:2], ["thought", "move"])
-        self.assertIn("action", kinds)
-        self.assertIn("mood", kinds)
-        action = next(e for e in log.recent() if e.kind == "action")
-        self.assertEqual(action.detail["location"], "Jenbina's House")
-        self.assertEqual(action.detail["lessons"], ["go out"])
-        self.assertEqual(st.session_state["jenbina_location"], "Coupa Cafe")
-        self.assertIn("satisfaction_delta", result)
-        self.assertTrue(any("completed in" in c.args[0] for c in rail.stage.call_args_list))
-        self.assertEqual(rail.live_row.call_count, 2)
-        st.success.assert_not_called()
-        st.expander.assert_not_called()
-        st.columns.assert_not_called()
-
-    def test_iteration_survives_event_log_failure(self):
-        import core.ui.simulation as sim
-        person, meta, patches = build_env(sim)
-        db = MagicMock()
-        db.store_event.side_effect = RuntimeError("disk")
-        with patches, patch("core.ui.simulation.st") as st, patch("core.ui.simulation.send_proactive_message"):
-            st.session_state = _session()
-            result = sim.run_single_iteration(person, MagicMock(), meta, 0, rail=NullRail(), event_log=EventLog(db, 1))
-        self.assertIn("action_decision", result)
-
-    def test_loop_records_delta_and_history(self):
-        import core.ui.simulation as sim
-        person, meta, patches = build_env(sim)
-        with ExitStack() as stack:
-            stack.enter_context(patches)
-            st = stack.enter_context(patch("core.ui.simulation.st"))
-            stack.enter_context(patch("core.ui.simulation.send_proactive_message"))
-            stack.enter_context(patch("core.ui.simulation.time.sleep"))
-            st.session_state = _session()
-            results = sim.run_simulation_loop(person, MagicMock(), meta, 2, 0, rail=NullRail(), event_log=EventLog())
-        self.assertEqual(len(st.session_state["simulation_history"]), 2)
-        self.assertIn("satisfaction_delta", results[0])
-        st.progress.assert_not_called()
-        # What the chat reads afterwards: the latest world, decision and state analysis
-        self.assertEqual(st.session_state["world_description"], WORLD_JSON)
-        self.assertEqual(st.session_state["action_decision"]["chosen_action"], ACTION["chosen_action"])
-        self.assertEqual(st.session_state["state_response"], {"ok": True})
 
 
 class TestHeadlessRunnerEvents(unittest.TestCase):
@@ -160,15 +105,6 @@ class TestPlanCompletionEvents(unittest.TestCase):
         self.assertIn("Goal advanced: new goal → 30%", titles)
         self.assertNotIn("Goal advanced: old goal → 30%", titles)  # finished long ago: not credited again
 
-    def test_ui_runner_records_plan_finished_once_and_goal_advanced(self):
-        import core.ui.simulation as sim
-        person, meta, patches = build_env(sim)
-        _plan_fixture(person)
-        log = EventLog()
-        with patches, patch("core.ui.simulation.st") as st, patch("core.ui.simulation.send_proactive_message"):
-            st.session_state = _session()
-            sim.run_single_iteration(person, MagicMock(), meta, 0, rail=NullRail(), event_log=log)
-        self._assert_events(log)
 
     def test_headless_runner_records_plan_finished_once_and_goal_advanced(self):
         import core.simulation_runner as hr
@@ -196,10 +132,8 @@ RECORD = {
 class TestPersonDict(unittest.TestCase):
     def test_person_dict_reports_the_real_esteem_and_growth_needs(self):
         import core.simulation_runner as hr
-        import core.ui.simulation as sim
-        for module in (hr, sim):
-            needs = module.get_person_dict(Person())["maslow_needs"]["individual_needs"]
-            self.assertEqual(set(needs), {"hunger", "sleep", "security", "love", "self_esteem", "personal_growth"})
+        needs = hr.get_person_dict(Person())["maslow_needs"]["individual_needs"]
+        self.assertEqual(set(needs), {"hunger", "sleep", "security", "love", "self_esteem", "personal_growth"})
 
 
 class TestActionKeywordMatch(unittest.TestCase):
@@ -232,15 +166,6 @@ class TestActionKeywordMatch(unittest.TestCase):
         self.assertIsNone(match_action_key("Plant seeds in the pot"))        # "plan" + t is not planning
         self.assertIsNone(match_action_key("Get ready for the day"))         # "read" + y is not reading
 
-    def test_ui_runner_applies_the_shared_matcher(self):
-        import core.ui.simulation as sim
-        person, meta, patches = build_env(sim)
-        person.maslow_needs.needs["sleep"].satisfaction = 10.0
-        with patches, patch("core.ui.simulation.st") as st, patch("core.ui.simulation.send_proactive_message"), \
-                patch("core.ui.simulation.match_action_key", return_value="sleep"):
-            st.session_state = _session()
-            sim.run_single_iteration(person, MagicMock(), meta, 0, rail=NullRail(), event_log=EventLog())
-        self.assertGreater(person.maslow_needs.needs["sleep"].satisfaction, 60.0)
 
     def test_headless_runner_applies_the_shared_matcher(self):
         import core.simulation_runner as hr
@@ -254,21 +179,201 @@ class TestActionKeywordMatch(unittest.TestCase):
         self.assertGreater(person.maslow_needs.needs["sleep"].satisfaction, 60.0)
 
 
-class TestHeadlessProactiveContext(unittest.TestCase):
-    def test_proactive_message_gets_recent_actions_and_world_from_history(self):
+class HeadlessFixture(unittest.TestCase):
+    def setUp(self):
         import core.simulation_runner as hr
-        person, meta, patches = build_env(hr)
-        context = {"simulation_history": [dict(RECORD)], "jenbina_location": "Jenbina's House",
-                   "debug_iterations": [], "event_log": EventLog(), "display_name": "Matt"}
-        triggers = {"low_social": {"need": "love", "satisfaction": 20}}
-        with patches, patch("core.simulation_runner._check_proactive_triggers", return_value=triggers), \
-                patch("core.simulation_runner.generate_proactive_message", return_value="Still there?") as gen, \
-                patch("core.simulation_runner.get_llm", return_value=MagicMock()):
-            hr.run_single_iteration_headless(person, MagicMock(), meta, 0, context)
-        gen.assert_called_once()
-        self.assertEqual(gen.call_args.kwargs["recent_actions"], ["Walk to Coupa Cafe"])
-        self.assertEqual(gen.call_args.kwargs["world_context"], "Jenbina's House, evening, Clear skies")
-        self.assertEqual(person.conversations["Matt"].messages[-1].content, "Still there?")
+        self.runner = hr
+        self.person, self.meta, patches = build_env(hr)
+        self.stack = ExitStack()
+        self.addCleanup(self.stack.close)
+        self.stack.enter_context(patches)
+        self.now = datetime(2026, 11, 15, 12, 0)
+        self.person.suspend_until(self.now)
+        self.stack.enter_context(patch.object(
+            self.person, "update_all_needs",
+            side_effect=lambda: Person.update_all_needs(self.person, now=self.now),
+        ))
+        clock = self.stack.enter_context(patch("core.simulation_runner.datetime"))
+        clock.now.return_value = self.now
+        self.world_summary = json.loads(json.dumps(RECORD["world_summary"]))
+        self.world_summary["weather"]["temperature"] = 18.0
+        self.stack.enter_context(patch("core.simulation_runner.create_comprehensive_world_state"))
+        self.stack.enter_context(patch(
+            "core.simulation_runner.get_world_state_summary", return_value=self.world_summary,
+        ))
+        self.action = self.stack.enter_context(patch(
+            "core.simulation_runner.create_meta_cognitive_action_chain", return_value=dict(ACTION),
+        ))
+        self.check_triggers = self.stack.enter_context(patch(
+            "core.simulation_runner._check_proactive_triggers",
+            return_value={"low_social": {"need": "friendship", "satisfaction": 20}},
+        ))
+        self.generate = self.stack.enter_context(patch(
+            "core.simulation_runner.generate_proactive_message", return_value="Still there?",
+        ))
+        self.get_llm = self.stack.enter_context(patch("core.simulation_runner.get_llm"))
+        self.person.inner_monologue.think = MagicMock()
+        self.context = {
+            "simulation_history": [], "jenbina_location": "Jenbina's House",
+            "debug_iterations": [], "event_log": EventLog(),
+        }
+
+    def run_iteration(self):
+        return self.runner.run_single_iteration_headless(
+            self.person, MagicMock(), self.meta, 0, self.context,
+        )
+
+
+class TestHeadlessParity(HeadlessFixture):
+    def test_social_action_is_recorded_in_the_tracker(self):
+        self.action.return_value = {"chosen_action": "Chat with the neighbor"}
+        for emotion, tone in (
+            ("joy", "warm"), ("sadness", "melancholic"), ("anger", "tense"),
+            ("fear", "tense"), ("trust", "warm"), ("anticipation", "warm"),
+            ("surprise", "neutral"),
+        ):
+            with self.subTest(emotion=emotion), patch.object(
+                self.person.emotion_system, "get_dominant_emotions",
+                return_value=[{"name": emotion, "intensity": 70}],
+            ):
+                result = self.run_iteration()
+                interaction = self.person.social_interaction_tracker.interactions[-1]
+                self.assertEqual(result["matched_action"], "socialize")
+                self.assertEqual(interaction.interaction_type, "simulated_social")
+                self.assertEqual(interaction.emotional_tone, tone)
+
+    def test_social_day_reaches_the_monologue(self):
+        self.person.social_interaction_tracker.record_chat("Ann", "warm")
+        self.run_iteration()
+        world_context = self.person.inner_monologue.think.call_args.kwargs["world_context_str"]
+        self.assertIn("\nSocial interactions today: met 1 person.", world_context)
+        self.assertIn("warm", world_context)
+        # Her thoughts are shown to every account, so nobody is named in what feeds them.
+        self.assertNotIn("Ann", world_context)
+
+    def test_status_sink_gets_five_stages_and_may_fail(self):
+        sink = MagicMock()
+        self.context["status"] = sink
+        stages = [
+            call("sensing the world…"), call("thinking…"), call("deciding…"),
+            call("reflecting…"), call("learning…"),
+        ]
+        self.run_iteration()
+        self.assertEqual(sink.stage.call_args_list, stages)
+        sink.reset_mock()
+        sink.stage.side_effect = RuntimeError("display unavailable")
+        self.assertIn("action_decision", self.run_iteration())
+        self.assertEqual(sink.stage.call_args_list, stages)
+
+    def test_debug_entry_includes_curiosity_and_social_interaction_stats(self):
+        self.run_iteration()
+        debug = self.context["debug_iterations"][-1]
+        self.assertEqual(debug["curiosity_stats"], self.person.curiosity_system.get_stats())
+        self.assertEqual(
+            debug["social_interaction_stats"], self.person.social_interaction_tracker.get_stats(),
+        )
+
+    def test_optional_subsystems_and_an_unmatched_action_are_supported(self):
+        self.person.social_interaction_tracker = None
+        self.person.curiosity_system = None
+        self.action.return_value = {"chosen_action": "Watch clouds"}
+        result = self.run_iteration()
+        self.assertIsNone(result["matched_action"])
+        self.assertFalse(result["fell_asleep"])
+        debug = self.context["debug_iterations"][-1]
+        self.assertIsNone(debug["curiosity_stats"])
+        self.assertIsNone(debug["social_interaction_stats"])
+
+
+class TestSleepGate(HeadlessFixture):
+    def setUp(self):
+        super().setUp()
+        self.action.return_value = {"chosen_action": "Go to bed and sleep"}
+        self.world_summary["time"]["time_of_day"] = "night"
+        self.person.maslow_needs.needs["sleep"].satisfaction = 60.0
+        self.context["sleep_config"] = RhythmConfig()
+
+    def test_sleep_at_night_is_not_an_instant_refill(self):
+        health_before = self.person.maslow_needs.get_need_satisfaction("health")
+        result = self.run_iteration()
+        self.assertTrue(result["fell_asleep"])
+        self.assertEqual(result["matched_action"], "sleep")
+        self.assertLessEqual(self.person.maslow_needs.get_need_satisfaction("sleep"), 60.0)
+        self.assertLessEqual(self.person.maslow_needs.get_need_satisfaction("health"), health_before)
+
+    def test_daytime_sleep_is_a_nap_as_before(self):
+        self.world_summary["time"]["time_of_day"] = "afternoon"
+        result = self.run_iteration()
+        self.assertFalse(result["fell_asleep"])
+        self.assertEqual(result["matched_action"], "sleep")
+        self.assertGreater(self.person.maslow_needs.get_need_satisfaction("sleep"), 60.0)
+
+    def test_without_sleep_config_nothing_changes(self):
+        del self.context["sleep_config"]
+        result = self.run_iteration()
+        self.assertFalse(result["fell_asleep"])
+        self.assertGreater(self.person.maslow_needs.get_need_satisfaction("sleep"), 60.0)
+
+    def test_low_sleep_need_during_the_day_uses_the_pre_action_value(self):
+        self.world_summary["time"]["time_of_day"] = "afternoon"
+        self.person.maslow_needs.needs["sleep"].satisfaction = 29.9
+        result = self.run_iteration()
+        self.assertTrue(result["fell_asleep"])
+        self.assertLessEqual(self.person.maslow_needs.get_need_satisfaction("sleep"), 29.9)
+
+    def test_disabling_sleep_keeps_the_instant_action_effect(self):
+        self.context["sleep_config"] = RhythmConfig(sleep_enabled=False)
+        result = self.run_iteration()
+        self.assertFalse(result["fell_asleep"])
+        self.assertGreater(self.person.maslow_needs.get_need_satisfaction("sleep"), 60.0)
+
+
+class TestHeadlessProactive(HeadlessFixture):
+    def test_message_goes_to_the_target_with_proactive_type(self):
+        user_db = MagicMock()
+        self.context.update(proactive_target=(7, "Ann"), user_db=user_db, user_id=9, display_name="Bob")
+        result = self.run_iteration()
+        self.check_triggers.assert_called_once_with(self.person, "Ann")
+        self.assertEqual(self.generate.call_args.kwargs["display_name"], "Ann")
+        message = self.person.conversations["Ann"].messages[-1]
+        self.assertEqual((message.content, message.message_type), ("Still there?", "proactive"))
+        self.assertNotIn("Bob", self.person.conversations)
+        user_db.store_message.assert_called_once_with(7, "Jenbina", "Still there?", "proactive_message")
+        self.assertEqual(self.person.social_cognition.get_or_create_model("Ann").last_proactive_at, self.now)
+        self.assertEqual(result["proactive_sent_to"], "Ann")
+
+    def test_no_target_means_no_proactive_check(self):
+        self.context.update(display_name="Bob", user_id=9, user_db=MagicMock())
+        result = self.run_iteration()
+        self.check_triggers.assert_not_called()
+        self.generate.assert_not_called()
+        self.get_llm.assert_not_called()
+        self.context["user_db"].store_message.assert_not_called()
+        self.assertIsNone(result["proactive_sent_to"])
+
+    def test_no_trigger_means_no_message(self):
+        self.context["proactive_target"] = (7, "Ann")
+        self.check_triggers.return_value = None
+        result = self.run_iteration()
+        self.generate.assert_not_called()
+        self.get_llm.assert_not_called()
+        self.assertIsNone(result["proactive_sent_to"])
+
+    def test_empty_message_does_not_start_a_cooldown(self):
+        self.context["proactive_target"] = (7, "Ann")
+        self.generate.return_value = None
+        result = self.run_iteration()
+        self.assertIsNone(self.person.social_cognition.get_or_create_model("Ann").last_proactive_at)
+        self.assertNotIn("Ann", self.person.conversations)
+        self.assertIsNone(result["proactive_sent_to"])
+
+    def test_proactive_message_gets_recent_actions_and_world_from_history(self):
+        self.context.update(simulation_history=[dict(RECORD)], proactive_target=(7, "Ann"))
+        self.run_iteration()
+        self.generate.assert_called_once()
+        self.assertEqual(self.generate.call_args.kwargs["recent_actions"], ["Walk to Coupa Cafe"])
+        self.assertEqual(self.generate.call_args.kwargs["world_context"], "Jenbina's House, evening, Clear skies")
+        self.assertEqual(self.person.conversations["Ann"].messages[-1].content, "Still there?")
 
 
 if __name__ == "__main__":
