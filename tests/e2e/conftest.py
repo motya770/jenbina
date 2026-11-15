@@ -30,7 +30,7 @@ def _wait_for_server(port: int, timeout: float = 120) -> None:
 
 
 @pytest.fixture(scope="session")
-def streamlit_server():
+def streamlit_server(tmp_path_factory):
     """Launch Streamlit for the test session and tear it down afterwards.
 
     Yields the base URL, e.g. ``http://localhost:8503``.
@@ -38,6 +38,8 @@ def streamlit_server():
     port = _free_port()
     env = os.environ.copy()
     env["JENBINA_SKIP_AUTH"] = "1"
+    env["JENBINA_DISABLE_SLEEP"] = "1"
+    env["JENBINA_DATA_DIR"] = str(tmp_path_factory.mktemp("jenbina-e2e"))
     # Disable Streamlit's browser auto-open and telemetry
     env["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
     env["STREAMLIT_SERVER_HEADLESS"] = "true"
