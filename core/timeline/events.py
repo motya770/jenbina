@@ -8,7 +8,7 @@ the same events as the UI.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 THOUGHT = "thought"
@@ -17,7 +17,10 @@ MOOD = "mood"
 GOAL = "goal"
 PLAN = "plan"
 MOVE = "move"
-KINDS = (THOUGHT, ACTION, MOOD, GOAL, PLAN, MOVE)
+SLEEP = "sleep"
+WAKE = "wake"
+GAP = "gap"
+KINDS = (THOUGHT, ACTION, MOOD, GOAL, PLAN, MOVE, SLEEP, WAKE, GAP)
 
 ACTION_TITLE_LIMIT = 90
 MOOD_MIN_DELTA = 1.0
@@ -37,6 +40,13 @@ class TimelineEvent:
 # --------------------------------------------------------------------------
 # Text helpers
 # --------------------------------------------------------------------------
+
+def format_duration(td: timedelta) -> str:
+    """Whole elapsed minutes, with hours when needed and no negative time."""
+    minutes = max(0, int(td.total_seconds() // 60))
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m" if hours else f"{minutes}m"
+
 
 def shorten(text: str, limit: int = ACTION_TITLE_LIMIT) -> str:
     """Cut ``text`` to at most ``limit`` characters, at a word boundary when
@@ -144,6 +154,21 @@ def make_move(src: str, dst: str) -> TimelineEvent:
     return TimelineEvent(MOVE, f"Walked from {src} to {dst}", {"from": src, "to": dst})
 
 
+def make_sleep(reason: str) -> TimelineEvent:
+    return TimelineEvent(SLEEP, "Fell asleep", {"reason": reason})
+
+
+def make_wake(slept: timedelta, reason: str) -> TimelineEvent:
+    prefix = "Woken by a message after" if reason == "message" else "Woke after"
+    return TimelineEvent(WAKE, f"{prefix} {format_duration(slept)}", {
+        "reason": reason, "seconds": slept.total_seconds(),
+    })
+
+
+def make_gap(gone: timedelta) -> TimelineEvent:
+    return TimelineEvent(GAP, f"Was away for {format_duration(gone)}", {"seconds": gone.total_seconds()})
+
+
 # --------------------------------------------------------------------------
 # The log
 # --------------------------------------------------------------------------
@@ -190,3 +215,35 @@ class EventLog:
             TimelineEvent(row["kind"], row["title"], row.get("detail") or {}, row["created_at"], row.get("id"))
             for row in rows
         ]
+
+
+class LifeEventLog(EventLog):
+    """Her shared life stream, persisted without a per-account owner."""
+
+    def __init__(self, store):
+        super().__init__()
+        self.store = store
+
+    @property
+    def persistent(self) -> bool:
+        return True
+
+    def record(self, event: TimelineEvent) -> TimelineEvent:
+        if event is None:
+            return None
+        try:
+            event.id = self.store.store_event(event.kind, event.title, event.detail, event.created_at)
+        except Exception as exc:  # noqa: BLE001 - logging must never break her life
+            print(f"LifeEventLog: could not store {event.kind} event: {exc}")
+        return event
+
+    def recent(self, limit: int = 200) -> list[TimelineEvent]:
+        try:
+            rows = self.store.get_events(limit=limit)
+            return [
+                TimelineEvent(row["kind"], row["title"], row.get("detail") or {}, row["created_at"], row.get("id"))
+                for row in rows
+            ]
+        except Exception as exc:  # noqa: BLE001
+            print(f"LifeEventLog: could not read events: {exc}")
+            return []

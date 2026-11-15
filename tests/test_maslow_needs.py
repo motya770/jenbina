@@ -19,6 +19,47 @@ from core.needs.maslow_needs import (
 )
 
 
+class TestNeedsClock(unittest.TestCase):
+    def test_a_clock_stepping_back_does_not_move_the_stamp(self):
+        needs = MaslowNeedsSystem()
+        now = datetime(2030, 1, 1, 12, 0)
+        needs.last_comprehensive_update = now
+        needs.needs["hunger"].satisfaction = 80.0
+        needs.update_all_needs(now=now - timedelta(hours=1))
+        self.assertEqual(needs.last_comprehensive_update, now)
+        self.assertEqual(needs.get_need_satisfaction("hunger"), 80.0)
+        needs.update_all_needs(now=now)
+        self.assertEqual(needs.get_need_satisfaction("hunger"), 80.0)
+        needs.update_all_needs(now=now + timedelta(hours=1))
+        self.assertEqual(needs.last_comprehensive_update, now + timedelta(hours=1))
+        self.assertAlmostEqual(needs.get_need_satisfaction("hunger"), 72.0, delta=1.7)
+
+    def test_skipped_needs_do_not_decay_but_clocks_are_stamped(self):
+        needs = MaslowNeedsSystem()
+        needs.needs["sleep"].satisfaction = 50.0
+        needs.needs["hunger"].satisfaction = 50.0
+        now = datetime(2030, 1, 1, 12, 0)
+        needs.update_all_needs(timedelta(hours=2), skip=("sleep",), now=now)
+        self.assertEqual(needs.get_need_satisfaction("sleep"), 50.0)
+        self.assertLess(needs.get_need_satisfaction("hunger"), 50.0)
+        self.assertEqual(needs.last_comprehensive_update, now)
+        self.assertTrue(all(need.last_updated == now for need in needs.needs.values()))
+
+    def test_need_update_stamps_the_supplied_time(self):
+        need = MaslowNeed("hunger", NeedCategory.FOOD, NeedLevel.PHYSIOLOGICAL)
+        now = datetime(2030, 1, 1, 12, 0)
+        need.update(timedelta(hours=1), now=now)
+        self.assertEqual(need.last_updated, now)
+        self.assertLess(need.satisfaction, 100.0)
+
+    def test_backwards_clock_does_not_reverse_decay(self):
+        needs = MaslowNeedsSystem()
+        needs.last_comprehensive_update = datetime(2030, 1, 1, 12, 0)
+        needs.needs["hunger"].satisfaction = 50.0
+        needs.update_all_needs(now=needs.last_comprehensive_update - timedelta(hours=1))
+        self.assertEqual(needs.get_need_satisfaction("hunger"), 50.0)
+
+
 class TestMaslowNeed(unittest.TestCase):
     """Test individual MaslowNeed functionality"""
     

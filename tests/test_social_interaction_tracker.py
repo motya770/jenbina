@@ -256,5 +256,17 @@ class TestPersonSocialInteractionTracker(unittest.TestCase):
         self.assertEqual(state["social_interactions"]["people_met_today"], 1)
 
 
+
+class TestPromptWithoutNames(unittest.TestCase):
+    def test_names_can_be_left_out(self):
+        from core.social.social_interaction_tracker import SocialInteractionTracker
+        tracker = SocialInteractionTracker()
+        tracker.record_chat("Ann", "warm")
+        tracker.record_chat("Bob", "warm")
+        self.assertIn("(Ann, Bob)", tracker.format_for_prompt())
+        nameless = tracker.format_for_prompt(names=False)
+        self.assertEqual(nameless, "Social interactions today: met 2 people. Overall tone: warm.")
+
+
 if __name__ == "__main__":
     unittest.main()

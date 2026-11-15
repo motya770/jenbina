@@ -260,7 +260,9 @@ class TestWideShell(unittest.TestCase):
             self.assertIn("max-width: 64rem", "".join(c.args[0] for c in st.markdown.call_args_list))
         with patch("core.ui.pixel_theme.st") as st:
             inject_pixel_css()
-            self.assertNotIn("64rem", "".join(c.args[0] for c in st.markdown.call_args_list))
+            # The page width rule only: the 2049 theme's background gradient
+            # also uses 64rem and is present in both modes.
+            self.assertNotIn("max-width: 64rem", "".join(c.args[0] for c in st.markdown.call_args_list))
 
 
 class TestEventHtml(unittest.TestCase):

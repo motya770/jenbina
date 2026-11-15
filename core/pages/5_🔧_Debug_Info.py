@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import streamlit as st
 from core.ui.pixel_theme import inject_pixel_css
-from core.ui.shared_init import require_auth
+from core.ui.shared_init import get_host, require_auth
 
 st.set_page_config(page_title="Jenbina — Debug Info", page_icon="🔧", layout="wide")
 inject_pixel_css()
@@ -16,10 +16,10 @@ if not require_auth():
 
 st.title("🔧 Debug Info")
 
-iterations = st.session_state.get("debug_iterations", [])
+iterations = list(get_host().debug_iterations)
 
 if not iterations:
-    st.info("No debug data yet. Run a simulation to see debug info here.")
+    st.info("No debug data yet. Her next moment of life will appear here.")
     st.stop()
 
 # Iteration selector

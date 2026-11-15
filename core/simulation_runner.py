@@ -25,6 +25,7 @@ from core.cognition.enhanced_action_decision_chain import create_meta_cognitive_
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.interaction.chat_handler import generate_proactive_message, history_context
 from core.connect import get_llm
+from core.heartbeat.rhythm import should_fall_asleep
 from core.timeline import (
     EventLog,
     record_action,
@@ -45,6 +46,12 @@ from core.timeline import (
 
 # One representative need per level, by its real name in MaslowNeedsSystem.
 HEADLINE_NEEDS = ("hunger", "sleep", "security", "love", "self_esteem", "personal_growth")
+
+_SOCIAL_ACTION_KEYS = {"socialize", "make_friends", "seek_love", "join_community", "build_relationships"}
+_tone_map = {
+    "joy": "warm", "sadness": "melancholic", "anger": "tense",
+    "fear": "tense", "trust": "warm", "anticipation": "warm",
+}
 
 
 def get_person_dict(person):
@@ -271,17 +278,28 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         iteration: Zero-based iteration index.
         context: Mutable dict replacing st.session_state. Keys:
             simulation_history (list), jenbina_location (str),
-            debug_iterations (list), user_db, user_id, display_name.
+            debug_iterations (list), user_db, event_log (provided by the host).
+            Optional: status (stage sink), sleep_config (RhythmConfig),
+            proactive_target ((user_id, person_key)). Without an event_log,
+            user_db and user_id provide the legacy event-log fallback.
 
     Returns:
         Dict with needs_response, world_description, action_decision,
         state_response, person_dict, world_summary, iteration_duration,
-        satisfaction_delta.
+        satisfaction_delta, matched_action, fell_asleep, proactive_sent_to.
     """
     event_log = context.get("event_log")
     if event_log is None:
         event_log = EventLog(context.get("user_db"), context.get("user_id"))
         context["event_log"] = event_log
+
+    def stage(text):
+        sink = context.get("status")
+        if sink is not None:
+            try:
+                sink.stage(text)
+            except Exception:
+                pass
 
     iteration_start_time = datetime.now()
     iter_num = iteration + 1
@@ -298,6 +316,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     # ==================================================================
     # Stage 1: Environment
     # ==================================================================
+    stage("sensing the world…")
     print(f"{'─'*40}")
     print(f"  Stage 1: Environment")
     print(f"{'─'*40}")
@@ -313,6 +332,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     # ==================================================================
     # Stage 2: Perception & Context
     # ==================================================================
+    stage("thinking…")
     print(f"{'─'*40}")
     print(f"  Stage 2: Perception & Context")
     print(f"{'─'*40}")
@@ -400,6 +420,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
             f"Time: {world_summary.get('time', {}).get('time_of_day', 'unknown')}, "
             f"Weather: {world_summary.get('weather', {}).get('description', 'unknown')}"
         )
+        if getattr(person, "social_interaction_tracker", None) is not None:
+            # Without names: her thoughts land on the timeline every account sees.
+            world_context_str += "\n" + person.social_interaction_tracker.format_for_prompt(names=False)
 
         last_action = "Nothing in particular."
         sim_history = context.get("simulation_history")
@@ -470,6 +493,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     # ==================================================================
     # Stage 3: Action Decision
     # ==================================================================
+    stage("deciding…")
     print(f"{'─'*40}")
     print(f"  Stage 3: Action Decision")
     print(f"{'─'*40}")
@@ -493,11 +517,28 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     # Apply action effects to needs via keyword matching
     action_executor = create_maslow_action_executor(person.maslow_needs)
     matched_action = match_action_key(chosen)
-    if matched_action:
+    sleep_config = context.get("sleep_config")
+    fell_asleep = sleep_config is not None and should_fall_asleep(
+        matched_action,
+        world_summary.get("time", {}).get("time_of_day", ""),
+        person.maslow_needs.get_need_satisfaction("sleep"),
+        sleep_config,
+    )
+    if fell_asleep:
+        print("  Falling asleep; sleep recovery will follow the clock")
+    elif matched_action:
         effect_result = action_executor(matched_action)
         print(f"  Action effect applied: {matched_action} -> satisfied {effect_result.get('satisfied_needs', {})}")
     else:
         print(f"  No need-satisfaction mapping for action: {chosen}")
+
+    if matched_action in _SOCIAL_ACTION_KEYS and getattr(person, "social_interaction_tracker", None) is not None:
+        dominant = person.emotion_system.get_dominant_emotions(1)
+        emotion = dominant[0]["name"].lower() if dominant else "neutral"
+        person.social_interaction_tracker.record_social_action(
+            action_description=chosen,
+            emotional_tone=_tone_map.get(emotion, "neutral"),
+        )
 
     # Detect location change
     new_location = _detect_location_from_action(chosen)
@@ -511,6 +552,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     # ==================================================================
     # Stage 4: Checks & Analysis
     # ==================================================================
+    stage("reflecting…")
     print(f"{'─'*40}")
     print(f"  Stage 4: Checks & Analysis")
     print(f"{'─'*40}")
@@ -555,6 +597,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     # ==================================================================
     # Stage 5: Learning & Updates
     # ==================================================================
+    stage("learning…")
     print(f"{'─'*40}")
     print(f"  Stage 5: Learning & Updates")
     print(f"{'─'*40}")
@@ -705,16 +748,22 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         "learning_stats": person.learning_system.get_learning_stats() if person.learning_system else None,
         "person_dict": person_dict,
         "world_summary": world_summary,
+        "curiosity_stats": person.curiosity_system.get_stats() if getattr(person, "curiosity_system", None) else None,
+        "social_interaction_stats": (
+            person.social_interaction_tracker.get_stats() if getattr(person, "social_interaction_tracker", None) else None
+        ),
     }
     context.setdefault("debug_iterations", []).append(debug_entry)
 
     # ==================================================================
     # Proactive message check (headless)
     # ==================================================================
+    proactive_sent_to = None
     try:
-        display_name = context.get("display_name", "User")
-        triggers = _check_proactive_triggers(person, display_name)
+        target = context.get("proactive_target")
+        triggers = _check_proactive_triggers(person, target[1]) if target is not None else None
         if triggers:
+            user_id, person_key = target
             recent_actions_for_msg, world_context_for_msg = history_context(
                 context.get("simulation_history", [])
             )
@@ -726,16 +775,18 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
 
             message = generate_proactive_message(
                 person, proactive_llm, triggers,
-                display_name=display_name,
+                display_name=person_key,
                 recent_actions=recent_actions_for_msg,
                 world_context=world_context_for_msg,
             )
             if message:
-                person.send_message(display_name, message, "text")
+                person.send_message(person_key, message, "proactive")
+                if person.social_cognition is not None:
+                    person.social_cognition.get_or_create_model(person_key).last_proactive_at = datetime.now()
+                proactive_sent_to = person_key
                 # Store in SQLite if available
                 user_db = context.get("user_db")
-                user_id = context.get("user_id")
-                if user_db and user_id:
+                if user_db is not None:
                     user_db.store_message(user_id, "Jenbina", message, "proactive_message")
                 print(f"  Proactive message sent: {message[:80]}...")
     except Exception as e:
@@ -755,4 +806,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         "world_summary": world_summary,
         "iteration_duration": iteration_duration,
         "satisfaction_delta": sat_delta,
+        "matched_action": matched_action,
+        "fell_asleep": fell_asleep,
+        "proactive_sent_to": proactive_sent_to,
     }

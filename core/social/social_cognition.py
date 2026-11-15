@@ -5,7 +5,8 @@ and conversational strategy.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Tuple
+from datetime import datetime
+from typing import Dict, Any, List, Tuple, Optional
 import re
 
 
@@ -66,6 +67,8 @@ class PersonModel:
     relationship: RelationshipState = field(default_factory=RelationshipState)
     user_dossier: Dict[str, Any] = field(default_factory=dict)
     last_predicted_reaction: str = ""
+    last_visit_time: Optional[datetime] = None
+    last_proactive_at: Optional[datetime] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -75,6 +78,8 @@ class PersonModel:
             "relationship": self.relationship.to_dict(),
             "user_dossier": dict(self.user_dossier),
             "last_predicted_reaction": self.last_predicted_reaction,
+            "last_visit_time": self.last_visit_time.isoformat() if self.last_visit_time else None,
+            "last_proactive_at": self.last_proactive_at.isoformat() if self.last_proactive_at else None,
         }
 
     @classmethod
@@ -86,6 +91,8 @@ class PersonModel:
             relationship=RelationshipState.from_dict(data.get("relationship", {})),
             user_dossier=dict(data.get("user_dossier", {})),
             last_predicted_reaction=data.get("last_predicted_reaction", ""),
+            last_visit_time=datetime.fromisoformat(data["last_visit_time"]) if data.get("last_visit_time") else None,
+            last_proactive_at=datetime.fromisoformat(data["last_proactive_at"]) if data.get("last_proactive_at") else None,
         )
 
 
@@ -232,10 +239,13 @@ class SocialCognitionSystem:
             f"Strategy guide: nice=warm+empathetic, polite=respectful+measured, assertive=direct+clear."
         )
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self, only: str | None = None) -> Dict[str, Any]:
         return {
             "tracked_entities": len(self.models),
-            "entities": {name: model.to_dict() for name, model in self.models.items()},
+            "entities": {
+                name: model.to_dict() for name, model in self.models.items()
+                if only is None or name == only
+            },
         }
 
     def to_dict(self) -> Dict[str, Any]:
