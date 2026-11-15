@@ -649,6 +649,38 @@ class TestTurnsAndStepOnce(HostCase):
         self.put_to_sleep(self.now)
         self.assertEqual(self.host.step_once(), "asleep")
 
+    def test_a_requested_step_runs_on_the_next_pass_without_blocking_the_asker(self):
+        self.host.tick()
+        self.assertEqual(len(self.calls), 1)
+        self.advance(minutes=1)
+        with self.host.chat_turn(ANN):
+            pass                                              # attention window is open
+        self.assertEqual(self.host.request_step(), "requested")
+        self.assertEqual(len(self.calls), 1)                  # asking does not beat
+        self.assertTrue(self.host.status().step_requested)
+        self.assertEqual(self.host.request_step(), "requested")   # asked twice, one moment
+        self.assertEqual(self.host.tick(), Step(BEAT, "requested"))
+        self.assertEqual(len(self.calls), 2)
+        self.assertFalse(self.host.status().step_requested)
+        self.assertEqual(self.host.situation.beats_count, 2)  # counts toward the daily cap
+        self.assertEqual(self.host.tick().kind, WAIT)
+
+    def test_a_step_cannot_be_requested_asleep_or_at_the_cap(self):
+        self.host.situation.beats_day = self.now.date().isoformat()
+        self.host.situation.beats_count = 80
+        self.assertEqual(self.host.request_step(), "daily_cap")
+        self.host.situation.beats_count = 0
+        self.assertEqual(self.host.request_step(), "requested")
+        calls = len(self.calls)
+        with self.host.lock:                                  # she fell asleep before the heart got to it
+            self.host._fall_asleep(self.now, "chose")
+        self.host.tick()
+        self.assertEqual(len(self.calls), calls)
+        self.assertFalse(self.host.status().step_requested)
+        self.assertEqual(self.host.request_step(), "asleep")
+        self.host.stop()
+        self.assertEqual(self.host.request_step(), "not_hosting")
+
     def test_step_once_reports_a_failure_and_counts_the_attempt(self):
         self.fail_next(1)
         with self.assertLogs("jenbina.heartbeat", level="ERROR"):

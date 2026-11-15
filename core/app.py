@@ -137,8 +137,10 @@ def main():
                 render_mind_card(person, person_key)
 
             if draw_guarded(draw) and step_clicked:
-                with st.spinner("Jenbina is living a moment…"):
-                    host.step_once()
+                # Ask and return: the heart thread lives the moment and the
+                # refresh shows it. Waiting here would freeze this session's
+                # timeline for the whole beat (and for the one before it).
+                host.request_step()
                 st.rerun()
 
         live_rail()

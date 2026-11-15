@@ -150,6 +150,8 @@ def heartbeat_lines(status: HeartStatus, now: datetime) -> list[str]:
     lines = [f"● {status.phase} · since {status.phase_since:%H:%M}"]
     if status.busy:
         lines.append(status.stage)
+    elif status.step_requested:
+        lines.append("a moment is coming…")
     elif status.phase == "awake":
         if status.last_beat_at is None:
             timing = "no moment yet"
@@ -176,7 +178,8 @@ def render_heartbeat_card(status: HeartStatus, admin: bool, now: datetime | None
         if admin:
             return st.button(
                 "Step once", type="primary", use_container_width=True,
-                disabled=status.phase == "asleep" or status.note == "daily_cap",
+                disabled=(status.phase == "asleep" or status.note == "daily_cap"
+                          or status.step_requested),
             )
     return False
 

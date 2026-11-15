@@ -10,7 +10,7 @@ from playwright.sync_api import Page, expect
 
 
 # Generous timeout: LLM calls can be slow
-STAGE_TIMEOUT = 180_000  # 3 minutes per stage
+STAGE_TIMEOUT = 300_000  # 5 minutes: a beat takes about two, and one may already be in flight
 
 
 @pytest.fixture()

@@ -218,6 +218,6 @@ class TestHomeScreen(unittest.TestCase):
 
     def test_step_once_uses_the_host_and_reruns_the_app(self):
         st, host, _, _, _, _ = self.run_home(clicked=True)
-        host.step_once.assert_called_once_with()
-        st.spinner.assert_called_once_with("Jenbina is living a moment…")
+        host.request_step.assert_called_once_with()
+        host.step_once.assert_not_called()                     # never block the page for a beat
         st.rerun.assert_called_once()

@@ -1162,4 +1162,5 @@ A second review, of Tasks 4 to 10, changed these points. Where they differ from 
 - **Host.** Lost time is not counted as time awake; an adopted Jenbina's clocks start at adoption; a storage error while renewing the lease does not stop the heart; `stop(patience=...)` lets process exit abandon a beat in flight.
 - **`run_heartbeat.py --once`** prints what happened and exits 2 when the beat failed.
 - **Greeting** is considered once per session (the 5-second refresh must not re-check it), and a message counts as a visit.
+- **"Step once" asks and returns.** The button calls `host.request_step()`; the heart thread takes the moment on its next pass and the refresh shows it. The first end-to-end run showed why: `step_once()` blocked the browser session for the whole beat, and for the beat already in flight before it, so the timeline froze for about four minutes. `step_once()` remains for `run_heartbeat.py --once`.
 

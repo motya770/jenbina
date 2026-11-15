@@ -76,6 +76,7 @@ class HeartStatus:
     note: str
     busy: bool
     stage: str
+    step_requested: bool = False   # an admin asked for a moment; the heart has not started it yet
 
 
 class _StatusSink:
@@ -116,6 +117,7 @@ class JenbinaHost:
         self.debug_iterations = []
         self._holder = None
         self._busy = False
+        self._step_requested = False
         self._stage = "idle"
         self._people = {}
         self._stop = threading.Event()
@@ -287,6 +289,9 @@ class JenbinaHost:
                 now = self.clock()
                 try:
                     self._check_lost_time(now)
+                    if self._take_step_request(now):
+                        self._beat(now)
+                        return Step(BEAT, "requested")
                     step = decide(self.situation, now, self.config)
                     if step.kind == BEAT:
                         self._beat(now)
@@ -463,6 +468,33 @@ class JenbinaHost:
         finally:
             self.lock.release()
 
+    def request_step(self) -> str:
+        """Ask the heart for a moment now, without waiting for it.
+
+        The heart takes it on its next pass (within the loop period), after any
+        beat already in flight, ignoring the interval, attention and back-off.
+        Several requests before it starts are one request. The caller returns
+        at once, so a page never blocks for the length of a beat.
+        Returns "requested", "asleep", "daily_cap" or "not_hosting".
+        """
+        if not self.hosting:
+            return "not_hosting"
+        if self.situation.phase == ASLEEP:
+            return "asleep"
+        if beats_today(self.situation, self.clock()) >= self.config.max_beats_per_day:
+            return "daily_cap"
+        self._step_requested = True
+        return "requested"
+
+    def _take_step_request(self, now: datetime) -> bool:
+        """Consume a pending request; True when the beat should run now."""
+        if not self._step_requested:
+            return False
+        self._step_requested = False
+        # She may have fallen asleep or reached the cap since it was asked for.
+        return (self.situation.phase == AWAKE
+                and beats_today(self.situation, now) < self.config.max_beats_per_day)
+
     def step_once(self) -> str:
         with self.lock:
             if not self.hosting or not self.pulse():
@@ -498,4 +530,5 @@ class JenbinaHost:
         return HeartStatus(
             self.hosting, self._holder, s.phase, s.phase_since, s.last_beat_at,
             next_beat_at(s, now, self.config), note, self._busy, self._stage,
+            self._step_requested,
         )
