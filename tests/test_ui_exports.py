@@ -18,10 +18,11 @@ class TestUiExports(unittest.TestCase):
         for name in (
             "inject_pixel_css", "run_single_iteration", "run_simulation_loop", "render_status_rail",
             "render_run_controls", "render_mind_card", "build_timeline", "render_timeline",
-            "handle_user_input", "ensure_outreach", "get_event_log",
+            "handle_user_input", "ensure_greeting", "get_event_log",
         ):
             self.assertTrue(hasattr(ui, name), name)
         self.assertFalse(hasattr(ui, "render_chat_interface"))
+        self.assertFalse(hasattr(ui, "ensure_outreach"))
 
     def test_chat_page_is_gone(self):
         self.assertFalse(any(p.name.endswith("Chat.py") for p in (ROOT / "core" / "pages").iterdir()))

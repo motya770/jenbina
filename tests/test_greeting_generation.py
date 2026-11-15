@@ -1,6 +1,6 @@
 """Tests for GPT-generated greeting functions."""
 
-import pytest
+import unittest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch, PropertyMock
 
@@ -297,130 +297,89 @@ class TestGenerateFirstGreeting:
         assert "curious" in prompt_text
 
 
-class TestCheckReturnGreetingIntegration:
-    """Tests for check_return_greeting in chat.py with llm parameter."""
+class TestCheckReturnGreetingIntegration(unittest.TestCase):
+    """Greeting visits belong to the partner's social model."""
 
-    @patch("core.ui.chat.st")
-    @patch("core.ui.chat._get_user_display_name", return_value="TestUser")
-    def test_no_llm_first_visit_returns_none(self, mock_name, mock_st):
-        """Without LLM, first visit (last_visit_time=None) returns None."""
+    NOW = datetime(2026, 11, 15, 12, 0)
+
+    def setUp(self):
+        from core.person.person import Person
         from core.ui.chat import check_return_greeting
 
-        mock_st.session_state = _FakeSessionState()
-        person = MagicMock()
-        person.last_visit_time = None
+        self.check = check_return_greeting
+        self.person = Person()
+        self.person.init_social_cognition()
+        self.model = self.person.social_cognition.get_or_create_model("TestUser")
+        self.st_patch = patch("core.ui.chat.st")
+        self.st = self.st_patch.start()
+        self.addCleanup(self.st_patch.stop)
+        self.st.session_state = _FakeSessionState()
 
-        result = check_return_greeting(person, llm=None)
-        assert result is None
+    def test_no_llm_first_visit_returns_none(self):
+        self.assertIsNone(self.check(self.person, None, "TestUser", now=self.NOW))
+        self.assertTrue(self.st.session_state.showed_return_greeting)
 
-    @patch("core.ui.chat.st")
-    @patch("core.ui.chat._get_user_display_name", return_value="TestUser")
-    def test_no_llm_returns_static_greeting(self, mock_name, mock_st):
-        """Without LLM, static greetings are returned (backward compat)."""
-        from core.ui.chat import check_return_greeting
+    def test_no_llm_returns_static_greeting(self):
+        self.model.last_visit_time = self.NOW - timedelta(hours=10)
+        self.assertEqual(self.check(self.person, None, "TestUser", now=self.NOW), "I missed you today...")
 
-        mock_st.session_state = _FakeSessionState()
-        person = MagicMock()
-        person.last_visit_time = datetime.now() - timedelta(hours=10)
+    def test_no_llm_static_greetings_cover_each_gap(self):
+        for hours, expected in (
+            (3, "You're back!"),
+            (48, "It's been a while..."),
+            (96, "I was worried you forgot about me... it's been 4 days."),
+        ):
+            with self.subTest(hours=hours):
+                self.st.session_state = _FakeSessionState()
+                self.model.last_visit_time = self.NOW - timedelta(hours=hours)
+                self.assertEqual(self.check(self.person, None, "TestUser", now=self.NOW), expected)
 
-        result = check_return_greeting(person, llm=None)
-        assert result == "I missed you today..."
-
-    @patch("core.ui.chat.st")
-    @patch("core.ui.chat._get_user_display_name", return_value="TestUser")
-    def test_no_llm_default_param(self, mock_name, mock_st):
-        """Calling without llm argument uses default None (backward compat)."""
-        from core.ui.chat import check_return_greeting
-
-        mock_st.session_state = _FakeSessionState()
-        person = MagicMock()
-        person.last_visit_time = datetime.now() - timedelta(hours=3)
-
-        result = check_return_greeting(person)
-        assert result == "You're back!"
-
-    @patch("core.ui.chat.st")
-    @patch("core.ui.chat._get_user_display_name", return_value="TestUser")
-    def test_with_llm_first_visit_calls_first_greeting(self, mock_name, mock_st):
-        """With LLM and first visit, generate_first_greeting is called."""
-        from core.ui.chat import check_return_greeting
-
-        mock_st.session_state = _FakeSessionState()
-        person = _make_mock_person()
-        person.last_visit_time = None
-
+    def test_with_llm_first_visit_calls_first_greeting(self):
         llm = _make_mock_llm("Welcome, newcomer!")
-        result = check_return_greeting(person, llm=llm)
-        assert result == "Welcome, newcomer!"
+        self.assertEqual(self.check(self.person, llm, "TestUser", now=self.NOW), "Welcome, newcomer!")
+        self.assertIn("TestUser", llm.invoke.call_args.args[0][1].content)
+        self.assertIn("first time", llm.invoke.call_args.args[0][1].content)
 
-    @patch("core.ui.chat.st")
-    @patch("core.ui.chat._get_user_display_name", return_value="TestUser")
-    def test_with_llm_return_visit_calls_return_greeting(self, mock_name, mock_st):
-        """With LLM and return visit, generate_return_greeting is called."""
-        from core.ui.chat import check_return_greeting
-
-        mock_st.session_state = _FakeSessionState()
-        person = _make_mock_person()
-        person.last_visit_time = datetime.now() - timedelta(hours=10)
-
+    def test_with_llm_return_visit_calls_return_greeting(self):
+        self.model.last_visit_time = self.NOW - timedelta(hours=10)
         llm = _make_mock_llm("Oh you're back! I was thinking about you.")
-        result = check_return_greeting(person, llm=llm)
-        assert result == "Oh you're back! I was thinking about you."
+        self.assertEqual(self.check(self.person, llm, "TestUser", now=self.NOW), "Oh you're back! I was thinking about you.")
+        self.assertIn("TestUser", llm.invoke.call_args.args[0][1].content)
+        self.assertIn("returning", llm.invoke.call_args.args[0][1].content)
 
-    @patch("core.ui.chat.st")
-    @patch("core.ui.chat._get_user_display_name", return_value="TestUser")
-    def test_recent_visit_returns_none(self, mock_name, mock_st):
-        """Visit less than 1 hour ago returns None even with LLM."""
-        from core.ui.chat import check_return_greeting
-
-        mock_st.session_state = _FakeSessionState()
-        person = MagicMock()
-        person.last_visit_time = datetime.now() - timedelta(minutes=30)
-
+    def test_recent_visit_returns_none(self):
+        self.model.last_visit_time = self.NOW - timedelta(minutes=30)
         llm = _make_mock_llm("Hello!")
-        result = check_return_greeting(person, llm=llm)
-        assert result is None
+        self.assertIsNone(self.check(self.person, llm, "TestUser", now=self.NOW))
+        llm.invoke.assert_not_called()
 
-    @patch("core.ui.chat.st")
-    @patch("core.ui.chat._get_user_display_name", return_value="TestUser")
-    def test_already_showed_greeting_returns_none(self, mock_name, mock_st):
-        """Returns None if greeting was already shown this session."""
-        from core.ui.chat import check_return_greeting
-
-        mock_st.session_state = _FakeSessionState({"showed_return_greeting": True})
-        person = MagicMock()
-        person.last_visit_time = datetime.now() - timedelta(hours=10)
-
+    def test_already_showed_greeting_returns_none(self):
+        self.st.session_state.showed_return_greeting = True
+        old_time = self.NOW - timedelta(hours=10)
+        self.model.last_visit_time = old_time
         llm = _make_mock_llm("Hello!")
-        result = check_return_greeting(person, llm=llm)
-        assert result is None
+        self.assertIsNone(self.check(self.person, llm, "TestUser", now=self.NOW))
+        self.assertEqual(self.model.last_visit_time, old_time)
+        llm.invoke.assert_not_called()
 
-    @patch("core.ui.chat.st")
-    @patch("core.ui.chat._get_user_display_name", return_value="TestUser")
-    def test_sets_showed_return_greeting_flag(self, mock_name, mock_st):
-        """The showed_return_greeting flag is set after generating a greeting."""
-        from core.ui.chat import check_return_greeting
+    def test_sets_showed_return_greeting_flag(self):
+        self.model.last_visit_time = self.NOW - timedelta(hours=10)
+        self.check(self.person, _make_mock_llm("Welcome back!"), "TestUser", now=self.NOW)
+        self.assertTrue(self.st.session_state.showed_return_greeting)
 
-        mock_st.session_state = _FakeSessionState()
-        person = _make_mock_person()
-        person.last_visit_time = datetime.now() - timedelta(hours=10)
+    def test_updates_last_visit_time(self):
+        self.model.last_visit_time = self.NOW - timedelta(hours=10)
+        self.check(self.person, _make_mock_llm("Hi!"), "TestUser", now=self.NOW)
+        self.assertEqual(self.model.last_visit_time, self.NOW)
 
-        llm = _make_mock_llm("Welcome back!")
-        check_return_greeting(person, llm=llm)
-        assert mock_st.session_state["showed_return_greeting"] is True
+    def test_last_visit_is_per_person(self):
+        self.check(self.person, None, "Ann", now=self.NOW)
+        self.assertEqual(self.person.social_cognition.get_or_create_model("Ann").last_visit_time, self.NOW)
+        self.assertIsNone(self.person.social_cognition.get_or_create_model("Bob").last_visit_time)
+        self.assertIsNone(self.person.last_visit_time)
 
-    @patch("core.ui.chat.st")
-    @patch("core.ui.chat._get_user_display_name", return_value="TestUser")
-    def test_updates_last_visit_time(self, mock_name, mock_st):
-        """The person's last_visit_time is updated to now."""
-        from core.ui.chat import check_return_greeting
-
-        mock_st.session_state = _FakeSessionState()
-        person = _make_mock_person()
-        old_time = datetime.now() - timedelta(hours=10)
-        person.last_visit_time = old_time
-
-        llm = _make_mock_llm("Hi!")
-        check_return_greeting(person, llm=llm)
-        # last_visit_time should have been updated to approximately now
-        assert person.last_visit_time != old_time
+    def test_time_defaults_to_now(self):
+        with patch("core.ui.chat.datetime") as clock:
+            clock.now.return_value = self.NOW
+            self.check(self.person, None, "TestUser")
+        self.assertEqual(self.model.last_visit_time, self.NOW)

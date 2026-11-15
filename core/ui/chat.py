@@ -10,6 +10,7 @@ from core.interaction.chat_handler import (
 )
 from core.emotions.emotion_analysis_chain import analyze_emotion_impact
 from core.auth.user_db import UserDatabase
+from core.heartbeat.host import ChatTurn
 from core.ui.shared_init import save_person_state
 from core.timeline import EventLog, record_mood
 from core.ui.pixel_theme import stage_pill_html
@@ -96,21 +97,21 @@ def send_proactive_message(person, llm):
         return None
 
 
-def check_return_greeting(person, llm=None):
+def check_return_greeting(person, llm, person_key: str, now: datetime | None = None) -> str | None:
     """Check how long since last visit and return an appropriate greeting, or None."""
     if st.session_state.get("showed_return_greeting"):
         return None
 
-    now = datetime.now()
-    last = person.last_visit_time
-    person.last_visit_time = now
-    display_name = _get_user_display_name()
+    now = now or datetime.now()
+    model = person.social_cognition.get_or_create_model(person_key)
+    last = model.last_visit_time
+    model.last_visit_time = now
 
     if last is None:
         # First-time user
         st.session_state.showed_return_greeting = True
         if llm is not None:
-            return generate_first_greeting(person, llm, display_name)
+            return generate_first_greeting(person, llm, person_key)
         return None
 
     gap = now - last
@@ -123,7 +124,7 @@ def check_return_greeting(person, llm=None):
 
     # Use LLM-generated greeting if available
     if llm is not None:
-        return generate_return_greeting(person, llm, gap_hours, display_name)
+        return generate_return_greeting(person, llm, gap_hours, person_key)
 
     # Fallback static greetings
     if gap_hours < 6:
@@ -168,38 +169,36 @@ def get_event_log() -> EventLog:
     return log
 
 
-def ensure_outreach(person, llm) -> None:
-    """Let Jenbina speak first when she should: the return greeting, and the
-    once-per-session proactive message. Both land in the conversation with
-    their own message types so the timeline can label them."""
-    display_name = _get_user_display_name()
-    greeting = check_return_greeting(person, llm)
-    if greeting:
-        person.send_message(display_name, greeting, "greeting")
+def ensure_greeting(host, user: dict, llm) -> None:
+    """Greet on an awake, available mind; retry on a later refresh otherwise."""
+    if st.session_state.get("showed_return_greeting"):
+        return
 
-    if not st.session_state.get("proactive_checked"):
-        st.session_state.proactive_checked = True
-        proactive_msg = send_proactive_message(person, llm)
-        if proactive_msg:
-            save_person_state()
+    with host.greeting_turn(user) as turn:
+        if turn is None:
+            return
+        greeting = check_return_greeting(host.person, llm, turn.person_key)
+        if greeting:
+            host.person.send_message(turn.person_key, greeting, "greeting")
 
 
-def handle_user_input(person, llm, memory_manager, debug_mode, user_input):
+def handle_user_input(person, llm, memory_manager, debug_mode, user_input, turn: ChatTurn):
     """Handle one submitted chat message and return the chat result, or
-    ``None`` when there is no input. The caller reads ``st.chat_input``."""
-    display_name = _get_user_display_name()
+    ``None`` when there is no input. The caller holds ``host.chat_turn``."""
+    person_key = turn.person_key
 
     if user_input:
         print("User input:", user_input)
         update_system_stage("listening…")
 
         # Store the user message in person's communication history
-        person.receive_message(display_name, user_input, "text")
+        person.receive_message(person_key, user_input, "text")
 
         # Store in SQLite
-        user_db, user_id = _get_user_db_and_id()
+        user_db, _ = _get_user_db_and_id()
+        user_id = turn.user_id
         if user_db and user_id:
-            user_db.store_message(user_id, display_name, user_input, "user_message")
+            user_db.store_message(user_id, _get_user_display_name(), user_input, "user_message")
 
         # Get conversation history for context (last 200 messages from SQLite)
         update_system_stage("remembering…")
@@ -212,26 +211,26 @@ def handle_user_input(person, llm, memory_manager, debug_mode, user_input):
             ])
 
         # Recent actions from the simulation history
-        recent_actions, _ = history_context(st.session_state.get("simulation_history", []))
+        recent_actions, _ = history_context(turn.history)
 
         # Handle chat interaction
         update_system_stage("replying…")
         chat_result = handle_chat_interaction(
             st=st,
             llm=llm,
-            needs_response=st.session_state.needs_response,
-            world_description=st.session_state.world_description,
-            action_decision=st.session_state.action_decision,
-            state_response=st.session_state.state_response,
+            needs_response=turn.last_responses.get("needs_response"),
+            world_description=turn.last_responses.get("world_description"),
+            action_decision=turn.last_responses.get("action_decision"),
+            state_response=turn.last_responses.get("state_response"),
             user_input=user_input,
-            person_state=person.get_current_state(),
+            person_state=person.get_current_state(partner=person_key),
             conversation_context=recent_context,
             memory_manager=memory_manager,
             debug_mode=debug_mode,
             emotional_state=person.emotion_system.get_emotional_state_summary(),
-            user_id=st.session_state.get("current_user", {}).get("id"),
+            user_id=user_id,
             person=person,
-            conversation_partner_name=display_name,
+            conversation_partner_name=person_key,
             recent_actions=recent_actions,
         )
 
@@ -239,7 +238,7 @@ def handle_user_input(person, llm, memory_manager, debug_mode, user_input):
 
         # Analyze emotion impact from the conversation
         if chat_result and "assistant_response" in chat_result:
-            person.send_message(display_name, chat_result["assistant_response"], "text")
+            person.send_message(person_key, chat_result["assistant_response"], "text")
 
             # Display context stats banner
             recent_count = chat_result.get("recent_messages_count", 0)
@@ -262,14 +261,14 @@ def handle_user_input(person, llm, memory_manager, debug_mode, user_input):
                 )
                 if emotion_adjustments:
                     person.emotion_system.apply_adjustments(emotion_adjustments)
-                    record_mood(get_event_log(), emotions_before, person.get_emotions_snapshot(), "chat")
+                    record_mood(turn.event_log, emotions_before, person.get_emotions_snapshot(), "chat")
             except Exception as e:
                 print(f"Emotion analysis after chat failed: {e}")
 
             # Satisfy social needs based on relationship closeness
             try:
                 if getattr(person, "social_cognition", None) is not None:
-                    model = person.social_cognition.get_or_create_model(display_name)
+                    model = person.social_cognition.get_or_create_model(person_key)
                     trust = model.relationship.trust
                     closeness = model.relationship.closeness
                     avg_factor = max(0.3, (trust + closeness) / 200)
