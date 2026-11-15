@@ -73,14 +73,15 @@ def owner_is_dead(owner: str) -> bool         # True only when the hostname matc
 class BeingStore:
     def __init__(self, db_path: str | None = None)        # default: UserDatabase().db_path
     def load_state(self) -> tuple[str, dict] | None       # (person_state_json, situation dict)
-    def save_state(self, person_state_json: str, situation: dict) -> None
+    def save_state(self, person_state_json: str, situation: dict, owner: str | None = None) -> bool
+    # with `owner`: written only while that owner holds the lease (same transaction); False when it does not
     def store_event(self, kind: str, title: str, detail: dict | None = None, created_at: datetime | None = None) -> int
     def get_events(self, limit: int = 200) -> list[dict]  # same row shape and order as UserDatabase.get_events
     def import_events(self, rows: list[dict]) -> int      # rows as returned by UserDatabase.get_events; keeps created_at
     def acquire_lease(self, owner: str, now: datetime, stale_after: timedelta) -> Lease
     def renew_lease(self, owner: str, now: datetime) -> bool   # False when another owner holds it
     def release_lease(self, owner: str) -> None
-    def person_key(self, user_id: int, display_name: str | None, email: str | None) -> str
+    def person_key(self, user_id: int, display_name: str | None) -> str
     def people(self) -> dict[int, str]                    # user_id -> person_key
 ```
 
@@ -97,7 +98,7 @@ being_people(user_id INTEGER PRIMARY KEY, person_key TEXT UNIQUE NOT NULL)
 
 Lease rule (`acquire_lease`, inside one `BEGIN IMMEDIATE` transaction): no row, or the row's owner is empty or is `owner`, or `now - renewed_at > stale_after`, or `owner_is_dead(row.owner)` → write `(owner, now)` and return `acquired=True`. Otherwise `acquired=False, holder=row.owner`. `previous_renewed_at` is the row's value before the write in every case. `release_lease` keeps the row and its `renewed_at` and sets the owner to `""`, so the next host still learns when the heart was last alive.
 
-Person key rule (`person_key`): a row for `user_id` wins and is returned unchanged whatever name is passed. Otherwise `base` is the stripped display name, else the email's local part, else `f"User {user_id}"`. Use `base` if no other user holds it; else `f"{base} ({email local part})"`; if that is also taken or there is no email, `f"{base} ({user_id})"`. Insert and return.
+Person key rule (`person_key`, revised by Task 4b): a row for `user_id` wins and is returned unchanged whatever name is passed; that lookup is a plain read with no write lock. Otherwise `base` is the stripped display name, else `f"User {user_id}"`. Use `base` if no other user holds it; else `f"{base} ({n})"` with the smallest `n >= 2` that is free. Nothing derived from an email address ever goes into a key, because keys are the names that cross between people's prompts.
 
 Titles: `make_sleep` → `"Fell asleep"`; `make_wake(slept, reason)` → `"Woken by a message after 3h 10m"` when `reason == "message"`, otherwise `"Woke after 7h 40m"`; `make_gap` → `"Was away for 3h 10m"`. `format_duration` gives `"7h 40m"`, `"40m"` under an hour, `"0m"` for zero or negative. Detail dicts carry `reason` and `seconds`. `EVENT_TAGS` gains `"sleep": "SLEEP"`, `"wake": "WAKE"`, `"gap": "GAP"`; `HER_DAY_KINDS` gains the three kinds.
 
@@ -150,19 +151,19 @@ class TestStateAndEvents(unittest.TestCase):
 
 class TestPeople(unittest.TestCase):
     def test_key_is_fixed_per_user_whatever_the_name_becomes(self):       # Review Focus 3
-        self.assertEqual(self.store.person_key(1, "Alex", "alex@a.com"), "Alex")
-        self.assertEqual(self.store.person_key(1, "Alexander", "alex@a.com"), "Alex")
-        self.assertEqual(self.store.person_key(1, None, None), "Alex")
+        self.assertEqual(self.store.person_key(1, "Alex"), "Alex")
+        self.assertEqual(self.store.person_key(1, "Alexander"), "Alex")
+        self.assertEqual(self.store.person_key(1, None), "Alex")
 
     def test_same_display_name_gets_a_distinct_key(self):
-        self.store.person_key(1, "Alex", "alex@a.com")
-        self.assertEqual(self.store.person_key(2, "Alex", "alex.b@b.com"), "Alex (alex.b)")
-        self.assertEqual(self.store.person_key(3, "Alex", None), "Alex (3)")
-        self.assertEqual(self.store.people(), {1: "Alex", 2: "Alex (alex.b)", 3: "Alex (3)"})
+        self.store.person_key(1, "Alex")
+        self.assertEqual(self.store.person_key(2, "Alex"), "Alex (2)")
+        self.assertEqual(self.store.person_key(3, "Alex"), "Alex (3)")
+        self.assertEqual(self.store.people(), {1: "Alex", 2: "Alex (2)", 3: "Alex (3)"})
 
-    def test_missing_name_falls_back_to_email_then_user_id(self):
-        self.assertEqual(self.store.person_key(4, "  ", "sam@x.org"), "sam")
-        self.assertEqual(self.store.person_key(5, None, None), "User 5")
+    def test_missing_name_falls_back_to_the_user_id(self):
+        self.assertEqual(self.store.person_key(4, "  "), "User 4")
+        self.assertEqual(self.store.person_key(5, None), "User 5")
 ```
 
 Add to `tests/test_timeline.py`: `format_duration(timedelta(minutes=40)) == "40m"`, `format_duration(timedelta(seconds=-5)) == "0m"`, `make_wake(timedelta(hours=3, minutes=10), "message").title == "Woken by a message after 3h 10m"`, `make_gap(timedelta(hours=3, minutes=10)).title == "Was away for 3h 10m"`, and `{"sleep", "wake", "gap"} <= set(KINDS)`.
@@ -259,14 +260,14 @@ Asleep:
 3. time since `last_sleep_tick_at` (or `phase_since`) ≥ `beat_interval` → `Step(SLEEP_TICK)`.
 4. else `Step(WAIT, "asleep")`.
 
-Awake:
-1. `sleep_enabled` and time since `awake_since` ≥ `max_awake` → `Step(FALL_ASLEEP, "exhausted")`.
-2. `beats_today(s, now) >= max_beats_per_day` → `Step(WAIT, "daily_cap")`.
-3. `last_chat_at` within `attention_window` → `Step(WAIT, "attention")`.
+Awake (order revised by Task 4b so forced sleep never interrupts a conversation):
+1. `last_chat_at` within `attention_window` → `Step(WAIT, "attention")`.
+2. `sleep_enabled` and time since `awake_since` ≥ `max_awake` → `Step(FALL_ASLEEP, "exhausted")`.
+3. `beats_today(s, now) >= max_beats_per_day` → `Step(WAIT, "daily_cap")`.
 4. `last_beat_at is None`, or time since it ≥ `effective_interval(cfg, s.consecutive_failures)` → `Step(BEAT)`.
 5. else `Step(WAIT, "backoff")` when `consecutive_failures >= failures_before_backoff`, otherwise `Step(WAIT, "interval")`.
 
-`effective_interval`: `beat_interval` below 3 failures; from 3 on, `min(max_backoff, beat_interval * 2 ** (failures - 2))` (3 failures → 30 min, 4 → 60 min, 5 → 60 min at the default interval).
+`effective_interval`: `beat_interval` below 3 failures; from 3 on, `max(beat_interval, min(max_backoff, beat_interval * 2 ** (failures - 2)))`, so back-off never beats more often than the configured interval (3 failures → 30 min, 4 → 60 min, 5 → 60 min at the default interval).
 
 `should_fall_asleep`: `cfg.sleep_enabled and action_key == "sleep" and (time_of_day == "night" or sleep_need < cfg.low_sleep_need)`.
 
@@ -543,6 +544,92 @@ def test_nobody_recent_means_nobody(self):
 
 ---
 
+### Task 4b: Fixes from the review of Tasks 1 to 3
+
+A review of the committed Tasks 1 to 3 found ten defects. This task fixes them; the text of Tasks 1, 2, 5 and 6 above already describes the corrected behaviour.
+
+**Files:**
+- Modify: `core/heartbeat/store.py`, `core/heartbeat/rhythm.py`, `core/connect.py`, `core/emotions/emotion_system.py`, `core/needs/maslow_needs.py`, `core/ui/shared_init.py:61-68`
+- Test: `tests/test_heartbeat_store.py`, `tests/test_heartbeat_rhythm.py`, `tests/test_connect.py`, `tests/test_emotions.py`, `tests/test_maslow_needs.py`, `tests/test_insight_system.py`
+
+**Interfaces:**
+- Produces (changed): `BeingStore.person_key(self, user_id: int, display_name: str | None) -> str`; `BeingStore.save_state(self, person_state_json: str, situation: dict, owner: str | None = None) -> bool`; `make_owner_id()` and `owner_is_dead()` as below.
+
+Fixes, one per finding:
+
+1. **Insight state wiped on session load** (`core/ui/shared_init.py`). Replace the `old_fi` / `init_insight_system` / flag lines with: rebuild on the plain LLM keeping all state, `InsightSystem.from_dict(person.insight_system.to_dict(), insight_llm)` when there is one, `init_insight_system(insight_llm)` when there is none.
+2. **A key exposed part of an email address.** `person_key` drops its `email` parameter and follows the rule now written in Task 1: display name, else `User {id}`; on collision `Name (2)`, `Name (3)`.
+3. **A process that lost the lease could still save.** `save_state(..., owner=...)` checks, inside one `BEGIN IMMEDIATE` transaction, that `being_lease.owner == owner` and writes only then; returns whether it wrote. Without `owner` it writes as before and returns `True`.
+4. **Same hostname, different PID namespace counted as dead.** The machine part of an owner id becomes `f"{socket.gethostname()}|{pid_namespace}"`, where `pid_namespace` is `os.readlink("/proc/self/ns/pid")` when that link exists and `""` otherwise. `owner_is_dead` returns `True` only when the whole machine part equals this process's and the pid is not running. Owner ids are still split with `rsplit(":", 2)`.
+5. **Back-off could shorten the interval.** `effective_interval` never returns less than `cfg.beat_interval`.
+6. **Unreadable situation crashed the start.** `load_state` returns `{}` for a `situation_json` that does not parse or is not an object; `Situation.from_dict` treats non-dict `data` as `{}`.
+7. **A bad `JENBINA_LLM_TIMEOUT_SECONDS` broke every import.** Parse it in a helper that returns `60.0` when the value is missing, empty, unparseable, not finite, or `<= 0`.
+8. **`person_key` took the write lock to read.** Look the user up with a plain `SELECT` first; open `BEGIN IMMEDIATE` only to insert, re-checking inside the transaction.
+9. **Forced sleep could interrupt a conversation.** In `decide`, the attention rule comes before the 20-hours-awake rule (order as now written in Task 2).
+10. **A clock stepping back moved decay stamps backwards.** `EmotionSystem.update_all` and `MaslowNeedsSystem.update_all_needs` never set their stamp (`last_update`, `last_comprehensive_update`) earlier than its current value. `Person.suspend_until` still sets the stamps directly.
+
+- [ ] **Step 1: Write the failing tests**
+
+```python
+# tests/test_heartbeat_store.py
+def test_save_is_refused_once_the_lease_is_lost(self):
+    self.store.acquire_lease("hostA|:1:aa", T0, STALE)
+    self.assertTrue(self.store.save_state('{"v": 1}', {}, owner="hostA|:1:aa"))
+    with patch("core.heartbeat.store.owner_is_dead", return_value=False):
+        self.store.acquire_lease("hostB|:2:bb", T0 + timedelta(seconds=121), STALE)
+    self.assertFalse(self.store.save_state('{"v": 2}', {}, owner="hostA|:1:aa"))
+    self.assertEqual(self.store.load_state()[0], '{"v": 1}')
+    self.assertTrue(self.store.save_state('{"v": 3}', {}))                 # unfenced callers (adoption, tests) still write
+def test_no_email_ever_reaches_a_key(self): ...                            # TestPeople cases as rewritten in Task 1
+def test_known_user_lookup_takes_no_write_lock(self):
+    self.store.person_key(1, "Alex")
+    blocker = sqlite3.connect(self.store.db_path); blocker.execute("BEGIN IMMEDIATE")
+    try: self.assertEqual(self.store.person_key(1, "Alex"), "Alex")       # would raise 'database is locked' if it wrote
+    finally: blocker.rollback(); blocker.close()
+def test_other_pid_namespace_is_never_assumed_dead(self):
+    with patch("core.heartbeat.store._pid_namespace", return_value="pid:[1]"):
+        mine = make_owner_id()
+    with patch("core.heartbeat.store._pid_namespace", return_value="pid:[2]"):
+        self.assertFalse(owner_is_dead(mine.rsplit(":", 2)[0] + ":999999999:aa"))
+def test_unreadable_situation_loads_as_empty(self):                        # write situation_json = "{broken" and "null" directly with sqlite3
+    self.assertEqual(self.store.load_state()[1], {})
+
+# tests/test_heartbeat_rhythm.py
+def test_backoff_never_beats_more_often_than_configured(self):
+    slow = RhythmConfig(beat_interval=timedelta(hours=2))
+    self.assertEqual(effective_interval(slow, 3), timedelta(hours=2)); self.assertEqual(effective_interval(slow, 9), timedelta(hours=2))
+def test_forced_sleep_waits_for_the_conversation_to_end(self):
+    s = awake(awake_since=NOON - timedelta(hours=20), last_chat_at=NOON - timedelta(minutes=1))
+    self.assertEqual(decide(s, NOON, CFG), Step(WAIT, "attention"))
+    s.last_chat_at = NOON - timedelta(minutes=3); self.assertEqual(decide(s, NOON, CFG), Step(FALL_ASLEEP, "exhausted"))
+def test_non_dict_situation_loads_fresh(self):
+    self.assertEqual(Situation.from_dict(None, NOON), Situation.fresh(NOON)); self.assertEqual(Situation.from_dict([], NOON), Situation.fresh(NOON))
+
+# tests/test_connect.py
+def test_bad_timeout_values_fall_back_to_sixty_seconds(self):
+    for bad in ("", "60s", "0", "-5", "nan", "inf"): self.assertEqual(timeout_from_env({"JENBINA_LLM_TIMEOUT_SECONDS": bad}), 60.0)
+    self.assertEqual(timeout_from_env({"JENBINA_LLM_TIMEOUT_SECONDS": "30"}), 30.0); self.assertEqual(timeout_from_env({}), 60.0)
+
+# tests/test_emotions.py and tests/test_maslow_needs.py
+def test_a_clock_stepping_back_does_not_move_the_stamp(self):
+    system.last_update = T; system.update_all(now=T - timedelta(hours=1)); self.assertEqual(system.last_update, T)
+    needs.last_comprehensive_update = T; needs.update_all_needs(now=T - timedelta(hours=1)); self.assertEqual(needs.last_comprehensive_update, T)
+
+# tests/test_insight_system.py
+def test_rebuilding_on_another_llm_keeps_every_persons_state(self):       # the shared_init rebuild: from_dict(old.to_dict(), new_llm)
+    rebuilt = InsightSystem.from_dict(s.to_dict(), other_llm)
+    self.assertIs(rebuilt.llm, other_llm); self.assertFalse(rebuilt.should_generate_first_impression({"x": 1}, person_key="Ann"))
+```
+
+(`timeout_from_env(env: Mapping[str, str] = os.environ) -> float` is the helper for fix 7; `_pid_namespace() -> str` the one for fix 4.) Update the Task 1 and Task 2 tests that pinned the old behaviour: the email-based keys, and any test that expected forced sleep ahead of attention.
+
+- [ ] **Step 2: Run** `$PY -m pytest tests/test_heartbeat_store.py tests/test_heartbeat_rhythm.py tests/test_connect.py tests/test_emotions.py tests/test_maslow_needs.py tests/test_insight_system.py -q`. Expected: the new tests FAIL.
+- [ ] **Step 3: Implement** the ten fixes.
+- [ ] **Step 4: Run** the full suite. Expected: PASS.
+- [ ] **Step 5: Commit** `fix: review findings in the being's storage, rhythm and state plumbing`.
+
+---
+
 ### Task 5: Building her, and moving the existing Jenbina
 
 **Files:**
@@ -574,7 +661,7 @@ def adopt_existing(store: BeingStore, user_db, llm, llm_json_mode, insight_llm, 
 
 `adopt_existing`, called only when `store.load_state()` is `None`:
 1. Read `user_db.list_person_states()` and choose. With nobody to adopt, return `build_person(None, ...)`, `Situation.fresh(now)` and an empty report.
-2. Build her from the chosen JSON. Register the chosen user first (`store.person_key(user_id, display_name, email)` from `user_db.get_user_by_id`), so they keep their plain display name.
+2. Build her from the chosen JSON. Register the chosen user first (`store.person_key(user_id, display_name)` from `user_db.get_user_by_id`), so they keep their plain display name.
 3. For the chosen user's key: move the legacy `person.last_visit_time` to that social model's `last_visit_time`, and the legacy `insight_system.legacy_first_impression_delivered` to that person's insight state.
 4. Copy the chosen user's life events: `store.import_events(user_db.get_events(user_id, limit=100000))`.
 5. For every other user with a readable state, parse the JSON (no `Person` needed) and, using that user's own display name `D` and their registered key `K`: copy `conversations[D]` into `person.conversations[K]` (with `outsider_name = K`), copy `social_cognition.models[D]` into `person.social_cognition.models[K]`, set that model's `last_visit_time` from their `last_visit_time`, and their insight first-impression flag from their `insight_system.first_impression_delivered`. Missing parts are skipped. Nothing of theirs is merged into any other key.
@@ -706,8 +793,8 @@ Behaviour:
 - **`chat_turn`**: takes the lock (blocking). If asleep, wake with reason `"message"` and `woken=True`. `last_chat_at = now`. Yields the `ChatTurn`. On exit: `last_chat_at = clock()`, `save()`, release.
 - **`greeting_turn`**: tries the lock without blocking. Lock busy, or she is asleep → yields `None` and changes nothing. Otherwise yields a `ChatTurn` and saves on exit.
 - **`step_once`**: under the lock (blocking): not hosting → `"not_hosting"`; asleep → `"asleep"`; `beats_today >= cap` → `"daily_cap"`; otherwise a beat right now, ignoring interval, attention and back-off, returning `"done"` or `"failed"`.
-- **`person_key`**: `store.person_key(user["id"], user.get("display_name"), user.get("email"))`.
-- **`save`**: under the lock, `store.save_state(person.serialize(), situation.to_dict())`.
+- **`person_key`**: `store.person_key(user["id"], user.get("display_name"))`, cached per user id in the host so page refreshes do not query the database.
+- **`save`**: under the lock, `store.save_state(person.serialize(), situation.to_dict(), owner=self.owner)`. A `False` result means another process has taken the lease: set `hosting = False`, log it, and write nothing more.
 - **`status`**: reads without the lock. `note` is `"daily_cap"` at the cap, `"backoff"` when `consecutive_failures >= failures_before_backoff`, else `""`.
 
 - [ ] **Step 1: Write the failing tests.** Fixture: temp db, `BeingStore`, `UserDatabase` with users Ann (id 1) and Bob (id 2), a mutable clock (`self.now`, starting `datetime(2026, 11, 15, 12, 0)`, `clock=lambda: self.now`), a fake `iteration_fn` returning a canned result dict (`action_decision={"chosen_action": "Read a book"}`, `fell_asleep=False`, and the other keys of the runner's result) and recording its calls in `self.calls`, `MagicMock()` LLMs, `meta_cognitive_system=MagicMock()`, `self.owner = "test:1:aa"`, `host.start(threads=False)`, then `host.person.suspend_until(self.now)` so her clocks start on the fake clock. Helpers:
@@ -1055,7 +1142,7 @@ In `tests/test_simulation_runner.py`, delete `TestUiRunnerEvents`, `test_ui_runn
 
 ## Decisions this plan makes inside the spec's "left to the builder"
 
-- Per-person keys live in a `being_people` table and are fixed at first sight; on a name collision the key is `Name (email local part)`, then `Name (user id)`.
+- Per-person keys live in a `being_people` table and are fixed at first sight; on a name collision the key is `Name (2)`, `Name (3)` and so on. No part of an email address is used.
 - The lease is renewed by its own pulse thread so a long beat cannot let it go stale, and a dead holder on the same machine is replaced at once.
 - A beat attempt counts toward the daily cap whether or not it succeeds.
 - After a message wakes her, going back to sleep within the hour records no event, and the eventual wake reports the length from the original start. The timeline therefore reads: fell asleep, woken by a message, woke after N hours.
