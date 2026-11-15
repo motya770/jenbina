@@ -22,19 +22,27 @@ class Lease:
     previous_renewed_at: datetime | None
 
 
+def _pid_namespace() -> str:
+    """Identify the local PID namespace where the platform exposes it."""
+    try:
+        return os.readlink("/proc/self/ns/pid")
+    except OSError:
+        return ""
+
+
 def make_owner_id() -> str:
     """Identify this host process and this particular attempt to host her."""
-    return f"{socket.gethostname()}:{os.getpid()}:{uuid4().hex[:8]}"
+    return f"{socket.gethostname()}|{_pid_namespace()}:{os.getpid()}:{uuid4().hex[:8]}"
 
 
 def owner_is_dead(owner: str) -> bool:
-    """Only a missing PID on this machine proves that an owner is dead."""
+    """Only a missing PID in this machine's namespace proves an owner is dead."""
     try:
-        hostname, pid_text, _ = owner.rsplit(":", 2)
+        machine, pid_text, _ = owner.rsplit(":", 2)
         pid = int(pid_text)
     except ValueError:
         return False
-    if hostname != socket.gethostname() or pid <= 0:
+    if machine != f"{socket.gethostname()}|{_pid_namespace()}" or pid <= 0:
         return False
     try:
         os.kill(pid, 0)
@@ -106,10 +114,22 @@ class BeingStore:
             ).fetchone()
         if row is None:
             return None
-        return row["person_state_json"], json.loads(row["situation_json"])
+        try:
+            situation = json.loads(row["situation_json"])
+        except (TypeError, ValueError):
+            situation = {}
+        if not isinstance(situation, dict):
+            situation = {}
+        return row["person_state_json"], situation
 
-    def save_state(self, person_state_json: str, situation: dict) -> None:
+    def save_state(self, person_state_json: str, situation: dict, owner: str | None = None) -> bool:
+        """Save only for the current lease holder when an owner is supplied."""
         with self._connection() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if owner is not None:
+                lease = conn.execute("SELECT owner FROM being_lease WHERE id = 1").fetchone()
+                if lease is None or lease["owner"] != owner:
+                    return False
             conn.execute(
                 """INSERT INTO being_state (id, person_state_json, situation_json, updated_at)
                    VALUES (1, ?, ?, ?)
@@ -119,6 +139,7 @@ class BeingStore:
                        updated_at = excluded.updated_at""",
                 (person_state_json, json.dumps(situation), datetime.now().isoformat()),
             )
+        return True
 
     def store_event(self, kind: str, title: str, detail: dict | None = None,
                     created_at: datetime | None = None) -> int:
@@ -198,26 +219,28 @@ class BeingStore:
         with self._connection() as conn:
             conn.execute("UPDATE being_lease SET owner = '' WHERE id = 1 AND owner = ?", (owner,))
 
-    def person_key(self, user_id: int, display_name: str | None, email: str | None) -> str:
+    def person_key(self, user_id: int, display_name: str | None) -> str:
         """An account's first key is permanent, even when its name changes."""
         with self._connection() as conn:
-            conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
                 "SELECT person_key FROM being_people WHERE user_id = ?", (user_id,)
             ).fetchone()
             if row is not None:
                 return row["person_key"]
-            local_part = (email or "").split("@", 1)[0].strip()
-            base = (display_name or "").strip() or local_part or f"User {user_id}"
+            conn.execute("BEGIN IMMEDIATE")
+            # Another connection may have registered this account after our read.
+            row = conn.execute(
+                "SELECT person_key FROM being_people WHERE user_id = ?", (user_id,)
+            ).fetchone()
+            if row is not None:
+                return row["person_key"]
+            base = (display_name or "").strip() or f"User {user_id}"
             used = {row["person_key"] for row in conn.execute("SELECT person_key FROM being_people")}
             key = base
-            if key in used:
-                key = f"{base} ({local_part})" if local_part else f"{base} ({user_id})"
-                if key in used:
-                    key = f"{base} ({user_id})"
-                # A literal display name can occupy even the account-id fallback.
-                while key in used:
-                    key += f" ({user_id})"
+            suffix = 2
+            while key in used:
+                key = f"{base} ({suffix})"
+                suffix += 1
             conn.execute("INSERT INTO being_people (user_id, person_key) VALUES (?, ?)", (user_id, key))
             return key
 

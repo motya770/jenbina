@@ -20,6 +20,20 @@ from core.needs.maslow_needs import (
 
 
 class TestNeedsClock(unittest.TestCase):
+    def test_a_clock_stepping_back_does_not_move_the_stamp(self):
+        needs = MaslowNeedsSystem()
+        now = datetime(2030, 1, 1, 12, 0)
+        needs.last_comprehensive_update = now
+        needs.needs["hunger"].satisfaction = 80.0
+        needs.update_all_needs(now=now - timedelta(hours=1))
+        self.assertEqual(needs.last_comprehensive_update, now)
+        self.assertEqual(needs.get_need_satisfaction("hunger"), 80.0)
+        needs.update_all_needs(now=now)
+        self.assertEqual(needs.get_need_satisfaction("hunger"), 80.0)
+        needs.update_all_needs(now=now + timedelta(hours=1))
+        self.assertEqual(needs.last_comprehensive_update, now + timedelta(hours=1))
+        self.assertAlmostEqual(needs.get_need_satisfaction("hunger"), 72.0, delta=1.7)
+
     def test_skipped_needs_do_not_decay_but_clocks_are_stamped(self):
         needs = MaslowNeedsSystem()
         needs.needs["sleep"].satisfaction = 50.0

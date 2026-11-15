@@ -173,6 +173,18 @@ class TestEmotionSystem(unittest.TestCase):
         # joy decay_rate=5, 1 hour: 65 - 5 = 60
         self.assertAlmostEqual(self.system.emotions["joy"].intensity, 60.0, delta=0.5)
 
+    def test_a_clock_stepping_back_does_not_move_the_stamp(self):
+        now = datetime(2030, 1, 1, 12, 0)
+        self.system.last_update = now
+        self.system.trigger_emotion("joy", 30)
+        self.system.update_all(now=now - timedelta(hours=1))
+        self.assertEqual(self.system.last_update, now)
+        self.assertEqual(self.system.emotions["joy"].intensity, 65.0)
+        self.system.update_all(now=now)
+        self.assertEqual(self.system.emotions["joy"].intensity, 65.0)
+        self.system.update_all(now=now + timedelta(hours=1))
+        self.assertEqual(self.system.emotions["joy"].intensity, 60.0)
+
     def test_serialization_roundtrip(self):
         """to_dict -> from_dict should preserve state"""
         self.system.trigger_emotion("anger", 25)

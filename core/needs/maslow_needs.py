@@ -234,7 +234,7 @@ class MaslowNeedsSystem:
             else:
                 need.last_updated = now
         
-        self.last_comprehensive_update = now
+        self.last_comprehensive_update = max(self.last_comprehensive_update, now)
         self._update_growth_stage()
     
     def _update_growth_stage(self):

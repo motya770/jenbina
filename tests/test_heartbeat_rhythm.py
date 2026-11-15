@@ -88,6 +88,15 @@ class TestAwake(unittest.TestCase):
         situation.consecutive_failures = 0
         self.assertEqual(decide(situation, NOON, CFG), Step(BEAT))
 
+    def test_backoff_never_beats_more_often_than_configured(self):
+        slow = RhythmConfig(beat_interval=timedelta(hours=2))
+        for failures in (3, 9):
+            with self.subTest(failures=failures):
+                self.assertEqual(effective_interval(slow, failures), timedelta(hours=2))
+                situation = awake(last_beat_at=NOON - timedelta(hours=1), consecutive_failures=failures)
+                self.assertEqual(decide(situation, NOON, slow), Step(WAIT, "backoff"))
+                self.assertEqual(next_beat_at(situation, NOON, slow), NOON + timedelta(hours=1))
+
     def test_twenty_hours_awake_forces_sleep(self):
         situation = awake(awake_since=NOON - timedelta(hours=20) + timedelta(seconds=1))
         self.assertEqual(decide(situation, NOON, CFG), Step(BEAT))
@@ -95,19 +104,27 @@ class TestAwake(unittest.TestCase):
         self.assertEqual(decide(situation, NOON, CFG), Step(FALL_ASLEEP, "exhausted"))
         self.assertEqual(decide(situation, NOON, RhythmConfig(sleep_enabled=False)), Step(BEAT))
 
-    def test_exhaustion_precedes_the_cap_and_the_cap_precedes_attention(self):
+    def test_attention_precedes_exhaustion_and_exhaustion_precedes_the_cap(self):
         situation = awake(
             awake_since=NOON - timedelta(hours=20),
             beats_day="2026-11-15",
             beats_count=80,
             last_chat_at=NOON,
         )
+        self.assertEqual(decide(situation, NOON, CFG), Step(WAIT, "attention"))
+        situation.last_chat_at = NOON - timedelta(minutes=3)
         self.assertEqual(decide(situation, NOON, CFG), Step(FALL_ASLEEP, "exhausted"))
         situation.awake_since = NOON
         self.assertEqual(decide(situation, NOON, CFG), Step(WAIT, "daily_cap"))
-        situation.beats_count = 79
-        self.assertEqual(beats_today(situation, NOON), 79)
+
+    def test_forced_sleep_waits_for_the_conversation_to_end(self):
+        situation = awake(
+            awake_since=NOON - timedelta(hours=20),
+            last_chat_at=NOON - timedelta(minutes=1),
+        )
         self.assertEqual(decide(situation, NOON, CFG), Step(WAIT, "attention"))
+        situation.last_chat_at = NOON - timedelta(minutes=3)
+        self.assertEqual(decide(situation, NOON, CFG), Step(FALL_ASLEEP, "exhausted"))
 
     def test_clock_moving_backwards_neither_crashes_nor_beats(self):
         future = NOON + timedelta(hours=1)
@@ -224,6 +241,11 @@ class TestRules(unittest.TestCase):
 
 
 class TestSituation(unittest.TestCase):
+    def test_non_dict_situation_loads_fresh(self):
+        for data in (None, [], ["phase"], "awake", 42):
+            with self.subTest(data=data):
+                self.assertEqual(Situation.from_dict(data, NOON), Situation.fresh(NOON))
+
     def test_fresh_starts_awake_at_home_with_independent_history(self):
         situation = Situation.fresh(NOON)
         self.assertEqual((situation.phase, situation.phase_since, situation.awake_since, situation.location),

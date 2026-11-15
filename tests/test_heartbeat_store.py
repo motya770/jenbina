@@ -48,10 +48,11 @@ class TestLease(StoreTestCase):
         self.assertFalse(self.store.renew_lease("hostA:1:aa", T0 + timedelta(seconds=122)))
 
     def test_dead_holder_on_this_machine_is_taken_over_at_once(self):
-        dead_owner = f"{socket.gethostname()}:999999999:aa"
+        machine = make_owner_id().rsplit(":", 2)[0]
+        dead_owner = f"{machine}:999999999:aa"
         self.store.acquire_lease(dead_owner, T0, STALE)
         self.assertTrue(owner_is_dead(dead_owner))
-        self.assertFalse(owner_is_dead(f"{socket.gethostname()}:{os.getpid()}:bb"))
+        self.assertFalse(owner_is_dead(f"{machine}:{os.getpid()}:bb"))
         self.assertFalse(owner_is_dead("some-other-host:999999999:cc"))
         owner = make_owner_id()
         lease = self.store.acquire_lease(owner, T0 + timedelta(seconds=1), STALE)
@@ -94,14 +95,33 @@ class TestLease(StoreTestCase):
 
 class TestOwnerIdentity(unittest.TestCase):
     def test_owner_id_contains_local_host_pid_and_unique_nonce(self):
-        prefix = f"{socket.gethostname()}:{os.getpid()}:"
-        first, second = make_owner_id(), make_owner_id()
+        with patch("core.heartbeat.store._pid_namespace", return_value="pid:[123]"):
+            first, second = make_owner_id(), make_owner_id()
+        prefix = f"{socket.gethostname()}|pid:[123]:{os.getpid()}:"
         self.assertRegex(first, re.escape(prefix) + r"[0-9a-f]{8}$")
         self.assertNotEqual(first, second)
 
     def test_permission_error_means_the_owner_is_alive(self):
+        machine = make_owner_id().rsplit(":", 2)[0]
         with patch("core.heartbeat.store.os.kill", side_effect=PermissionError):
-            self.assertFalse(owner_is_dead(f"{socket.gethostname()}:123:aa"))
+            self.assertFalse(owner_is_dead(f"{machine}:123:aa"))
+
+    def test_other_pid_namespace_is_never_assumed_dead(self):
+        with patch("core.heartbeat.store._pid_namespace", return_value="pid:[1]"):
+            mine = make_owner_id()
+        with patch("core.heartbeat.store._pid_namespace", return_value="pid:[2]"), \
+                patch("core.heartbeat.store.os.kill", side_effect=ProcessLookupError) as kill:
+            self.assertFalse(owner_is_dead(mine.rsplit(":", 2)[0] + ":999999999:aa"))
+        kill.assert_not_called()
+
+    def test_pid_namespace_reads_the_link_and_defaults_when_unavailable(self):
+        from core.heartbeat.store import _pid_namespace
+
+        with patch("core.heartbeat.store.os.readlink", return_value="pid:[123]") as readlink:
+            self.assertEqual(_pid_namespace(), "pid:[123]")
+        readlink.assert_called_once_with("/proc/self/ns/pid")
+        with patch("core.heartbeat.store.os.readlink", side_effect=FileNotFoundError):
+            self.assertEqual(_pid_namespace(), "")
 
     def test_unknown_and_malformed_owners_are_not_assumed_dead(self):
         with patch("core.heartbeat.store.os.kill") as kill:
@@ -113,6 +133,34 @@ class TestOwnerIdentity(unittest.TestCase):
 
 
 class TestStateAndEvents(StoreTestCase):
+    def test_save_is_refused_once_the_lease_is_lost(self):
+        self.store.acquire_lease("hostA|:1:aa", T0, STALE)
+        self.assertTrue(self.store.save_state('{"v": 1}', {}, owner="hostA|:1:aa"))
+        with patch("core.heartbeat.store.owner_is_dead", return_value=False):
+            lease = self.store.acquire_lease("hostB|:2:bb", T0 + timedelta(seconds=121), STALE)
+        self.assertTrue(lease.acquired)
+        self.assertFalse(self.store.save_state('{"v": 2}', {"phase": "asleep"}, owner="hostA|:1:aa"))
+        self.assertEqual(self.store.load_state(), ('{"v": 1}', {}))
+        self.assertTrue(self.store.save_state('{"v": 3}', {}))
+        self.assertEqual(self.store.load_state()[0], '{"v": 3}')
+
+    def test_owned_save_requires_an_existing_active_lease(self):
+        self.assertFalse(self.store.save_state("{}", {}, owner="hostA|:1:aa"))
+        self.assertIsNone(self.store.load_state())
+        self.store.acquire_lease("hostA|:1:aa", T0, STALE)
+        self.store.release_lease("hostA|:1:aa")
+        self.assertFalse(self.store.save_state("{}", {}, owner="hostA|:1:aa"))
+        self.assertIsNone(self.store.load_state())
+
+    def test_unreadable_situation_loads_as_empty(self):
+        person_json = '{"name": "Jenbina"}'
+        self.store.save_state(person_json, {})
+        for situation_json in ("{broken", "null", "[]", '"awake"', "42"):
+            with self.subTest(situation_json=situation_json):
+                with sqlite3.connect(self.db_path) as conn:
+                    conn.execute("UPDATE being_state SET situation_json = ? WHERE id = 1", (situation_json,))
+                self.assertEqual(self.store.load_state(), (person_json, {}))
+
     def test_state_round_trip_and_none_when_empty(self):
         self.assertIsNone(self.store.load_state())
         person_json = '{"name": "Jenbina"}'
@@ -182,7 +230,7 @@ class TestStateAndEvents(StoreTestCase):
             [{k: v for k, v in row.items() if k != "id"} for row in source],
         )
         self.store.save_state("{}", {"phase": "awake"})
-        self.store.person_key(uid, "Alex", "alex@example.com")
+        self.store.person_key(uid, "Alex")
         self.store.acquire_lease("hostA:1:aa", T0, STALE)
         with sqlite3.connect(self.db_path) as conn:
             self.assertEqual(conn.execute("SELECT * FROM user_state").fetchall(), original_state)
@@ -221,33 +269,50 @@ class TestStateAndEvents(StoreTestCase):
 
 class TestPeople(StoreTestCase):
     def test_key_is_fixed_per_user_whatever_the_name_becomes(self):
-        self.assertEqual(self.store.person_key(1, "Alex", "alex@a.com"), "Alex")
-        self.assertEqual(self.store.person_key(1, "Alexander", "alex@a.com"), "Alex")
-        self.assertEqual(self.store.person_key(1, None, None), "Alex")
+        self.assertEqual(self.store.person_key(1, "Alex"), "Alex")
+        self.assertEqual(self.store.person_key(1, "Alexander"), "Alex")
+        self.assertEqual(self.store.person_key(1, None), "Alex")
         self.assertEqual(BeingStore(self.db_path).people(), {1: "Alex"})
 
     def test_same_display_name_gets_a_distinct_key(self):
-        self.assertEqual(self.store.person_key(1, "Alex", "alex@a.com"), "Alex")
-        self.assertEqual(self.store.person_key(2, "Alex", "alex.b@b.com"), "Alex (alex.b)")
-        self.assertEqual(self.store.person_key(3, "Alex", None), "Alex (3)")
-        self.assertEqual(self.store.people(), {1: "Alex", 2: "Alex (alex.b)", 3: "Alex (3)"})
+        self.assertEqual(self.store.person_key(1, "Alex"), "Alex")
+        self.assertEqual(self.store.person_key(2, "Alex"), "Alex (2)")
+        self.assertEqual(self.store.person_key(3, "Alex"), "Alex (3)")
+        self.assertEqual(self.store.people(), {1: "Alex", 2: "Alex (2)", 3: "Alex (3)"})
 
-    def test_missing_name_falls_back_to_email_then_user_id(self):
-        self.assertEqual(self.store.person_key(4, "  ", "sam@x.org"), "sam")
-        self.assertEqual(self.store.person_key(5, None, None), "User 5")
-        self.assertEqual(self.store.person_key(6, "  Taylor  ", None), "Taylor")
+    def test_missing_name_falls_back_to_the_user_id(self):
+        self.assertEqual(self.store.person_key(4, "  "), "User 4")
+        self.assertEqual(self.store.person_key(5, None), "User 5")
+        self.assertEqual(self.store.person_key(6, "  Taylor  "), "Taylor")
 
-    def test_email_collision_falls_back_to_user_id(self):
-        self.store.person_key(1, "Alex", None)
-        self.assertEqual(self.store.person_key(2, "Alex", "sam@a.com"), "Alex (sam)")
-        self.assertEqual(self.store.person_key(3, "Alex", "sam@b.com"), "Alex (3)")
+    def test_no_email_ever_reaches_a_key(self):
+        accounts = [
+            {"id": 1, "display_name": "Alex", "email": "private.one@example.com"},
+            {"id": 2, "display_name": "Alex", "email": "private.two@example.com"},
+            {"id": 3, "display_name": None, "email": "private.three@example.com"},
+        ]
+        keys = [self.store.person_key(user["id"], user["display_name"]) for user in accounts]
+        self.assertEqual(keys, ["Alex", "Alex (2)", "User 3"])
+        for user in accounts:
+            self.assertNotIn(user["email"].split("@")[0], " ".join(keys))
+
+    def test_known_user_lookup_takes_no_write_lock(self):
+        self.store.person_key(1, "Alex")
+        blocker = sqlite3.connect(self.db_path)
+        blocker.execute("BEGIN IMMEDIATE")
+        try:
+            self.assertEqual(self.store.person_key(1, "Alexander"), "Alex")
+        finally:
+            blocker.rollback()
+            blocker.close()
 
     def test_literal_names_cannot_take_another_accounts_key(self):
-        self.store.person_key(1, "Alex", None)
-        self.store.person_key(2, "Alex (3)", None)
-        self.store.person_key(4, "Alex (3) (3)", None)
-        self.assertEqual(self.store.person_key(3, "Alex", None), "Alex (3) (3) (3)")
-        self.assertEqual(len(set(self.store.people().values())), 4)
+        self.store.person_key(1, "Alex")
+        self.store.person_key(2, "Alex (2)")
+        self.store.person_key(4, "Alex (4)")
+        self.assertEqual(self.store.person_key(3, "Alex"), "Alex (3)")
+        self.assertEqual(self.store.person_key(5, "Alex"), "Alex (5)")
+        self.assertEqual(len(set(self.store.people().values())), 5)
 
 
 if __name__ == "__main__":

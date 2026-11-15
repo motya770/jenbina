@@ -98,6 +98,29 @@ class TestGetJsonLlm(unittest.TestCase):
 
 
 class TestLlmTimeoutConfiguration(unittest.TestCase):
+    def test_bad_timeout_values_fall_back_to_sixty_seconds(self):
+        from core.connect import timeout_from_env
+
+        for bad in ("", "60s", "0", "-5", "nan", "inf", "-inf"):
+            with self.subTest(value=bad):
+                self.assertEqual(timeout_from_env({"JENBINA_LLM_TIMEOUT_SECONDS": bad}), 60.0)
+        self.assertEqual(timeout_from_env({"JENBINA_LLM_TIMEOUT_SECONDS": "30"}), 30.0)
+        self.assertEqual(timeout_from_env({}), 60.0)
+        with patch.dict(os.environ, {"JENBINA_LLM_TIMEOUT_SECONDS": "12.5"}):
+            self.assertEqual(timeout_from_env(), 12.5)
+
+    def test_bad_environment_timeout_does_not_break_module_loading(self):
+        import core.connect as connect
+
+        try:
+            for bad in ("", "60s", "0", "-5", "nan", "inf"):
+                with self.subTest(value=bad), \
+                        patch.dict(os.environ, {"JENBINA_LLM_TIMEOUT_SECONDS": bad}):
+                    importlib.reload(connect)
+                    self.assertEqual(connect.LLM_TIMEOUT_SECONDS, 60.0)
+        finally:
+            importlib.reload(connect)
+
     def test_environment_timeout_reaches_every_provider_and_factory(self):
         import core.connect as connect
         try:

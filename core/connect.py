@@ -1,11 +1,23 @@
 import os
-from typing import Literal
+import math
+from typing import Literal, Mapping
 from langchain_openai import ChatOpenAI
 
 
 
 LLMProvider = Literal["openai", "openai-advanced"]
-LLM_TIMEOUT_SECONDS: float = float(os.getenv("JENBINA_LLM_TIMEOUT_SECONDS", "60.0"))
+
+
+def timeout_from_env(env: Mapping[str, str] = os.environ) -> float:
+    """Use a finite positive timeout, falling back to sixty seconds."""
+    try:
+        timeout = float(env.get("JENBINA_LLM_TIMEOUT_SECONDS", "60.0"))
+    except (TypeError, ValueError):
+        return 60.0
+    return timeout if math.isfinite(timeout) and timeout > 0 else 60.0
+
+
+LLM_TIMEOUT_SECONDS: float = timeout_from_env()
 
 def get_llm(provider: LLMProvider = "openai", temperature: float = 1, max_tokens: int = None):
     """

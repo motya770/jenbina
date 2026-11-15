@@ -96,6 +96,8 @@ class Situation:
     def from_dict(cls, data: dict, now: datetime) -> Situation:
         """Restore valid fields independently; old or malformed fields default."""
         situation = cls.fresh(now)
+        if not isinstance(data, dict):
+            data = {}
         for name in _DATETIME_FIELDS:
             try:
                 value = datetime.fromisoformat(data.get(name))
@@ -146,7 +148,7 @@ def effective_interval(cfg: RhythmConfig, failures: int) -> timedelta:
     for _ in range(failures - cfg.failures_before_backoff + 1):
         # Stop at the cap before doubling can overflow on a long failure streak.
         if interval >= cfg.max_backoff / 2:
-            return cfg.max_backoff
+            return max(cfg.beat_interval, cfg.max_backoff)
         interval *= 2
     return interval
 
@@ -175,12 +177,12 @@ def decide(s: Situation, now: datetime, cfg: RhythmConfig) -> Step:
             return Step(SLEEP_TICK)
         return Step(WAIT, "asleep")
 
+    if s.last_chat_at is not None and _elapsed(now, s.last_chat_at) < cfg.attention_window:
+        return Step(WAIT, "attention")
     if cfg.sleep_enabled and _elapsed(now, s.awake_since) >= cfg.max_awake:
         return Step(FALL_ASLEEP, "exhausted")
     if beats_today(s, now) >= cfg.max_beats_per_day:
         return Step(WAIT, "daily_cap")
-    if s.last_chat_at is not None and _elapsed(now, s.last_chat_at) < cfg.attention_window:
-        return Step(WAIT, "attention")
     if s.last_beat_at is None or _elapsed(now, s.last_beat_at) >= effective_interval(cfg, s.consecutive_failures):
         return Step(BEAT)
     return Step(WAIT, "backoff" if s.consecutive_failures >= cfg.failures_before_backoff else "interval")

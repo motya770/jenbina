@@ -67,7 +67,7 @@ class EmotionSystem:
         if hours_passed > 0:
             for emotion in self.emotions.values():
                 emotion.update(hours_passed)
-        self.last_update = now
+        self.last_update = max(self.last_update, now)
 
     def trigger_emotion(self, name: str, amount: float):
         """Spike a specific emotion by amount (positive or negative)."""
