@@ -251,6 +251,20 @@ class TestHeadlessParity(HeadlessFixture):
         # Her thoughts are shown to every account, so nobody is named in what feeds them.
         self.assertNotIn("Ann", world_context)
 
+    def test_parallel_llm_waits_are_announced_to_the_host(self):
+        from contextlib import contextmanager
+        entered = []
+
+        @contextmanager
+        def waiting():
+            entered.append("in")
+            yield
+            entered.append("out")
+
+        self.context["waiting"] = waiting
+        self.run_iteration()
+        self.assertEqual(entered, ["in", "out", "in", "out"])     # perception, then checks
+
     def test_status_sink_gets_five_stages_and_may_fail(self):
         sink = MagicMock()
         self.context["status"] = sink
