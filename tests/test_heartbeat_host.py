@@ -584,6 +584,137 @@ class TestLostTime(HostCase):
         self.assertEqual(self.host.person.maslow_needs.get_need_satisfaction("hunger"), 80.0)
 
 
+class TestTalkingDuringAMoment(HostCase):
+    """A beat is mostly waiting on LLMs. A message must not wait for all of it."""
+
+    def in_another_thread(self, work):
+        result = []
+        thread = threading.Thread(target=lambda: result.append(work()))
+        thread.start()
+        thread.join()
+        return result[0]
+
+    def try_the_lock(self):
+        def attempt():
+            got = self.host.lock.acquire(blocking=False)
+            if got:
+                self.host.lock.release()
+            return got
+        return self.in_another_thread(attempt)
+
+    def test_the_mind_is_free_while_the_beat_waits_for_an_llm(self):
+        seen = {}
+
+        def during_the_beat(**kwargs):
+            seen["before"] = self.try_the_lock()
+            self.host._llm_wait.on_chat_model_start({}, [])
+            seen["waiting"] = self.try_the_lock()
+            self.host._llm_wait.on_llm_end(None)
+            seen["after"] = self.try_the_lock()
+            return self.iteration(**kwargs)
+
+        self.host.iteration_fn = during_the_beat
+        self.assertEqual(self.host.tick(), Step(BEAT))
+        self.assertEqual(seen, {"before": False, "waiting": True, "after": False})
+        self.assertTrue(self.try_the_lock())
+
+    def test_a_message_is_answered_in_the_middle_of_a_beat(self):
+        def chat():
+            with self.host.chat_turn(ANN) as turn:
+                self.host.person.receive_message(turn.person_key, "are you there?")
+                self.host.person.send_message(turn.person_key, "yes")
+            return True
+
+        def during_the_beat(**kwargs):
+            with kwargs["context"]["waiting"]():              # her parallel LLM calls
+                self.assertTrue(self.in_another_thread(chat))
+            return self.iteration(**kwargs)
+
+        self.host.iteration_fn = during_the_beat
+        self.assertEqual(self.host.tick(), Step(BEAT))
+        messages = [m.content for m in self.host.person.conversations["Ann"].messages]
+        self.assertEqual(messages, ["are you there?", "yes"])
+        self.assertEqual(self.host.situation.beats_count, 1)
+        self.assertEqual(self.host.situation.last_chat_at, self.now)
+        again = self.make_host()
+        self.host.stop()
+        self.assertTrue(again.start(threads=False))
+        self.assertEqual(len(again.person.conversations["Ann"].messages), 2)     # the beat's save kept the chat
+
+    def test_a_second_beat_cannot_start_inside_the_first(self):
+        results = []
+
+        def during_the_beat(**kwargs):
+            with kwargs["context"]["waiting"]():
+                results.append(self.in_another_thread(self.host.step_once))
+            return self.iteration(**kwargs)
+
+        self.host.iteration_fn = during_the_beat
+        self.host.tick()
+        self.assertEqual(results, ["busy"])
+        self.assertEqual(len(self.calls), 1)
+
+    def test_only_the_beat_thread_lets_go(self):
+        # A chat turn that calls the same LLM keeps her mind for the whole turn.
+        with self.host.chat_turn(ANN):
+            self.host._llm_wait.on_chat_model_start({}, [])
+            self.assertFalse(self.try_the_lock())
+            self.host._llm_wait.on_llm_end(None)
+        self.assertTrue(self.try_the_lock())
+
+    def test_the_lock_is_taken_back_after_an_llm_error_or_a_missing_end(self):
+        def llm_fails(**kwargs):
+            self.host._llm_wait.on_llm_start({}, [])
+            self.host._llm_wait.on_llm_error(RuntimeError("timeout"))
+            self.assertFalse(self.try_the_lock())
+            self.host._llm_wait.on_chat_model_start({}, [])       # and this one never reports back
+            raise RuntimeError("fake beat failed")
+
+        self.host.iteration_fn = llm_fails
+        self.assertEqual(self.host.tick(), Step(BEAT))
+        self.assertEqual(self.host.situation.consecutive_failures, 1)
+        self.assertTrue(self.try_the_lock())                      # released exactly once by tick
+        self.assertIsNone(self.host._beat_thread)
+        self.advance(minutes=15)
+        self.host.iteration_fn = self.iteration
+        self.assertEqual(self.host.tick(), Step(BEAT))
+
+    def test_a_real_langchain_model_frees_her_mind_while_it_generates(self):
+        # The wiring itself, with a real LangChain chat model (no network).
+        from typing import ClassVar
+        from langchain_core.language_models.fake_chat_models import FakeListChatModel
+
+        case = self
+
+        class Probe(FakeListChatModel):
+            seen: ClassVar[list] = []
+
+            def _generate(self, *args, **kwargs):
+                Probe.seen.append(case.try_the_lock())
+                return super()._generate(*args, **kwargs)
+
+        model = Probe(responses=["a thought", "a reply"])
+        self.host.stop()
+        host = self.make_host(owner="test:1:bb")
+        host.llm_json_mode = model
+        host._watch(model)
+        self.assertTrue(host.start(threads=False))
+        self.host = host
+        self.assertIn(host._llm_wait, model.callbacks)
+
+        def during_the_beat(**kwargs):
+            self.assertEqual(model.invoke("what now?").content, "a thought")
+            return self.iteration(**kwargs)
+
+        host.iteration_fn = during_the_beat
+        self.assertEqual(host.tick(), Step(BEAT))
+        self.assertEqual(Probe.seen, [True])                      # free during the beat's call
+
+        with host.chat_turn(ANN):
+            self.assertEqual(model.invoke("hello").content, "a reply")
+        self.assertEqual(Probe.seen, [True, False])               # kept during a chat turn's call
+
+
 class TestTurnsAndStepOnce(HostCase):
     def test_chat_holds_her_attention_until_three_minutes_after_the_turn(self):
         self.host.tick()
@@ -648,6 +779,38 @@ class TestTurnsAndStepOnce(HostCase):
         self.assertIsNone(self.host.status().next_beat_at)
         self.put_to_sleep(self.now)
         self.assertEqual(self.host.step_once(), "asleep")
+
+    def test_a_requested_step_runs_on_the_next_pass_without_blocking_the_asker(self):
+        self.host.tick()
+        self.assertEqual(len(self.calls), 1)
+        self.advance(minutes=1)
+        with self.host.chat_turn(ANN):
+            pass                                              # attention window is open
+        self.assertEqual(self.host.request_step(), "requested")
+        self.assertEqual(len(self.calls), 1)                  # asking does not beat
+        self.assertTrue(self.host.status().step_requested)
+        self.assertEqual(self.host.request_step(), "requested")   # asked twice, one moment
+        self.assertEqual(self.host.tick(), Step(BEAT, "requested"))
+        self.assertEqual(len(self.calls), 2)
+        self.assertFalse(self.host.status().step_requested)
+        self.assertEqual(self.host.situation.beats_count, 2)  # counts toward the daily cap
+        self.assertEqual(self.host.tick().kind, WAIT)
+
+    def test_a_step_cannot_be_requested_asleep_or_at_the_cap(self):
+        self.host.situation.beats_day = self.now.date().isoformat()
+        self.host.situation.beats_count = 80
+        self.assertEqual(self.host.request_step(), "daily_cap")
+        self.host.situation.beats_count = 0
+        self.assertEqual(self.host.request_step(), "requested")
+        calls = len(self.calls)
+        with self.host.lock:                                  # she fell asleep before the heart got to it
+            self.host._fall_asleep(self.now, "chose")
+        self.host.tick()
+        self.assertEqual(len(self.calls), calls)
+        self.assertFalse(self.host.status().step_requested)
+        self.assertEqual(self.host.request_step(), "asleep")
+        self.host.stop()
+        self.assertEqual(self.host.request_step(), "not_hosting")
 
     def test_step_once_reports_a_failure_and_counts_the_attempt(self):
         self.fail_next(1)

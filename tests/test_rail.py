@@ -132,6 +132,21 @@ class TestHeartbeatAndMind(unittest.TestCase):
         self.assertIn("Nothing known yet.", written)
 
 
+class TestRequestedStep(unittest.TestCase):
+    def test_a_requested_moment_is_shown_and_cannot_be_asked_for_twice(self):
+        from datetime import datetime, timedelta
+        from core.heartbeat.host import HeartStatus
+        from core.ui.rail import heartbeat_lines, render_heartbeat_card
+        now = datetime(2026, 11, 15, 7, 23)
+        status = HeartStatus(True, None, "awake", datetime(2026, 11, 15, 7, 12), now - timedelta(minutes=4),
+                             now + timedelta(minutes=11), "", False, "idle", step_requested=True)
+        self.assertEqual(heartbeat_lines(status, now)[1], "a moment is coming…")
+        with patch("core.ui.rail.st") as st:
+            st.button.return_value = False
+            render_heartbeat_card(status, admin=True, now=now)
+            self.assertTrue(st.button.call_args.kwargs["disabled"])
+
+
 class TestAboutYouIsReadOnly(unittest.TestCase):
     def test_drawing_never_creates_a_social_model(self):
         from core.person.person import Person

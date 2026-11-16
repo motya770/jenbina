@@ -8,6 +8,7 @@ from datetime import datetime
 import time
 import json
 import re
+from contextlib import nullcontext
 from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
 
@@ -279,6 +280,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         context: Mutable dict replacing st.session_state. Keys:
             simulation_history (list), jenbina_location (str),
             debug_iterations (list), user_db, event_log (provided by the host).
+            waiting: optional context-manager factory entered while this thread
+            only waits for the LLM calls it runs in parallel, so the host can
+            let a chat message be answered meanwhile.
             Optional: status (stage sink), sleep_config (RhythmConfig),
             proactive_target ((user_id, person_key)). Without an event_log,
             user_db and user_id provide the legacy event-log fallback.
@@ -300,6 +304,8 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
                 sink.stage(text)
             except Exception:
                 pass
+
+    waiting = context.get("waiting") or nullcontext
 
     iteration_start_time = datetime.now()
     iter_num = iteration + 1
@@ -455,10 +461,11 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         else:
             monologue_future = None
 
-        needs_response = needs_future.result()
-        world_response = world_future.result()
-        if monologue_future is not None:
-            monologue_future.result()
+        with waiting():
+            needs_response = needs_future.result()
+            world_response = world_future.result()
+            if monologue_future is not None:
+                monologue_future.result()
     record_thought(event_log, person.inner_monologue)
 
     print(f"  Needs analysis complete")
@@ -570,8 +577,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
             maslow_needs=person.maslow_needs,
         )
 
-        asimov_response = asimov_future.result()
-        emotion_adjustments = emotion_future.result()
+        with waiting():
+            asimov_response = asimov_future.result()
+            emotion_adjustments = emotion_future.result()
 
     print(f"  Safety check complete")
     _print_json("Asimov Response", asimov_response)

@@ -48,6 +48,13 @@ def streamlit_server(tmp_path_factory):
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     )
 
+    # The server's output goes to a file, never to a pipe nobody reads: her
+    # heart beats for the whole session and prints as it goes, so an unread
+    # pipe fills up and blocks the heart thread in the middle of a beat.
+    log_path = tmp_path_factory.mktemp("jenbina-e2e-logs") / "streamlit.log"
+    log_file = open(log_path, "w")
+    print(f"\nStreamlit server log: {log_path}")
+
     proc = subprocess.Popen(
         [
             sys.executable, "-m", "streamlit", "run",
@@ -58,7 +65,7 @@ def streamlit_server(tmp_path_factory):
         ],
         cwd=project_root,
         env=env,
-        stdout=subprocess.PIPE,
+        stdout=log_file,
         stderr=subprocess.STDOUT,
     )
 
@@ -71,3 +78,4 @@ def streamlit_server(tmp_path_factory):
             proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             proc.kill()
+        log_file.close()
