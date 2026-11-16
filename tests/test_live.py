@@ -190,7 +190,7 @@ class TestHomeScreen(unittest.TestCase):
 
     def test_submitted_chat_uses_a_host_turn_and_shows_the_waiting_stage(self):
         st, host, mocks, _, turn, _ = self.run_home(message="hello")
-        mocks["core.ui.chat.update_system_stage"].assert_called_with("finishing what she was doing…")
+        mocks["core.ui.chat.update_system_stage"].assert_called_with("turning to you…")
         host.chat_turn.assert_called_once_with(st.session_state.current_user)
         mocks["core.ui.chat.handle_user_input"].assert_called_once_with(
             host.person, "chat llm", st.session_state.memory_manager, False, "hello", turn,
@@ -201,7 +201,7 @@ class TestHomeScreen(unittest.TestCase):
         st, _, _, _, _, _ = self.run_home(message="hello")
         waiting = st.empty.return_value
         waiting.info.assert_called_once_with(
-            "Jenbina is finishing what she was doing. Your message is waiting for her.")
+            "Jenbina is in the middle of something and is turning to you.")
         waiting.empty.assert_called_once()
 
     def test_the_place_line_shows_where_she_is_now(self):

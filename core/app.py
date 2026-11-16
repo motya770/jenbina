@@ -148,12 +148,13 @@ def main():
     if user_input:
         waiting = None
         if host.status().busy:
-            # The turn below waits for the beat in flight. Say so where the
-            # person is looking, or the page seems frozen for up to a minute or two.
-            update_system_stage("finishing what she was doing…")
+            # She is in the middle of a moment. The turn below gets her as soon
+            # as she is between steps of it, normally within a second or two;
+            # say so in case it takes longer.
+            update_system_stage("turning to you…")
             with live:
                 waiting = st.empty()
-                waiting.info("Jenbina is finishing what she was doing. Your message is waiting for her.")
+                waiting.info("Jenbina is in the middle of something and is turning to you.")
         try:
             with host.chat_turn(user) as turn:
                 if waiting is not None:
