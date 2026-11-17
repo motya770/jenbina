@@ -354,9 +354,9 @@
     "semantic_hash": "911168c2351058f5f68136c9c3628d38"
   },
   "core/simulation_runner.py": {
-    "mtime": 1794881889.7323377,
-    "seen": 1794881927.381258,
-    "ast_hash": "46a2fef69a2b97d33aa53b8c7d4911c1",
+    "mtime": 1794887775.8924198,
+    "seen": 1794910132.249877,
+    "ast_hash": "745a3abe8efa24d702036d6c9030e765",
     "semantic_hash": ""
   },
   "core/social/__init__.py": {
@@ -714,9 +714,9 @@
     "semantic_hash": "84ecd6773e6e01508f36ca4090e042d3"
   },
   "CLAUDE.md": {
-    "mtime": 1794880609.3717911,
-    "seen": 1794881927.381332,
-    "ast_hash": "a468776be452be28001874d8b3226305",
+    "mtime": 1794887985.3921933,
+    "seen": 1794910132.249978,
+    "ast_hash": "35ca840109f77b41a1e8b0e12db8712d",
     "semantic_hash": ""
   },
   "CURRENT_ARCHITECTURE_DIAGRAMS.md": {
@@ -1182,9 +1182,9 @@
     "semantic_hash": ""
   },
   "core/ui/rail.py": {
-    "mtime": 1794881838.5129175,
-    "seen": 1794881927.3812668,
-    "ast_hash": "77bb9c84006caf4e0121045651f92a11",
+    "mtime": 1794887767.3219619,
+    "seen": 1794910132.249894,
+    "ast_hash": "a7d45ca76947275694606b8bd4bfd6df",
     "semantic_hash": ""
   },
   "core/ui/timeline.py": {
@@ -1296,9 +1296,9 @@
     "semantic_hash": ""
   },
   "core/heartbeat/host.py": {
-    "mtime": 1794881859.98415,
-    "seen": 1794881927.38123,
-    "ast_hash": "2bcb25169826228f87d5087a5ceb8d84",
+    "mtime": 1794887767.3210402,
+    "seen": 1794910132.249846,
+    "ast_hash": "d6b386055a549be34c6e7e0b2df63015",
     "semantic_hash": ""
   },
   "core/heartbeat/outreach.py": {
@@ -1428,9 +1428,9 @@
     "semantic_hash": ""
   },
   "core/environment/minecraft/provider.py": {
-    "mtime": 1794881889.732928,
-    "seen": 1794881927.3812218,
-    "ast_hash": "be15c85c9859d38dbd44b9505e09819a",
+    "mtime": 1794887775.8926759,
+    "seen": 1794910132.249838,
+    "ast_hash": "789c41412580d05e1fc500d070b7df3b",
     "semantic_hash": ""
   },
   "core/environment/minecraft/scene.py": {
@@ -1440,15 +1440,15 @@
     "semantic_hash": ""
   },
   "minecraft/bridge/actions.js": {
-    "mtime": 1794881409.7634268,
-    "seen": 1794881927.381275,
-    "ast_hash": "0efe36125292f5f0091f8dd38dcd2c10",
+    "mtime": 1794887589.952325,
+    "seen": 1794910132.2499042,
+    "ast_hash": "e5bd53c44de1a8828be4c0a927831805",
     "semantic_hash": ""
   },
   "minecraft/bridge/bridge.js": {
-    "mtime": 1794881409.7630432,
-    "seen": 1794881927.381276,
-    "ast_hash": "971d4f840b0f03006bf675609ccc7e6c",
+    "mtime": 1794887609.3777928,
+    "seen": 1794910132.2499049,
+    "ast_hash": "479b7276f7aa0ceac55619d43a4e971f",
     "semantic_hash": ""
   },
   "minecraft/bridge/observe.js": {
@@ -1464,9 +1464,9 @@
     "semantic_hash": ""
   },
   "minecraft/bridge/run.js": {
-    "mtime": 1794881409.514355,
-    "seen": 1794881927.381278,
-    "ast_hash": "a182fa5d891b281728355522ac7ea3a7",
+    "mtime": 1794887589.9517226,
+    "seen": 1794910132.249907,
+    "ast_hash": "00b7ed47331c57b3aba38967f3df4785",
     "semantic_hash": ""
   },
   "minecraft/bridge/test/hunt.test.js": {
@@ -1476,9 +1476,9 @@
     "semantic_hash": ""
   },
   "minecraft/bridge/test/run.test.js": {
-    "mtime": 1794881437.274676,
-    "seen": 1794881927.38128,
-    "ast_hash": "1b715e8a1f457dacdfd7ae820cf079fd",
+    "mtime": 1794887635.0580711,
+    "seen": 1794910132.24991,
+    "ast_hash": "f466d779b03ea5f6fff9408631623ced",
     "semantic_hash": ""
   },
   "minecraft/bridge/test/words.test.js": {
@@ -1506,21 +1506,51 @@
     "semantic_hash": ""
   },
   "tests/test_minecraft_world.py": {
-    "mtime": 1794881889.7334366,
-    "seen": 1794881927.381313,
-    "ast_hash": "1468ba7712ce610489186ea94481b7db",
+    "mtime": 1794887896.9319954,
+    "seen": 1794910132.2499561,
+    "ast_hash": "8f281fd13586b5e11d5541608277e829",
     "semantic_hash": ""
   },
   "docs/plans/2026-11-17-minecraft-world-design.md": {
-    "mtime": 1794881781.0098398,
-    "seen": 1794881927.3813472,
-    "ast_hash": "7a973a56d7a5abab543f0d9f851f555f",
+    "mtime": 1794887985.3917358,
+    "seen": 1794910132.2499971,
+    "ast_hash": "8f26037db3e0d874710bfaadd5a7c363",
     "semantic_hash": ""
   },
   "minecraft/README.md": {
-    "mtime": 1794881781.0089324,
-    "seen": 1794881927.3813472,
-    "ast_hash": "1e45ef0a5cf0e6ff9885c9364c9aedf0",
+    "mtime": 1794887985.391167,
+    "seen": 1794910132.249998,
+    "ast_hash": "67fab90c2fb632d21d09c34d53c7a789",
+    "semantic_hash": ""
+  },
+  "core/environment/minecraft/launcher.py": {
+    "mtime": 1794887767.0959604,
+    "seen": 1794910132.249836,
+    "ast_hash": "56d432942aa0001ba216c084ebb9951f",
+    "semantic_hash": ""
+  },
+  "minecraft/bridge/session.js": {
+    "mtime": 1794887609.2306466,
+    "seen": 1794910132.249908,
+    "ast_hash": "116195f5a2105e2923e57f37187d6837",
+    "semantic_hash": ""
+  },
+  "minecraft/bridge/test/session.test.js": {
+    "mtime": 1794887635.0547557,
+    "seen": 1794910132.249911,
+    "ast_hash": "3141ffda63419ba8680c8ecd5dfbe588",
+    "semantic_hash": ""
+  },
+  "minecraft/bridge/test/within.test.js": {
+    "mtime": 1794887635.0613985,
+    "seen": 1794910132.249912,
+    "ast_hash": "8865e385f82c59a32a4a9ad78ec9deb5",
+    "semantic_hash": ""
+  },
+  "tests/test_minecraft_launcher.py": {
+    "mtime": 1794887882.541665,
+    "seen": 1794910132.2499552,
+    "ast_hash": "6e460926eaedd841285a3aecd4f99fd5",
     "semantic_hash": ""
   }
 }
