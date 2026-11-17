@@ -8,6 +8,7 @@ from datetime import datetime
 import time
 import json
 import re
+from contextlib import nullcontext
 from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
 
@@ -279,6 +280,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         context: Mutable dict replacing st.session_state. Keys:
             simulation_history (list), jenbina_location (str),
             debug_iterations (list), user_db, event_log (provided by the host).
+            waiting: optional context-manager factory entered while this thread
+            only waits for the LLM calls it runs in parallel, so the host can
+            let a chat message be answered meanwhile.
             Optional: status (stage sink), sleep_config (RhythmConfig),
             proactive_target ((user_id, person_key)), world_provider (a real
             world such as MinecraftWorld) with world_memory (its saved dict). Without an event_log,
@@ -303,6 +307,8 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
             except Exception:
                 pass
 
+    waiting = context.get("waiting") or nullcontext
+
     iteration_start_time = datetime.now()
     iter_num = iteration + 1
 
@@ -312,7 +318,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     scene = None
     if provider is not None:
         stage("arriving in the world…")
-        scene = provider.observe(person, context.setdefault("world_memory", {}), context.get("sleep_config"))
+        scene = provider.observe(
+            person, context.setdefault("world_memory", {}), context.get("sleep_config"), waiting=waiting,
+        )
     print(f"{'='*60}")
     print(f"  ITERATION {iter_num}")
     print(f"{'='*60}")
@@ -474,12 +482,13 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         else:
             monologue_future = None
 
-        needs_response = needs_future.result()
-        world_response = (
-            world_future.result() if world_future is not None else json.dumps(scene.description_data())
-        )
-        if monologue_future is not None:
-            monologue_future.result()
+        with waiting():
+            needs_response = needs_future.result()
+            world_response = (
+                world_future.result() if world_future is not None else json.dumps(scene.description_data())
+            )
+            if monologue_future is not None:
+                monologue_future.result()
     record_thought(event_log, person.inner_monologue)
 
     print(f"  Needs analysis complete")
@@ -542,7 +551,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     if scene is not None:
         # In a real world she is credited for what happened, not for what she said.
         stage("acting in the world…")
-        outcome = provider.perform(scene, chosen, person, context["world_memory"])
+        outcome = provider.perform(scene, chosen, person, context["world_memory"], waiting=waiting)
         if isinstance(action_response, dict):
             action_response["outcome"] = outcome.summary
             action_response["outcome_ok"] = outcome.ok
@@ -609,8 +618,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
             maslow_needs=person.maslow_needs,
         )
 
-        asimov_response = asimov_future.result()
-        emotion_adjustments = emotion_future.result()
+        with waiting():
+            asimov_response = asimov_future.result()
+            emotion_adjustments = emotion_future.result()
 
     print(f"  Safety check complete")
     _print_json("Asimov Response", asimov_response)

@@ -324,6 +324,27 @@ class TestPerform(ProviderCase):
         self.assertEqual(outcome.summary, "Chopped wood from the trees. Gained 4 oak logs.")
         self.assertIn("Gained 4 oak logs", self.notes())
 
+    def test_the_host_may_answer_chat_only_while_she_waits_for_the_bridge(self):
+        from contextlib import contextmanager
+
+        @contextmanager
+        def waiting():
+            self.bridge.calls.append("wait begins")
+            notes_before = len(self.person.working_memory.notes)
+            yield
+            # Nothing of hers changed while the mind lock was let go.
+            self.assertEqual(len(self.person.working_memory.notes), notes_before)
+            self.bridge.calls.append("wait ends")
+
+        self.world.perform(self.scene, "Chop wood from the trees nearby", self.person, self.memory,
+                           waiting=waiting)
+        self.assertEqual(self.bridge.calls, [
+            "wait begins", "start", ("act", "gather_wood", {}), "end", "wait ends"])
+        self.assertIn("Gained 4 oak logs", self.notes())
+        self.bridge.calls.clear()
+        self.world.observe(self.person, self.memory, self.config, waiting=waiting)
+        self.assertEqual(self.bridge.calls, ["wait begins", "start", "end", "wait ends"])
+
     def test_action_arguments_reach_the_bridge(self):
         self.world.perform(self.scene, "Explore to the east", self.person, self.memory)
         self.assertIn(("act", "explore", {"direction": "east"}), self.bridge.calls)
@@ -589,6 +610,21 @@ class TestRunnerInMinecraft(unittest.TestCase):
         self.assertEqual(result["world_summary"]["body"], {"health": 9, "food": 8})
         # The action itself is still recorded where it was taken.
         self.assertEqual(self.action_event().detail["location"], HOME_PLACE)
+
+    def test_the_runner_hands_the_hosts_wait_to_the_world(self):
+        from contextlib import contextmanager
+        entered = []
+
+        @contextmanager
+        def waiting():
+            entered.append(list(self.bridge.calls))
+            yield
+
+        self.context["waiting"] = waiting
+        self.run_beat()
+        # Once around looking, once around acting (and around the parallel LLM joins).
+        self.assertIn([], entered)
+        self.assertIn(["start", "end"], entered)
 
     def test_only_her_latest_action_counts_as_recent(self):
         self.context["simulation_history"] = [

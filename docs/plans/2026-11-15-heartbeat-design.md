@@ -358,6 +358,8 @@ before the build.
 7. Proactive messages go to one person at a time, the closest recent one.
 8. She keeps the host machine's clock; no Palo Alto time zone.
 9. One mind lock: a message arriving mid-beat waits for the beat to end.
+   (Changed after first use: the wait was up to two minutes. A message is now
+   answered between the steps of a beat; see the implementation plan.)
 10. `run_scheduler.py` is replaced, not kept alongside.
 11. Sleep length is set by the clock (6 to 9 hours), not by the sleep need.
 12. Opening the page never wakes her and gives no greeting while she sleeps.
