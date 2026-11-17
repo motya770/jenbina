@@ -563,6 +563,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     elif matched_action:
         effect_result = action_executor(matched_action)
         print(f"  Action effect applied: {matched_action} -> satisfied {effect_result.get('satisfied_needs', {})}")
+        if outcome is not None:
+            # Some effects carry a little hunger; in a real world only her body decides that.
+            provider.sync_body(person, outcome.observation or scene.observation)
     else:
         print(f"  No need-satisfaction mapping for action: {chosen}")
 

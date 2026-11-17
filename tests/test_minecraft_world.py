@@ -526,6 +526,15 @@ class TestRunnerInMinecraft(unittest.TestCase):
         self.run_beat()
         self.assertEqual(self.person.maslow_needs.get_need_satisfaction("hunger"), 80.0)
 
+    def test_a_credited_action_cannot_feed_her(self):
+        # The "drink" effect carries a little hunger; her body's food bar must win.
+        self.bridge.observation = observation(food=10, nearby={"water": True})
+        self.bridge.result = {"ok": True, "summary": "Drank from the water.", "died": False}
+        self.decide.return_value = {"chosen_action": "Drink from the water nearby", "reasoning": "thirsty"}
+        result = self.run_beat()
+        self.assertEqual(result["matched_action"], "drink")
+        self.assertEqual(self.person.maslow_needs.get_need_satisfaction("hunger"), 50.0)
+
     def test_the_outcome_reaches_the_timeline_and_the_emotion_analysis(self):
         self.run_beat()
         self.assertEqual(self.action_event().detail["outcome"],

@@ -29,6 +29,8 @@ class Outcome:
     action: WorldAction | None = None
     died: bool = False
     place: str | None = None
+    # What the world looked like afterwards; ``None`` when nothing was done there.
+    observation: dict | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -66,7 +68,11 @@ class MinecraftWorld:
             own = memory[MEMORY_KEY] = {}
         return own
 
-    def _sync_body(self, person, observation: dict, now: datetime) -> None:
+    def sync_body(self, person, observation: dict | None, now: datetime | None = None) -> None:
+        """Set her hunger need from the body's food bar in ``observation``."""
+        if not isinstance(observation, dict):
+            return
+        now = now if now is not None else self.clock()
         try:
             food = float(observation.get("food"))
         except (TypeError, ValueError):
@@ -91,7 +97,7 @@ class MinecraftWorld:
         position = observation.get("position") or {}
         if "home" not in own and all(k in position for k in ("x", "y", "z")):
             own["home"] = [position["x"], position["y"], position["z"]]
-        self._sync_body(person, observation, now)
+        self.sync_body(person, observation, now)
         return build_scene(observation, own.get("home"), now, self._can_sleep(person, sleep_config, now))
 
     def perform(self, scene: Scene, chosen_text: str, person, memory: dict) -> Outcome:
@@ -128,7 +134,7 @@ class MinecraftWorld:
         ok = bool(result.get("ok"))
         died = bool(result.get("died"))
         summary = str(result.get("summary") or ("Done." if ok else "It did not work."))
-        self._sync_body(person, observation, now)
+        self.sync_body(person, observation, now)
         if died:
             own["deaths"] = int(own.get("deaths", 0)) + 1
             security = person.maslow_needs.needs.get("security")
@@ -139,6 +145,7 @@ class MinecraftWorld:
         return Outcome(
             ok=ok and not died, summary=summary, need_key=action.need_key if ok and not died else None,
             action=action, died=died, place=place_label(observation, own.get("home")),
+            observation=observation,
         )
 
 
