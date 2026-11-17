@@ -25,6 +25,7 @@ jenbina/
 │   ├── cognition/               # Decision-making, meta-cognition, inner monologue
 │   ├── emotions/                # Emotional state management and analysis
 │   ├── environment/             # World simulation, locations, dynamic events
+│   │   └── minecraft/           # A real world: bridge client, scene and action builder, world provider
 │   ├── goals/                   # Short/mid/long-term goal tracking
 │   ├── heartbeat/               # One shared being, owned by one process; no Streamlit imports
 │   │   ├── adoption.py          # One-time adoption of existing per-user state and history
@@ -61,6 +62,11 @@ jenbina/
 │   ├── e2e/                     # End-to-end Playwright tests
 │   ├── run_tests.py             # Test runner (unittest discovery)
 │   └── run_chain_tests.py       # LangChain integration tests
+├── minecraft/                   # Her Minecraft world (see minecraft/README.md)
+│   ├── bridge/                  # Node bridge (Mineflayer): her body, a localhost HTTP API with observe and act
+│   ├── setup_server.sh          # Download and configure the private 1.21.4 server (EULA only with --accept-eula)
+│   ├── run_server.sh            # Start the server
+│   └── server/                  # The server and the world itself (ignored by git)
 ├── docs/plans/                  # Design and planning documents
 ├── .github/workflows/           # CI/CD pipelines
 ├── assets/                      # Static assets (favicon, jenbina_nav.png face crop for the sidebar and tab icon)
@@ -101,7 +107,7 @@ LLM Integration (LangChain → OpenAI)
 - **Memory (`core/memory/`):** Hybrid system — ChromaDB for semantic search, Neo4j for relationship graphs, SQLite for chronological tracking.
 - **Cognition (`core/cognition/`):** Meta-cognition (self-reflection, bias detection), inner monologue (4 thought modes), action decision chains, Asimov safety checks.
 - **Emotions (`core/emotions/`):** Emotional state tracking and LLM-powered emotion analysis.
-- **Environment (`core/environment/`):** World simulation with locations (Palo Alto-based), weather, and dynamic events.
+- **Environment (`core/environment/`):** World simulation with locations (Palo Alto-based), weather, and dynamic events. With `JENBINA_WORLD=minecraft`, `core/environment/minecraft/` replaces it with a private Minecraft world: the scene and the available actions are read from the world, and needs are credited from what actually happened there.
 - **Goals (`core/goals/`):** Short/mid/long-term objective generation and tracking.
 - **Learning (`core/learning/`):** Experience recording, lesson extraction, confidence tracking.
 
@@ -130,6 +136,26 @@ python run_heartbeat.py --once
 
 # Choose whose saved Jenbina to adopt on the first start
 python run_heartbeat.py --adopt-user-id 3
+```
+
+### Minecraft world
+
+Her Minecraft world needs two extra processes that you start yourself: the
+server and the Node bridge. Python never launches them. Full notes are in
+`minecraft/README.md`.
+
+```bash
+# Once: download and configure the server, then install the bridge's packages
+./minecraft/setup_server.sh --accept-eula
+cd minecraft/bridge && npm install
+
+# Each time: the world, the bridge, then her mind
+./minecraft/run_server.sh
+node minecraft/bridge/bridge.js
+JENBINA_WORLD=minecraft python run_heartbeat.py --once
+
+# The bridge's unit tests (CI does not run them)
+cd minecraft/bridge && npm test
 ```
 
 ### Running Tests
@@ -182,6 +208,9 @@ Copy `.env.example` to `.env` and configure:
 | `JENBINA_MAX_BEATS_PER_DAY` | Daily cap on awake beat attempts, including manual steps (default: `80`) |
 | `JENBINA_LLM_TIMEOUT_SECONDS` | Timeout for each LLM call in seconds (default: `60`, with one retry) |
 | `JENBINA_DISABLE_SLEEP` | Set to `1` to keep her awake, including in E2E tests (default: `0`, sleep enabled) |
+| `JENBINA_WORLD` | `minecraft` makes her live in a private Minecraft world (default: `palo_alto`, the described world) |
+| `JENBINA_MINECRAFT_BRIDGE_URL` | Where the Node bridge listens (default: `http://127.0.0.1:3010`) |
+| `JENBINA_MINECRAFT_STAY_ONLINE` | Set to `1` to keep her logged in to Minecraft between beats (default: `0`, she is in the world only while looking and acting) |
 | `JENBINA_ADOPT_USER_ID` | On the very first start only: the user id whose saved Jenbina becomes the one Jenbina (default: the real account with the most experiences; the E2E test login is never picked automatically) |
 
 ## Code Conventions
@@ -235,6 +264,7 @@ The primary CI gate is `run-tests.yml` which runs `python -m pytest tests/test_*
 - **LLM JSON Parsing:** LLM responses are parsed as JSON for structured decisions. The `fix_llm_json.py` utility handles malformed JSON from LLMs — use it when processing LLM output.
 - **Memory Databases:** The hybrid memory system uses three databases simultaneously. Changes to memory schemas affect ChromaDB collections, Neo4j nodes/relationships, and SQLite tables.
 - **Streamlit State:** The live `Person` belongs to the host in `core/heartbeat/host.py`. `st.session_state.person` is a reference to that shared object. Change her only inside `host.chat_turn(...)` or a beat so the mind lock protects her state; the host saves it.
+- **Minecraft world:** A real world is a `world_provider` on the host (`core/environment/minecraft/provider.py`). The runner calls `observe` before any LLM call and `perform` after the decision; with no provider the Palo Alto code path is unchanged. Keep every Minecraft routine bounded and report failures honestly: she is credited only for what the bridge says happened.
 - **No `.env` in VCS:** The `.env` file contains secrets and must never be committed. Use `.env.example` as the template.
 
 ## Superpowers Plugin
@@ -305,6 +335,7 @@ git commit -m "<conventional commit message>"
 | `2026-10-28-timeline-ui-implementation.md` | Timeline home screen implementation — `core/timeline/` event log, `core/ui/timeline.py`, `core/ui/rail.py`, runner refactor, home screen |
 | `2026-11-14-blade-runner-theme-redesign.md` | Blade Runner 2049 skin proposal — replaces the candy arcade pixel skin with smoke, amber, ice and violet tokens, IBM Plex and Rajdhani type, kind tags instead of pixel icons; layout unchanged |
 | `2026-11-15-heartbeat-design.md` | Heartbeat spec — one shared Jenbina, continuous beats, sleep and wake, honest lost time, private conversations and a live home screen |
+| `2026-11-17-minecraft-world-design.md` | Minecraft world spec — a private server, a Node bridge with observe and act, a scene and action list built from the world, needs credited from real outcomes |
 | `2026-11-15-heartbeat-implementation.md` | Heartbeat implementation — shared storage, rhythm, host, state adoption, standalone runner, per-person chat privacy and live UI |
 
 ## graphify
