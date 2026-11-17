@@ -108,7 +108,8 @@ watch while it is on. It is off unless you set `VIEWER_PORT`.
 - **Monsters are off** (`spawn-monsters=false`). With them on, she is attacked
   at night and loses everything she carries when she dies. Switch them on in
   `minecraft/server/server.properties` if you want that danger; she can dig a
-  burrow to shelter, but it does not always save her.
+  burrow to shelter, but it does not always save her. Switching them off stops
+  new ones appearing; any already in the world stay until they burn at sunrise.
 - **The world waits for her.** It pauses ten seconds after she leaves.
 - **Offline mode** lets her join without a Microsoft account. Keep `server-ip`
   set to `127.0.0.1`: an offline-mode server open to a network lets anyone

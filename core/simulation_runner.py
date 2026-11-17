@@ -836,6 +836,13 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     except Exception as e:
         print(f"  Proactive message check failed: {e}")
 
+    if outcome is not None and outcome.observation is not None:
+        # What the rail shows until the next beat is where she is and how her
+        # body is now, after the action, not what she saw before it.
+        after = provider.scene_after(outcome.observation, context["world_memory"])
+        world_summary = get_world_state_summary(after.world_state)
+        world_summary["body"] = after.body
+
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
     print(f"{'='*60}")
     print(f"  ITERATION {iter_num} COMPLETE — {iteration_duration:.2f}s")

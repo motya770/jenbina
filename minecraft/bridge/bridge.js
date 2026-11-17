@@ -15,7 +15,7 @@ const { pathfinder, Movements } = require('mineflayer-pathfinder')
 const collectBlock = require('mineflayer-collectblock').plugin
 const { ACTIONS, stopMoving } = require('./actions')
 const { inventoryCounts, observe } = require('./observe')
-const { inventoryDiff, outcomeSummary } = require('./words')
+const { runRoutine } = require('./run')
 
 const MC_HOST = process.env.MC_HOST || '127.0.0.1'
 const MC_PORT = Number(process.env.MC_PORT || 25565)
@@ -79,8 +79,7 @@ function login () {
     }
     theBot.once('error', err => fail(err.message))
     theBot.once('kicked', reason => fail(`kicked (${JSON.stringify(reason)})`))
-    theBot.once('spawn', async () => {
-      clearTimeout(timer)
+    theBot.once('spawn', () => {
       theBot.removeAllListeners('error')
       theBot.removeAllListeners('kicked')
       theBot.on('error', err => log(`bot error: ${err.message}`))
@@ -89,11 +88,22 @@ function login () {
         log(`left the world (${reason})`)
         if (bot === theBot) bot = null
       })
-      theBot.pathfinder.setMovements(new Movements(theBot))
-      // Health, food and the first chunks arrive just after spawn.
-      await theBot.waitForTicks(20)
-      startViewer(theBot)
-      resolve(theBot)
+      // Settling in can fail (no chunks, no ticks). That must reject this
+      // login, not escape as an unhandled rejection; the watchdog above stays
+      // armed until it is done.
+      Promise.resolve().then(async () => {
+        theBot.pathfinder.setMovements(new Movements(theBot))
+        // Health, food and the first chunks arrive just after spawn.
+        await theBot.waitForTicks(20)
+        startViewer(theBot)
+      }).then(() => {
+        clearTimeout(timer)
+        resolve(theBot)
+      }, err => {
+        clearTimeout(timer)
+        try { theBot.end() } catch (e) {}
+        reject(new BridgeError(503, 'world_unreachable', `Joined the world but could not settle in: ${err.message}`))
+      })
     })
   })
 }
@@ -133,51 +143,31 @@ async function act (name, args, budgetMs) {
   const routine = ACTIONS[name]
   if (!routine) throw new BridgeError(400, 'unknown_action', `There is no action called "${name}".`)
   if (busy) throw new BridgeError(409, 'busy', 'She is already in the middle of something.')
+  // Busy until the result has been read, so nothing else starts while pickups settle.
   busy = true
   const theBot = bot
-  const started = Date.now()
-  const budget = Math.min(Math.max(Number(budgetMs) || DEFAULT_BUDGET_MS, 1000), MAX_BUDGET_MS)
-  const ctx = { deadline: started + budget, died: false }
-  const onDeath = () => { ctx.died = true }
-  theBot.on('death', onDeath)
-  const before = inventoryCounts(theBot)
-  let result
   try {
-    let timer
-    const overrun = new Promise((resolve, reject) => {
-      timer = setTimeout(() => reject(new Error('ran out of time')), budget + OVERRUN_GRACE_MS)
+    const outcome = await runRoutine({
+      bot: theBot,
+      name,
+      routine,
+      args,
+      budgetMs: Math.min(Math.max(Number(budgetMs) || DEFAULT_BUDGET_MS, 1000), MAX_BUDGET_MS),
+      graceMs: OVERRUN_GRACE_MS,
+      deps: {
+        inventoryCounts,
+        observe,
+        stop: stopMoving,
+        disconnect: async gone => { if (bot === gone) await endSession() }
+      }
     })
-    try {
-      result = await Promise.race([routine(theBot, args || {}, ctx), overrun])
-    } finally {
-      clearTimeout(timer)
-    }
+    log(`${name}: ${outcome.ok ? 'ok' : 'not ok'} - ${outcome.summary}`)
+    return outcome
   } catch (e) {
-    stopMoving(theBot)
-    result = { ok: false, sentence: `Tried to ${name.replace(/_/g, ' ')} but it did not work out (${e.message}).` }
+    if (e instanceof BridgeError) throw e
+    throw new BridgeError(503, 'world_unreachable', `She was cut off from the world during the action: ${e.message}`)
   } finally {
-    theBot.removeListener('death', onDeath)
     busy = false
-  }
-  if (!connected() || bot !== theBot) {
-    throw new BridgeError(503, 'world_unreachable', 'She was disconnected from the world during the action.')
-  }
-  // Let pickups, crafts and a respawn settle before reading the result.
-  await theBot.waitForTicks(ctx.died ? 40 : 10)
-  const { gained, lost } = inventoryDiff(before, inventoryCounts(theBot))
-  const outcome = ctx.died
-    ? { ok: false, summary: 'Died and woke up again at the spawn point. What was carried may be lost.' }
-    : { ok: result.ok, summary: outcomeSummary(result.sentence, gained, lost) }
-  log(`${name}: ${outcome.ok ? 'ok' : 'not ok'} - ${outcome.summary}`)
-  return {
-    ok: outcome.ok,
-    name,
-    summary: outcome.summary,
-    gained,
-    lost,
-    died: ctx.died,
-    duration_ms: Date.now() - started,
-    observation: observe(theBot)
   }
 }
 
@@ -242,6 +232,8 @@ async function shutdown () {
 }
 
 if (require.main === module) {
+  // A stray rejection inside Mineflayer must not take her body down with it.
+  process.on('unhandledRejection', reason => log(`unhandled rejection: ${reason && reason.message ? reason.message : reason}`))
   process.on('SIGTERM', shutdown)
   process.on('SIGINT', shutdown)
   // Localhost only: nothing here is authenticated.

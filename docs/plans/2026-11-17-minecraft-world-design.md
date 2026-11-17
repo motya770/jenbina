@@ -1,8 +1,7 @@
 # Minecraft world: Jenbina lives in a real place
 
-Status: design. The owner asked for the design and the implementation in one
-request, so building proceeds from this document; the build is then reviewed
-with Codex. Date: 2026-11-17. Revised the same day after a design review and a
+Status: built. The owner asked for the design and the implementation in one
+request; the build was reviewed with Codex and its eight findings were fixed. Date: 2026-11-17. Revised the same day after a design review and a
 live test of the bridge (sleep offer, drinking, plans, the variety rule, when
 she is logged in, and monsters off by default).
 
@@ -246,6 +245,13 @@ people. This is accepted for the first version.
 `summary` is one plain sentence written by the bridge from what actually
 changed. `observation` is a fresh observation after the action.
 
+A routine that is still running when its budget and a short grace period are
+over cannot be cancelled, so the bridge logs her out of the world: nothing she
+started can go on changing things after the failure is reported. That outcome
+has `"timed_out": true` and no observation. A death counts for the action it
+happened in, including while its pickups settle. A hunt succeeds only when the
+animal's death was seen; an animal that walks out of sight got away.
+
 ### Resolving her choice
 
 The decision chain returns free text. The provider matches it to the offered
@@ -266,6 +272,13 @@ If the bridge reports that she died during an action, the outcome says so, her
 `security` need drops by 30 points, and a note goes into working memory for the
 next three beats. Minecraft respawns her; her dropped items may be lost.
 
+### Needs the world owns
+
+Her hunger is her body's. It is set from the food bar whenever the world is
+observed, and the clock never decays it in this mode: not at the end of a
+beat, and not while she sleeps. An action effect that happens to carry a
+little hunger is overridden by the food bar straight away.
+
 ### What is stored
 
 `Situation` gains one field, `world: dict`, saved with the rest of her
@@ -277,9 +290,10 @@ saved situations without it load with an empty dict.
 The bridge serves the browser viewer when `VIEWER_PORT` is set. The viewer
 library listens on all network interfaces, so it is off by default.
 
-She is in the world only during a beat, so the view is live for about a minute
-every beat interval. `JENBINA_MINECRAFT_STAY_ONLINE=1` keeps her logged in
-between beats so she can be watched continuously. The world then keeps running
+She is in the world only while she looks and while she acts, so the view is
+live for a short stretch of every beat. `JENBINA_MINECRAFT_STAY_ONLINE=1` keeps
+her logged in between beats so she can be watched continuously. Even then she
+is logged out whenever she falls asleep and when her host stops. The world then keeps running
 while she stands still, which on any difficulty above `peaceful` means monsters
 can reach her at night; the setup notes say so.
 

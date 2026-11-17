@@ -7,6 +7,7 @@ get a usable answer is raised as ``WorldUnavailable``.
 
 from __future__ import annotations
 
+import http.client
 import json
 import urllib.error
 import urllib.request
@@ -41,7 +42,8 @@ class MinecraftBridge:
                 payload = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as err:
             raise WorldUnavailable(self._error_text(err)) from err
-        except (urllib.error.URLError, OSError, ValueError) as err:
+        except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as err:
+            # HTTPException covers an answer cut off mid-body (a bridge restart).
             raise WorldUnavailable(f"The Minecraft bridge at {self.base_url} did not answer: {err}") from err
         if not isinstance(payload, dict):
             raise WorldUnavailable("The Minecraft bridge answered with something other than an object.")

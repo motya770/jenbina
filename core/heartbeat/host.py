@@ -207,6 +207,8 @@ class JenbinaHost:
         self._stop.set()
         # Never join a heart thread while holding the lock it may be waiting for.
         self._join_threads(patience)
+        # Whatever happens below, she is not left standing in a running world.
+        self._leave_world()
         if not self.lock.acquire(timeout=-1 if patience is None else patience):
             if self.hosting:
                 # hosting = False first, so the beat in flight cannot save.
@@ -368,7 +370,18 @@ class JenbinaHost:
         event.created_at = now
         self.event_log.record(event)
 
+    def _leave_world(self) -> None:
+        """Log her out of a real world; a described world has nothing to leave."""
+        close = getattr(self.world_provider, "close", None)
+        if close is not None:
+            try:
+                close()
+            except Exception:
+                logger.exception("Could not take Jenbina out of her world.")
+
     def _fall_asleep(self, now: datetime, reason: str) -> None:
+        # Asleep she is not in the world, however she came to fall asleep.
+        self._leave_world()
         s = self.situation
         same_sleep = (
             s.woken_by_message_at is not None
@@ -392,7 +405,10 @@ class JenbinaHost:
         self.person.maslow_needs.satisfy_need(
             "sleep", self.config.sleep_recovery_per_hour * hours, source="sleeping",
         )
-        self.person.update_all_needs(now=now, skip_needs=("sleep",))
+        # A real world owns some needs (her body's hunger): the clock must not
+        # move them while she is away from it.
+        owned = tuple(getattr(self.world_provider, "skip_needs", ()))
+        self.person.update_all_needs(now=now, skip_needs=("sleep",) + owned)
         s.last_sleep_tick_at = now
         self.save()
 

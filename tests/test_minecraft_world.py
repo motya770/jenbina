@@ -2,6 +2,7 @@
 """Tests for Jenbina's Minecraft world. A fake bridge stands in for the Node
 process, so nothing here touches the network or a Minecraft server."""
 
+import http.client
 import io
 import json
 import os
@@ -9,7 +10,7 @@ import sys
 import unittest
 import urllib.error
 from contextlib import ExitStack
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -28,6 +29,7 @@ from core.timeline import EventLog
 from core.timeline.events import make_action
 from core.ui.rail import env_line_html
 from core.ui.timeline import action_details_text
+from test_heartbeat_host import HostCase
 from test_simulation_runner import ACTION, build_env
 
 NOON = datetime(2026, 11, 17, 12, 0)
@@ -341,14 +343,35 @@ class TestPerform(ProviderCase):
         self.assertEqual(outcome.summary, UNCLEAR_CHOICE)
         self.assertEqual(outcome.place, HOME_PLACE)
 
-    def test_sleep_never_reaches_the_bridge(self):
+    def test_sleep_sends_no_action_only_a_logout(self):
         self.now = MIDNIGHT
         scene = self.world.observe(self.person, self.memory, self.config)
         self.bridge.calls.clear()
         outcome = self.world.perform(scene, "Go to sleep for the night", self.person, self.memory)
-        self.assertEqual(self.bridge.calls, [])
+        self.assertEqual(self.bridge.calls, ["end"])
         self.assertTrue(outcome.ok)
         self.assertEqual(outcome.need_key, "sleep")
+
+    def test_choosing_sleep_logs_her_out_even_when_she_stays_online(self):
+        self.now = MIDNIGHT
+        world = MinecraftWorld(self.bridge, stay_online=True, clock=lambda: self.now)
+        scene = world.observe(self.person, self.memory, self.config)
+        self.assertEqual(self.bridge.calls, ["start"])
+        world.perform(scene, "Go to sleep for the night", self.person, self.memory)
+        self.assertEqual(self.bridge.calls, ["start", "end"])
+
+    def test_close_always_logs_her_out_and_never_raises(self):
+        world = MinecraftWorld(self.bridge, stay_online=True)
+        world.close()
+        self.assertEqual(self.bridge.calls, ["end"])
+        self.bridge.end_session = MagicMock(side_effect=RuntimeError("bridge exploded"))
+        world.close()
+
+    def test_scene_after_describes_where_she_ended_up(self):
+        after = self.world.scene_after(
+            observation(food=8, health=9, biome="plains", position={"x": -90, "y": 65, "z": 157}), self.memory)
+        self.assertEqual(after.place, "Plains")
+        self.assertEqual(after.body, {"health": 9, "food": 8})
 
     def test_losing_the_world_mid_action_is_a_failed_outcome_not_an_error(self):
         self.bridge.fail_act = True
@@ -437,6 +460,14 @@ class TestBridgeClient(unittest.TestCase):
 
     def test_ending_a_session_never_raises(self):
         self.client(error=urllib.error.URLError("gone")).end_session()
+        self.client(error=http.client.IncompleteRead(b"{")).end_session()
+
+    def test_an_answer_cut_off_mid_body_is_unavailable(self):
+        # A bridge restart during a response raises IncompleteRead, not URLError.
+        bridge = self.client(error=http.client.IncompleteRead(b'{"ok": tr'))
+        for call in (bridge.observe, bridge.start_session, lambda: bridge.act("rest")):
+            with self.subTest(call=call), self.assertRaises(WorldUnavailable):
+                call()
 
 
 class TestWorldFromEnv(unittest.TestCase):
@@ -548,6 +579,17 @@ class TestRunnerInMinecraft(unittest.TestCase):
         moves = [e for e in self.context["event_log"].recent() if e.kind == "move"]
         self.assertEqual(len(moves), 1)
 
+    def test_the_returned_summary_is_where_she_is_after_acting(self):
+        self.decide.return_value = {"chosen_action": "Explore to the east", "reasoning": "curious"}
+        self.bridge.result = {"ok": True, "summary": "Walked 40 blocks east.", "died": False,
+                              "observation": observation(food=8, health=9, biome="plains",
+                                                         position={"x": -104, "y": 65, "z": 157})}
+        result = self.run_beat()
+        self.assertEqual(result["world_summary"]["location"]["name"], "Plains")
+        self.assertEqual(result["world_summary"]["body"], {"health": 9, "food": 8})
+        # The action itself is still recorded where it was taken.
+        self.assertEqual(self.action_event().detail["location"], HOME_PLACE)
+
     def test_only_her_latest_action_counts_as_recent(self):
         self.context["simulation_history"] = [
             {"action_decision": {"chosen_action": name}}
@@ -572,14 +614,15 @@ class TestRunnerInMinecraft(unittest.TestCase):
         self.decide.assert_not_called()
         self.assertEqual(self.context["event_log"].recent(), [])
 
-    def test_choosing_sleep_at_night_falls_asleep_without_touching_the_world(self):
+    def test_choosing_sleep_at_night_falls_asleep_without_acting_in_the_world(self):
         self.world.clock = lambda: MIDNIGHT
         clock = self.stack.enter_context(patch("core.environment.minecraft.scene.datetime"))
         clock.now.return_value = MIDNIGHT
         self.decide.return_value = {"chosen_action": "Go to sleep for the night", "reasoning": "tired"}
         result = self.run_beat()
         self.assertTrue(result["fell_asleep"])
-        self.assertEqual(self.bridge.calls, ["start", "end"])
+        self.assertFalse(any(isinstance(call, tuple) for call in self.bridge.calls))
+        self.assertEqual(self.bridge.calls[-1], "end")
 
     def test_without_a_provider_the_runner_is_the_palo_alto_runner(self):
         del self.context["world_provider"]
@@ -628,6 +671,45 @@ class TestSavedWorldMemory(unittest.TestCase):
         host = JenbinaHost(MagicMock(), MagicMock(), MagicMock(), MagicMock(), MagicMock(),
                            meta_cognitive_system=MagicMock(), owner="test")
         self.assertIsNone(host.world_provider)
+
+
+class TestHostLeavesTheWorld(HostCase):
+    """She is never left standing in a running world while asleep or stopped."""
+
+    def setUp(self):
+        super().setUp()
+        self.world = SimpleNamespace(skip_needs=("hunger",), close=MagicMock())
+        self.host.world_provider = self.world
+
+    def test_falling_asleep_takes_her_out_of_the_world(self):
+        self.host._fall_asleep(self.now, "exhausted")
+        self.world.close.assert_called_once_with()
+
+    def test_stopping_the_host_takes_her_out_of_the_world(self):
+        self.host.stop()
+        self.world.close.assert_called_once_with()
+
+    def test_a_world_that_cannot_be_left_does_not_stop_her_sleeping(self):
+        self.world.close.side_effect = RuntimeError("bridge exploded")
+        self.host._fall_asleep(self.now, "chose")
+        self.assertEqual(self.host.situation.phase, "asleep")
+
+    def test_sleep_does_not_decay_the_hunger_her_body_owns(self):
+        hunger = self.host.person.maslow_needs.needs["hunger"]
+        thirst = self.host.person.maslow_needs.needs["thirst"]
+        hunger.satisfaction, thirst.satisfaction = 80.0, 80.0
+        self.host._fall_asleep(self.now, "chose")
+        self.host._sleep_tick(self.now + timedelta(hours=3))
+        self.assertEqual(hunger.satisfaction, 80.0)
+        self.assertLess(thirst.satisfaction, 80.0)
+
+    def test_without_a_world_sleep_decays_hunger_as_before(self):
+        self.host.world_provider = None
+        hunger = self.host.person.maslow_needs.needs["hunger"]
+        hunger.satisfaction = 80.0
+        self.host._fall_asleep(self.now, "chose")
+        self.host._sleep_tick(self.now + timedelta(hours=3))
+        self.assertLess(hunger.satisfaction, 80.0)
 
 
 class TestTimelineAndRail(unittest.TestCase):

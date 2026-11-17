@@ -192,19 +192,28 @@ async function hunt (bot, args, ctx) {
   if (!target) return failed('There was no animal close enough to hunt.')
   const name = target.name
   if (!(await equipBest(bot, 'sword'))) await equipBest(bot, 'axe')
+  // An entity also stops being valid when it walks out of sight, so only its
+  // death event counts as a kill.
+  let killed = false
+  const onDead = entity => { if (entity === target) killed = true }
+  bot.on('entityDead', onDead)
   let lastSeen = target.position.clone()
-  while (target.isValid && remaining(ctx) > 6000) {
-    lastSeen = target.position.clone()
-    if (bot.entity.position.distanceTo(target.position) > 3) {
-      bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
-    } else {
-      await bot.lookAt(target.position.offset(0, (target.height || 1) * 0.6, 0), true)
-      bot.attack(target)
+  try {
+    while (!killed && target.isValid && remaining(ctx) > 6000) {
+      lastSeen = target.position.clone()
+      if (bot.entity.position.distanceTo(target.position) > 3) {
+        bot.pathfinder.setGoal(new goals.GoalFollow(target, 2), true)
+      } else {
+        await bot.lookAt(target.position.offset(0, (target.height || 1) * 0.6, 0), true)
+        bot.attack(target)
+      }
+      await bot.waitForTicks(12)
     }
-    await bot.waitForTicks(12)
+  } finally {
+    bot.removeListener('entityDead', onDead)
+    stopMoving(bot)
   }
-  stopMoving(bot)
-  if (target.isValid) return failed(`The ${name} got away.`)
+  if (!killed) return failed(`The ${name} got away.`)
   // Walk onto the spot so the drops are picked up.
   await walkTo(bot, ctx, new goals.GoalNear(lastSeen.x, lastSeen.y, lastSeen.z, 1), 5000)
   await bot.waitForTicks(20)

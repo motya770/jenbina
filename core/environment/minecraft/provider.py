@@ -61,6 +61,21 @@ class MinecraftWorld:
         if not self.stay_online:
             self.bridge.end_session()
 
+    def close(self) -> None:
+        """Take her out of the world, even when she is set to stay online.
+
+        Called when she falls asleep and when her host stops: she must never
+        be left standing in a running world with nobody home. Never raises.
+        """
+        try:
+            self.bridge.end_session()
+        except Exception:
+            pass
+
+    def scene_after(self, observation: dict, memory: dict) -> Scene:
+        """The scene as it is after an action, for the summary the rail shows."""
+        return build_scene(observation, self._memory(memory).get("home"), self.clock())
+
     @staticmethod
     def _memory(memory: dict) -> dict:
         own = memory.get(MEMORY_KEY)
@@ -106,7 +121,9 @@ class MinecraftWorld:
         if action is None:
             outcome = Outcome(False, UNCLEAR_CHOICE, place=scene.place)
         elif action.name == SLEEP:
-            # Sleeping is the heartbeat's business: she leaves the world.
+            # Sleeping is the heartbeat's business: she leaves the world, even
+            # when she is set to stay online between beats.
+            self.close()
             return Outcome(True, "", SLEEP, action, place=scene.place)
         else:
             outcome = self._act(scene, action, person, memory)
