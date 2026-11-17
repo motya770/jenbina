@@ -57,6 +57,9 @@ def env_line_html(world_summary: dict | None) -> str:
             parts.append(f"Food {int(body['food'])}/20")
         except (KeyError, TypeError, ValueError):
             pass
+    if world_summary.get("last_seen"):
+        # She was cut off from a real world mid-action: this is from before it.
+        parts.append("as last seen")
     return '<div class="px-env-line">' + " · ".join(parts) + "</div>"
 
 

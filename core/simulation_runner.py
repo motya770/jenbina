@@ -55,6 +55,10 @@ _tone_map = {
 }
 
 
+class BeatAbandoned(RuntimeError):
+    """Her host stopped hosting her in the middle of this beat."""
+
+
 def get_person_dict(person):
     """Get person state as dictionary."""
     return {
@@ -285,7 +289,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
             let a chat message be answered meanwhile.
             Optional: status (stage sink), sleep_config (RhythmConfig),
             proactive_target ((user_id, person_key)), world_provider (a real
-            world such as MinecraftWorld) with world_memory (its saved dict). Without an event_log,
+            world such as MinecraftWorld) with world_memory (its saved dict),
+            still_hosting (callable; when it returns False the beat raises
+            BeatAbandoned instead of acting in a real world). Without an event_log,
             user_db and user_id provide the legacy event-log fallback.
 
     Returns:
@@ -551,6 +557,11 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     if scene is not None:
         # In a real world she is credited for what happened, not for what she said.
         stage("acting in the world…")
+        still_hosting = context.get("still_hosting")
+        if still_hosting is not None and not still_hosting():
+            # Her host stopped while this beat was thinking. She is no longer
+            # this process's to move, so nothing more is done in the world.
+            raise BeatAbandoned("Her host stopped hosting her during this beat.")
         outcome = provider.perform(scene, chosen, person, context["world_memory"], waiting=waiting)
         if isinstance(action_response, dict):
             action_response["outcome"] = outcome.summary
@@ -852,6 +863,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         after = provider.scene_after(outcome.observation, context["world_memory"])
         world_summary = get_world_state_summary(after.world_state)
         world_summary["body"] = after.body
+    elif outcome is not None and outcome.unseen:
+        # She did not see how the action ended; this is the world from before it.
+        world_summary["last_seen"] = True
 
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
     print(f"{'='*60}")

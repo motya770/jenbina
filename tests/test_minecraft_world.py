@@ -85,7 +85,10 @@ class FakeBridge:
         self.calls.append(("act", name, dict(args or {})))
         if self.fail_act:
             raise WorldUnavailable("lost the connection")
-        return dict(self.result)
+        result = dict(self.result)
+        # Like the bridge: a finished action comes with what the world looks like now.
+        result.setdefault("observation", self.observation)
+        return result
 
 
 class TestPlaceAndScene(unittest.TestCase):
@@ -364,22 +367,48 @@ class TestPerform(ProviderCase):
         self.assertEqual(outcome.summary, UNCLEAR_CHOICE)
         self.assertEqual(outcome.place, HOME_PLACE)
 
-    def test_sleep_sends_no_action_only_a_logout(self):
+    def test_choosing_sleep_sends_nothing_to_the_world(self):
+        # Her host logs her out when she really falls asleep, with her mind free.
         self.now = MIDNIGHT
         scene = self.world.observe(self.person, self.memory, self.config)
         self.bridge.calls.clear()
         outcome = self.world.perform(scene, "Go to sleep for the night", self.person, self.memory)
-        self.assertEqual(self.bridge.calls, ["end"])
+        self.assertEqual(self.bridge.calls, [])
         self.assertTrue(outcome.ok)
         self.assertEqual(outcome.need_key, "sleep")
+        self.assertFalse(outcome.unseen)
 
-    def test_choosing_sleep_logs_her_out_even_when_she_stays_online(self):
-        self.now = MIDNIGHT
-        world = MinecraftWorld(self.bridge, stay_online=True, clock=lambda: self.now)
-        scene = world.observe(self.person, self.memory, self.config)
-        self.assertEqual(self.bridge.calls, ["start"])
-        world.perform(scene, "Go to sleep for the night", self.person, self.memory)
-        self.assertEqual(self.bridge.calls, ["start", "end"])
+    def test_an_action_that_ran_out_of_time_reports_nothing_she_did_not_see(self):
+        self.bridge.result = {"ok": False, "summary": "Ran out of time trying to explore, and left the world.",
+                              "died": False, "timed_out": True, "observation": None}
+        hunger = self.person.maslow_needs.needs["hunger"]
+        hunger.satisfaction = 33.0
+        outcome = self.world.perform(self.scene, "Explore to the east", self.person, self.memory)
+        self.assertFalse(outcome.ok)
+        self.assertIsNone(outcome.need_key)
+        # Not the snapshot from before the action dressed up as the result.
+        self.assertIsNone(outcome.observation)
+        self.assertTrue(outcome.unseen)
+        self.assertEqual(outcome.place, self.scene.place)
+        self.assertEqual(hunger.satisfaction, 33.0)
+
+    def test_an_answer_without_an_observation_is_never_a_success(self):
+        self.bridge.result = {"ok": True, "summary": "Chopped wood.", "died": False, "observation": None}
+        outcome = self.world.perform(self.scene, "Chop wood from the trees nearby", self.person, self.memory)
+        self.assertFalse(outcome.ok)
+        self.assertIsNone(outcome.need_key)
+
+    def test_losing_the_world_mid_action_is_marked_as_unseen(self):
+        self.bridge.fail_act = True
+        outcome = self.world.perform(self.scene, "Chop wood from the trees nearby", self.person, self.memory)
+        self.assertFalse(outcome.ok)
+        self.assertTrue(outcome.unseen)
+        self.assertIsNone(outcome.observation)
+
+    def test_a_seen_result_is_not_marked_unseen(self):
+        outcome = self.world.perform(self.scene, "Chop wood from the trees nearby", self.person, self.memory)
+        self.assertFalse(outcome.unseen)
+        self.assertEqual(outcome.observation, self.bridge.observation)
 
     def test_close_always_logs_her_out_and_never_raises(self):
         world = MinecraftWorld(self.bridge, stay_online=True)
@@ -502,6 +531,19 @@ class TestWorldFromEnv(unittest.TestCase):
         self.assertIsInstance(world, MinecraftWorld)
         self.assertEqual(world.bridge.base_url, "http://127.0.0.1:4000")
         self.assertFalse(world.stay_online)
+
+    def test_her_world_starts_with_her_unless_switched_off_or_remote(self):
+        self.assertIsNotNone(world_from_env({"JENBINA_WORLD": "minecraft"}).launcher)
+        off = world_from_env({"JENBINA_WORLD": "minecraft", "JENBINA_MINECRAFT_AUTOSTART": "0"})
+        self.assertIsNone(off.launcher)
+        remote = world_from_env({"JENBINA_WORLD": "minecraft",
+                                 "JENBINA_MINECRAFT_BRIDGE_URL": "http://10.0.0.5:3010"})
+        self.assertIsNone(remote.launcher)
+
+    def test_the_launcher_uses_the_configured_bridge_port(self):
+        world = world_from_env({"JENBINA_WORLD": "minecraft",
+                                "JENBINA_MINECRAFT_BRIDGE_URL": "http://localhost:4000"})
+        self.assertEqual(world.launcher.bridge_port, 4000)
 
     def test_stay_online_is_opt_in(self):
         world = world_from_env({"JENBINA_WORLD": "minecraft", "JENBINA_MINECRAFT_STAY_ONLINE": "1"})
@@ -641,6 +683,29 @@ class TestRunnerInMinecraft(unittest.TestCase):
         self.assertIn("Chop wood from the trees nearby", offered)
         self.assertIn("Rest for a while", offered)
 
+    def test_a_beat_whose_host_has_stopped_does_nothing_in_the_world(self):
+        from core.simulation_runner import BeatAbandoned
+        self.context["still_hosting"] = lambda: False
+        with self.assertRaises(BeatAbandoned):
+            self.run_beat()
+        # She looked before the host stopped, and never logged in again to act.
+        self.assertEqual(self.bridge.calls, ["start", "end"])
+
+    def test_a_beat_whose_host_still_has_her_acts_as_usual(self):
+        self.context["still_hosting"] = lambda: True
+        result = self.run_beat()
+        self.assertTrue(result["world_outcome"]["ok"])
+        self.assertNotIn("last_seen", result["world_summary"])
+
+    def test_an_action_she_did_not_see_end_leaves_the_summary_marked_as_last_seen(self):
+        self.bridge.result = {"ok": False, "summary": "Ran out of time trying to gather wood, and left the world.",
+                              "died": False, "timed_out": True, "observation": None}
+        result = self.run_beat()
+        self.assertFalse(result["world_outcome"]["ok"])
+        self.assertTrue(result["world_outcome"]["unseen"])
+        self.assertTrue(result["world_summary"]["last_seen"])
+        self.assertEqual(result["world_summary"]["location"]["name"], HOME_PLACE)
+
     def test_an_unreachable_world_stops_the_beat_before_any_llm_call(self):
         self.bridge.fail_start = True
         needs_chain = self.stack.enter_context(patch.object(self.runner, "create_basic_needs_chain"))
@@ -714,21 +779,81 @@ class TestHostLeavesTheWorld(HostCase):
 
     def setUp(self):
         super().setUp()
-        self.world = SimpleNamespace(skip_needs=("hunger",), close=MagicMock())
+        self.world = SimpleNamespace(skip_needs=("hunger",), close=MagicMock(),
+                                     start=MagicMock(), stop=MagicMock())
         self.host.world_provider = self.world
+
+    def lock_is_free(self):
+        """True when another thread could take her mind right now."""
+        import threading
+        seen = []
+
+        def probe():
+            took = self.host.lock.acquire(timeout=1)
+            seen.append(took)
+            if took:
+                self.host.lock.release()
+
+        thread = threading.Thread(target=probe)
+        thread.start()
+        thread.join()
+        return seen == [True]
 
     def test_falling_asleep_takes_her_out_of_the_world(self):
         self.host._fall_asleep(self.now, "exhausted")
+        self.host._leave_world_if_asked()
         self.world.close.assert_called_once_with()
+        self.host._leave_world_if_asked()
+        self.world.close.assert_called_once_with()
+
+    def test_the_logout_at_sleep_does_not_hold_her_mind(self):
+        from core.heartbeat.rhythm import FALL_ASLEEP, Step
+        free = []
+        self.world.close.side_effect = lambda: free.append(self.lock_is_free())
+        with patch("core.heartbeat.host.decide", return_value=Step(FALL_ASLEEP, "exhausted")):
+            self.host.tick()
+        self.assertEqual(self.host.situation.phase, "asleep")
+        # A stalled world cannot hold up a message to her.
+        self.assertEqual(free, [True])
 
     def test_stopping_the_host_takes_her_out_of_the_world(self):
         self.host.stop()
         self.world.close.assert_called_once_with()
 
+    def test_a_host_that_has_stopped_does_not_log_out_the_next_one(self):
+        self.host.stop()
+        self.host.stop()
+        # The second stop finds her no longer here: the session may be another host's.
+        self.world.close.assert_called_once_with()
+
+    def test_a_host_that_lost_her_does_not_log_her_out_when_it_stops(self):
+        self.host._lost_lease()
+        self.host.stop()
+        self.world.close.assert_not_called()
+
     def test_a_world_that_cannot_be_left_does_not_stop_her_sleeping(self):
         self.world.close.side_effect = RuntimeError("bridge exploded")
         self.host._fall_asleep(self.now, "chose")
+        self.host._leave_world_if_asked()
         self.assertEqual(self.host.situation.phase, "asleep")
+
+    def test_a_beat_is_told_whether_its_host_still_has_her(self):
+        self.host.step_once()
+        still_hosting = self.calls[-1]["context"]["still_hosting"]
+        self.assertTrue(still_hosting())
+        self.host.hosting = False
+        self.assertFalse(still_hosting())
+        self.host.hosting = True
+
+    def test_a_beat_abandoned_mid_way_leaves_the_world_when_it_ends(self):
+        def abandoned(**kwargs):
+            # The host stops while the beat is out thinking.
+            self.host.hosting = False
+            raise RuntimeError("acted on nothing")
+
+        self.host.iteration_fn = abandoned
+        self.host.step_once()
+        self.world.close.assert_called_once_with()
 
     def test_sleep_does_not_decay_the_hunger_her_body_owns(self):
         hunger = self.host.person.maslow_needs.needs["hunger"]
@@ -746,6 +871,97 @@ class TestHostLeavesTheWorld(HostCase):
         self.host._fall_asleep(self.now, "chose")
         self.host._sleep_tick(self.now + timedelta(hours=3))
         self.assertLess(hunger.satisfaction, 80.0)
+
+
+class TestHostStartsAndStopsTheWorld(HostCase):
+    """Her world starts when she does and stops when she does."""
+
+    def setUp(self):
+        super().setUp()
+        self.host.stop()
+        self.world = SimpleNamespace(skip_needs=("hunger",), close=MagicMock(),
+                                     start=MagicMock(), stop=MagicMock())
+
+    def test_starting_her_starts_her_world(self):
+        host = self.make_host(world_provider=self.world)
+        self.world.start.assert_not_called()
+        self.assertTrue(host.start(threads=False))
+        self.world.start.assert_called_once_with()
+        self.world.stop.assert_not_called()
+
+    def test_a_world_that_cannot_start_does_not_stop_her_starting(self):
+        self.world.start.side_effect = WorldUnavailable("Her Minecraft server is not set up.")
+        host = self.make_host(world_provider=self.world)
+        with self.assertLogs("jenbina.heartbeat", level="WARNING") as logs:
+            self.assertTrue(host.start(threads=False))
+        self.assertIn("not set up", logs.output[0])
+        self.assertTrue(host.hosting)
+
+    def test_a_host_refused_the_lease_does_not_start_the_world(self):
+        other = self.make_host(owner="someone:else")
+        self.assertTrue(other.start(threads=False))
+        host = self.make_host(world_provider=self.world)
+        self.assertFalse(host.start(threads=False))
+        self.world.start.assert_not_called()
+
+    def test_stopping_her_logs_her_out_and_then_stops_her_world(self):
+        order = []
+        self.world.close.side_effect = lambda: order.append("logout")
+        self.world.stop.side_effect = lambda: order.append("stop world")
+        host = self.make_host(world_provider=self.world)
+        host.start(threads=False)
+        host.stop()
+        self.assertEqual(order, ["logout", "stop world"])
+
+    def test_a_world_without_processes_of_its_own_is_fine(self):
+        host = self.make_host(world_provider=SimpleNamespace(skip_needs=(), close=MagicMock()))
+        self.assertTrue(host.start(threads=False))
+        host.stop()
+
+
+class TestWorldWithALauncher(ProviderCase):
+    def setUp(self):
+        super().setUp()
+        self.launcher = MagicMock()
+        self.launcher.ensure_ready.side_effect = lambda: self.bridge.calls.append("ensure ready")
+        self.world = MinecraftWorld(self.bridge, clock=lambda: self.now, launcher=self.launcher)
+
+    def test_start_and_stop_reach_the_launcher(self):
+        self.world.start()
+        self.launcher.start.assert_called_once_with()
+        self.world.stop()
+        self.launcher.stop.assert_called_once_with()
+        # Stopping the processes is not a logout; her host decides that.
+        self.assertEqual(self.bridge.calls, [])
+
+    def test_stop_never_raises(self):
+        self.launcher.stop.side_effect = RuntimeError("could not signal")
+        self.world.stop()
+
+    def test_looking_waits_for_the_world_before_logging_in(self):
+        from contextlib import contextmanager
+
+        @contextmanager
+        def waiting():
+            self.bridge.calls.append("wait begins")
+            yield
+            self.bridge.calls.append("wait ends")
+
+        self.world.observe(self.person, self.memory, self.config, waiting=waiting)
+        # The wait for a starting world happens with her mind let go.
+        self.assertEqual(self.bridge.calls, ["wait begins", "ensure ready", "start", "end", "wait ends"])
+
+    def test_a_world_that_does_not_come_up_fails_the_look(self):
+        self.launcher.ensure_ready.side_effect = WorldUnavailable("Her Minecraft world is still starting.")
+        with self.assertRaises(WorldUnavailable):
+            self.world.observe(self.person, self.memory, self.config)
+        self.assertEqual(self.bridge.calls, [])
+
+    def test_without_a_launcher_start_and_stop_do_nothing(self):
+        world = MinecraftWorld(self.bridge)
+        world.start()
+        world.stop()
+        self.assertEqual(self.bridge.calls, [])
 
 
 class TestTimelineAndRail(unittest.TestCase):
@@ -768,6 +984,13 @@ class TestTimelineAndRail(unittest.TestCase):
         self.assertIn("Health 14/20", line)
         self.assertIn("Food 16/20", line)
         self.assertNotIn("Health", env_line_html({**summary, "body": {"health": None}}))
+
+    def test_the_rail_says_when_the_world_is_only_as_last_seen(self):
+        summary = {"location": {"name": "Home"}, "time": {"time_of_day": "afternoon"},
+                   "weather": {"description": "clear sky", "temperature": 15.0},
+                   "body": {"health": 14, "food": 16}}
+        self.assertNotIn("as last seen", env_line_html(summary))
+        self.assertIn("as last seen", env_line_html({**summary, "last_seen": True}))
 
 
 if __name__ == "__main__":

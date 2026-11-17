@@ -1,9 +1,12 @@
 # Minecraft world: Jenbina lives in a real place
 
 Status: built. The owner asked for the design and the implementation in one
-request; the build was reviewed with Codex and its eight findings were fixed. Date: 2026-11-17. Revised the same day after a design review and a
-live test of the bridge (sleep offer, drinking, plans, the variety rule, when
-she is logged in, and monsters off by default).
+request; the build was reviewed with Codex twice and its fourteen findings
+(eight, then six in the fixes and the merge with main) were fixed. Date:
+2026-11-17. Revised the same day after a design review and a live test of the
+bridge (sleep offer, drinking, plans, the variety rule, when she is logged in,
+and monsters off by default), and again when the owner asked that her world
+start with her (see Starting and stopping the world).
 
 ## Intent
 
@@ -126,7 +129,48 @@ Minecraft server 1.21.4  <--game protocol-->  Node bridge  <--HTTP, localhost-->
   the code that turns an observation into a scene and a list of actions, and
   the provider the runner calls.
 
-The owner starts the server and the bridge. Python never launches them.
+### Starting and stopping the world
+
+The first version left the server and the bridge to the owner: three terminals
+for one Jenbina. The owner asked that the world start when she does.
+
+- `core/environment/minecraft/launcher.py` owns the two processes. When her
+  host begins hosting her it starts whichever of the server and the bridge is
+  not already running, and returns at once. When the host stops it stops the
+  ones it started, the bridge first so she is logged out before the world
+  closes. A server or bridge somebody else started is used and left running.
+- The look at the start of every beat first checks that both answer, starts
+  again whichever went down, and waits up to 150 seconds for them. That wait
+  is inside the host's `waiting()`, so a message to her is answered meanwhile.
+- The launcher never sets the world up. A missing server, an unaccepted EULA
+  or missing bridge packages make the beat fail with the step that is missing.
+- The two run in their own sessions, so Ctrl-C reaches her mind first and the
+  shutdown is ordered. Their output goes to `minecraft/logs/`.
+- `JENBINA_MINECRAFT_AUTOSTART=0` leaves both to the owner, and a bridge URL
+  on another machine switches the launcher off.
+
+A mind killed outright leaves its server and bridge running; the next start
+adopts them without owning them. An idle limit in the bridge would close that
+gap and is not built.
+
+### Leaving the world safely
+
+These rules came out of the second review:
+
+- Only a host that still has her logs her out. A host that has stopped, or
+  lost its lease, leaves the session alone: it may be the next host's.
+- A beat checks that its host still has her before it acts. The mind lock is
+  free during a beat's waits, so a host can stop in the middle of one.
+- Logging out waits on the bridge, so it never happens with the mind lock
+  held. Falling asleep asks for it; it is done once the lock is free.
+- A request to leave during a login wins: the bot that arrives is sent away.
+- A step the bridge stopped waiting for and cannot cancel ends the action with
+  her logged out, like an action that overran its budget.
+- A bot that is cut off mid-action is an error at once. Its tick counter stops,
+  so waiting on it would never return and the bridge would stay busy.
+- When she did not see how an action ended, nothing is made up from what she
+  saw before it: the outcome carries no observation, her body is not synced,
+  and the rail marks the world "as last seen" until the next beat looks.
 
 ### One beat in Minecraft
 
@@ -304,6 +348,7 @@ can reach her at night; the setup notes say so.
 | `JENBINA_WORLD` | Python | `palo_alto` | `minecraft` turns this on |
 | `JENBINA_MINECRAFT_BRIDGE_URL` | Python | `http://127.0.0.1:3010` | where the bridge listens |
 | `JENBINA_MINECRAFT_STAY_ONLINE` | Python | `0` | `1` keeps her logged in between beats |
+| `JENBINA_MINECRAFT_AUTOSTART` | Python | `1` | `0` stops Python from starting the server and the bridge |
 | `MC_HOST`, `MC_PORT`, `MC_USERNAME`, `MC_VERSION` | bridge | `127.0.0.1`, `25565`, `Jenbina`, `1.21.4` | the server to join |
 | `BRIDGE_PORT` | bridge | `3010` | bridge HTTP port, bound to `127.0.0.1` |
 | `VIEWER_PORT` | bridge | unset | serve the browser viewer on this port |
@@ -311,21 +356,22 @@ can reach her at night; the setup notes say so.
 ### Code changes
 
 - `core/environment/minecraft/` (new): `bridge_client.py`, `scene.py`,
-  `provider.py`, `__init__.py`.
+  `provider.py`, `launcher.py`, `__init__.py`.
 - `core/simulation_runner.py`: when `context["world_provider"]` is set, use it
   for the world state, the scene, the action outcome, the need key and the
   location. With no provider the code path is exactly today's.
 - `core/heartbeat/rhythm.py`: `Situation.world`.
 - `core/heartbeat/host.py`: accept `world_provider`, pass it and
-  `situation.world` to the runner.
+  `situation.world` to the runner; start the world when hosting begins, log
+  her out and stop it when hosting ends.
 - `core/ui/shared_init.py`, `run_heartbeat.py`: build the provider from the
   environment.
 - `core/timeline/events.py`, `core/timeline/recording.py`,
   `core/ui/timeline.py`: an optional `outcome` on action events, shown as
   "What happened" in the row's details.
 - `core/ui/rail.py`: a body line (health and food) when the world reports one.
-- `minecraft/bridge/` (new): `bridge.js`, `actions.js`, `observe.js`,
-  `package.json`, lock file.
+- `minecraft/bridge/` (new): `bridge.js`, `session.js`, `run.js`,
+  `actions.js`, `observe.js`, `words.js`, `package.json`, lock file.
 - `minecraft/setup_server.sh`, `minecraft/README.md` (new).
 - `.gitignore`, `.env.example`, `CLAUDE.md`.
 
@@ -336,9 +382,11 @@ can reach her at night; the setup notes say so.
   bar, home and place labels, the runner with a provider (no world LLM call,
   the session always ends, nothing credited on failure), the host passing the
   provider and saving `Situation.world`, and the timeline and rail additions.
+- The launcher is tested with fake processes and ports: what it starts, what
+  it leaves alone, what it refuses to start and why, the wait, and stopping.
 - The bridge's pure helpers (shaping an observation, writing a summary from an
-  inventory difference) have Node tests run with `node --test`. CI does not run
-  them; it has no Node step today.
+  inventory difference), its session rules and its action runner have Node
+  tests run with `node --test`. CI does not run them; it has no Node step today.
 - The bridge's routines need a live server and are checked by hand with the
   procedure in `minecraft/README.md`: one real beat with
   `python run_heartbeat.py --once`.

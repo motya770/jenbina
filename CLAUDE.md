@@ -25,7 +25,7 @@ jenbina/
 │   ├── cognition/               # Decision-making, meta-cognition, inner monologue
 │   ├── emotions/                # Emotional state management and analysis
 │   ├── environment/             # World simulation, locations, dynamic events
-│   │   └── minecraft/           # A real world: bridge client, scene and action builder, world provider
+│   │   └── minecraft/           # A real world: bridge client, scene and action builder, world provider, launcher for its processes
 │   ├── goals/                   # Short/mid/long-term goal tracking
 │   ├── heartbeat/               # One shared being, owned by one process; no Streamlit imports
 │   │   ├── adoption.py          # One-time adoption of existing per-user state and history
@@ -140,8 +140,10 @@ python run_heartbeat.py --adopt-user-id 3
 
 ### Minecraft world
 
-Her Minecraft world needs two extra processes that you start yourself: the
-server and the Node bridge. Python never launches them. Full notes are in
+Her Minecraft world needs two extra processes: the server and the Node
+bridge. Her mind starts both when it starts and stops the ones it started when
+it stops (`core/environment/minecraft/launcher.py`); ones already running are
+used and left running. The setup is never done for you. Full notes are in
 `minecraft/README.md`.
 
 ```bash
@@ -149,10 +151,12 @@ server and the Node bridge. Python never launches them. Full notes are in
 ./minecraft/setup_server.sh --accept-eula
 cd minecraft/bridge && npm install
 
-# Each time: the world, the bridge, then her mind
+# Each time: her mind; the world starts with it (output in minecraft/logs/)
+JENBINA_WORLD=minecraft python run_heartbeat.py --once
+
+# Or start the world yourself and keep it up between runs
 ./minecraft/run_server.sh
 node minecraft/bridge/bridge.js
-JENBINA_WORLD=minecraft python run_heartbeat.py --once
 
 # The bridge's unit tests (CI does not run them)
 cd minecraft/bridge && npm test
@@ -211,6 +215,7 @@ Copy `.env.example` to `.env` and configure:
 | `JENBINA_WORLD` | `minecraft` makes her live in a private Minecraft world (default: `palo_alto`, the described world) |
 | `JENBINA_MINECRAFT_BRIDGE_URL` | Where the Node bridge listens (default: `http://127.0.0.1:3010`) |
 | `JENBINA_MINECRAFT_STAY_ONLINE` | Set to `1` to keep her logged in to Minecraft between beats (default: `0`, she is in the world only while looking and acting) |
+| `JENBINA_MINECRAFT_AUTOSTART` | Set to `0` to start the Minecraft server and the bridge yourself (default: `1`, her mind starts and stops them) |
 | `JENBINA_ADOPT_USER_ID` | On the very first start only: the user id whose saved Jenbina becomes the one Jenbina (default: the real account with the most experiences; the E2E test login is never picked automatically) |
 
 ## Code Conventions
@@ -264,7 +269,7 @@ The primary CI gate is `run-tests.yml` which runs `python -m pytest tests/test_*
 - **LLM JSON Parsing:** LLM responses are parsed as JSON for structured decisions. The `fix_llm_json.py` utility handles malformed JSON from LLMs — use it when processing LLM output.
 - **Memory Databases:** The hybrid memory system uses three databases simultaneously. Changes to memory schemas affect ChromaDB collections, Neo4j nodes/relationships, and SQLite tables.
 - **Streamlit State:** The live `Person` belongs to the host in `core/heartbeat/host.py`. `st.session_state.person` is a reference to that shared object. Change her only inside `host.chat_turn(...)` or a beat so the mind lock protects her state; the host saves it.
-- **Minecraft world:** A real world is a `world_provider` on the host (`core/environment/minecraft/provider.py`). The runner calls `observe` before any LLM call and `perform` after the decision; with no provider the Palo Alto code path is unchanged. Keep every Minecraft routine bounded and report failures honestly: she is credited only for what the bridge says happened.
+- **Minecraft world:** A real world is a `world_provider` on the host (`core/environment/minecraft/provider.py`). The runner calls `observe` before any LLM call and `perform` after the decision; with no provider the Palo Alto code path is unchanged. Keep every Minecraft routine bounded and report failures honestly: she is credited only for what the bridge says happened. Never call the bridge with the mind lock held (use the `waiting` the runner passes, or ask for the logout as `_fall_asleep` does), and let only a host that still has her log her out.
 - **No `.env` in VCS:** The `.env` file contains secrets and must never be committed. Use `.env.example` as the template.
 
 ## Superpowers Plugin

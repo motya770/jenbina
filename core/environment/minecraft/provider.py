@@ -3,6 +3,9 @@
 A beat calls ``observe`` once before it thinks and ``perform`` once after it
 has decided. She is logged in only inside those two calls, so she never stands
 idle in a running world while her mind works.
+
+Her host calls ``start`` when it begins hosting her and ``stop`` when it ends:
+with a launcher, that starts and stops the world's own processes.
 """
 
 from __future__ import annotations
@@ -13,7 +16,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable, Mapping
 
+from urllib.parse import urlsplit
+
 from .bridge_client import DEFAULT_BRIDGE_URL, MinecraftBridge, WorldUnavailable
+from .launcher import WorldLauncher, is_local, repo_root
 from .scene import SLEEP, Scene, WorldAction, build_scene, place_label, resolve_action, time_of_day
 
 MEMORY_KEY = "minecraft"
@@ -30,12 +36,17 @@ class Outcome:
     action: WorldAction | None = None
     died: bool = False
     place: str | None = None
-    # What the world looked like afterwards; ``None`` when nothing was done there.
+    # What the world looked like afterwards; ``None`` when nothing was done
+    # there, or when she could not see how it ended.
     observation: dict | None = None
+    # She acted, or may have, and did not see the result: what she knows of
+    # the world is from before the action.
+    unseen: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "ok": self.ok, "summary": self.summary, "died": self.died, "place": self.place,
+            "unseen": self.unseen,
             "action": self.action.name if self.action is not None else None,
         }
 
@@ -53,10 +64,35 @@ class MinecraftWorld:
     skip_needs = ("hunger",)
 
     def __init__(self, bridge: MinecraftBridge, stay_online: bool = False,
-                 clock: Callable[[], datetime] = datetime.now):
+                 clock: Callable[[], datetime] = datetime.now,
+                 launcher: WorldLauncher | None = None):
         self.bridge = bridge
         self.stay_online = stay_online
         self.clock = clock
+        # Starts and stops the server and the bridge; ``None`` when the owner
+        # runs them.
+        self.launcher = launcher
+
+    def start(self) -> None:
+        """Start the world's processes if they are ours to start.
+
+        Returns once they are launched; ``observe`` waits until they are
+        ready. Raises ``WorldUnavailable`` when the world is not set up.
+        """
+        if self.launcher is not None:
+            self.launcher.start()
+
+    def stop(self) -> None:
+        """Stop the processes ``start`` launched. Never raises.
+
+        It does not log her out: ``close`` does, and only the host that has
+        her may call it.
+        """
+        if self.launcher is not None:
+            try:
+                self.launcher.stop()
+            except Exception:
+                pass
 
     def _leave(self) -> None:
         if not self.stay_online:
@@ -65,8 +101,8 @@ class MinecraftWorld:
     def close(self) -> None:
         """Take her out of the world, even when she is set to stay online.
 
-        Called when she falls asleep and when her host stops: she must never
-        be left standing in a running world with nobody home. Never raises.
+        Called by her host when she falls asleep and when it stops: she must
+        never be left standing in a running world with nobody home. Never raises.
         """
         try:
             self.bridge.end_session()
@@ -110,6 +146,10 @@ class MinecraftWorld:
         the world. Her state is touched only after it has been left.
         """
         with waiting():
+            if self.launcher is not None:
+                # A world that is still starting, or that went down, is waited
+                # for here, with her mind free to talk meanwhile.
+                self.launcher.ensure_ready()
             try:
                 observation = self.bridge.start_session()
             finally:
@@ -131,9 +171,8 @@ class MinecraftWorld:
         if action is None:
             outcome = Outcome(False, UNCLEAR_CHOICE, place=scene.place)
         elif action.name == SLEEP:
-            # Sleeping is the heartbeat's business: she leaves the world, even
-            # when she is set to stay online between beats.
-            self.close()
+            # Sleeping is the heartbeat's business. When she does fall asleep
+            # her host takes her out of the world, without holding her mind.
             return Outcome(True, "", SLEEP, action, place=scene.place)
         else:
             outcome = self._act(scene, action, person, memory, waiting)
@@ -154,14 +193,19 @@ class MinecraftWorld:
                 finally:
                     self._leave()
         except WorldUnavailable as err:
-            return Outcome(False, f"I could not reach the world to do it ({err}).", action=action, place=scene.place)
+            # The action may have begun before the world was lost.
+            return Outcome(False, f"I could not reach the world to do it ({err}).",
+                           action=action, place=scene.place, unseen=True)
 
         now = self.clock()
         own = self._memory(memory)
         observation = result.get("observation")
         if not isinstance(observation, dict):
-            observation = scene.observation
-        ok = bool(result.get("ok"))
+            # She was cut off (an action that ran out of time): where she is
+            # and how her body is now is not known. Nothing is made up from
+            # what she saw before; the next beat looks again.
+            observation = None
+        ok = bool(result.get("ok")) and observation is not None
         died = bool(result.get("died"))
         summary = str(result.get("summary") or ("Done." if ok else "It did not work."))
         self.sync_body(person, observation, now)
@@ -174,8 +218,9 @@ class MinecraftWorld:
                 "I died in the world and woke at the spawn point. What I carried may be gone.", cycles=3)
         return Outcome(
             ok=ok and not died, summary=summary, need_key=action.need_key if ok and not died else None,
-            action=action, died=died, place=place_label(observation, own.get("home")),
-            observation=observation,
+            action=action, died=died,
+            place=place_label(observation, own.get("home")) if observation is not None else scene.place,
+            observation=observation, unseen=observation is None,
         )
 
 
@@ -185,4 +230,10 @@ def world_from_env(env: Mapping[str, str] | None = None) -> MinecraftWorld | Non
     if str(env.get("JENBINA_WORLD", "")).strip().lower() != "minecraft":
         return None
     bridge = MinecraftBridge(env.get("JENBINA_MINECRAFT_BRIDGE_URL") or DEFAULT_BRIDGE_URL)
-    return MinecraftWorld(bridge, stay_online=env.get("JENBINA_MINECRAFT_STAY_ONLINE") == "1")
+    launcher = None
+    # Her world starts and stops with her, unless that is switched off or the
+    # bridge is on another machine.
+    if env.get("JENBINA_MINECRAFT_AUTOSTART", "1") != "0" and is_local(urlsplit(bridge.base_url).hostname):
+        launcher = WorldLauncher(repo_root(), bridge, env=env)
+    return MinecraftWorld(bridge, stay_online=env.get("JENBINA_MINECRAFT_STAY_ONLINE") == "1",
+                          launcher=launcher)

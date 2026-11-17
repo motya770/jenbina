@@ -98,3 +98,4 @@ graphify-out/.needs_update
 # Minecraft world (see minecraft/README.md)
 node_modules/
 minecraft/server/
+minecraft/logs/

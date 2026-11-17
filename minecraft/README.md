@@ -13,12 +13,18 @@ The design is in
 
 | Piece | Where | Started by |
 |---|---|---|
-| Minecraft server 1.21.4 | `minecraft/server/` (ignored by git) | you |
-| Bridge (Node, Mineflayer) | `minecraft/bridge/` | you |
 | Her mind | the app or `run_heartbeat.py` | you, as before |
+| Minecraft server 1.21.4 | `minecraft/server/` (ignored by git) | her mind, when it starts |
+| Bridge (Node, Mineflayer) | `minecraft/bridge/` | her mind, when it starts |
 
-Python never starts the server or the bridge. If either is down, her beats
-fail before any LLM call and back off until the world returns.
+Her world starts with her. When her mind starts, it starts the server and the
+bridge if they are not already running, and when it stops it stops the ones it
+started. One that you started yourself is left running. Before each look at
+the world she checks that both are up and starts again whichever went down.
+
+If the world cannot be started or reached, her beats fail before any LLM call
+and back off until it returns. Set `JENBINA_MINECRAFT_AUTOSTART=0` to start
+the two yourself instead.
 
 ## Requirements
 
@@ -49,19 +55,7 @@ cd minecraft/bridge && npm install
 
 ## Run
 
-In one terminal, the world:
-
-```bash
-./minecraft/run_server.sh
-```
-
-In a second, the bridge:
-
-```bash
-node minecraft/bridge/bridge.js
-```
-
-In a third, her mind, for one beat:
+Start her mind; the world comes up with it. For one beat:
 
 ```bash
 JENBINA_WORLD=minecraft python run_heartbeat.py --once
@@ -69,9 +63,40 @@ JENBINA_WORLD=minecraft python run_heartbeat.py --once
 
 Or put `JENBINA_WORLD=minecraft` in `.env` and start the app as usual.
 
+The first beat waits for the server, which takes about half a minute, and
+longer the first time, when it makes the world. What the server and the bridge
+print goes to `minecraft/logs/server.log` and `minecraft/logs/bridge.log`.
+
+`--once` starts the world, takes one beat and stops the world again. To keep
+the world up between such beats, start it yourself first; she then uses the
+running one and leaves it running:
+
+```bash
+./minecraft/run_server.sh
+```
+
+```bash
+node minecraft/bridge/bridge.js
+```
+
+The setup is never done for you: if the server is not set up, the EULA is not
+accepted, or the bridge's packages are missing, her mind says which step
+above is missing and starts nothing.
+
+If her mind is killed outright, the server and the bridge it started keep
+running. The next start finds them, uses them, and leaves them running when it
+stops; stop them yourself with `pkill -f server.jar` and `pkill -f bridge.js`.
+
 ## Watching her
 
-Start the bridge with a viewer port and open `http://localhost:3007`:
+Give the bridge a viewer port and open `http://localhost:3007`. When her mind
+starts the bridge, set it where her mind runs:
+
+```bash
+VIEWER_PORT=3007 JENBINA_WORLD=minecraft python run_heartbeat.py
+```
+
+When you start the bridge yourself:
 
 ```bash
 VIEWER_PORT=3007 node minecraft/bridge/bridge.js
@@ -92,6 +117,7 @@ watch while it is on. It is off unless you set `VIEWER_PORT`.
 | `JENBINA_WORLD` | her mind | `palo_alto` | `minecraft` turns this on |
 | `JENBINA_MINECRAFT_BRIDGE_URL` | her mind | `http://127.0.0.1:3010` | where the bridge listens |
 | `JENBINA_MINECRAFT_STAY_ONLINE` | her mind | `0` | `1` keeps her logged in between beats |
+| `JENBINA_MINECRAFT_AUTOSTART` | her mind | `1` | `0` stops her mind from starting the server and the bridge |
 | `MC_HOST`, `MC_PORT` | bridge | `127.0.0.1`, `25565` | the server to join |
 | `MC_USERNAME` | bridge | `Jenbina` | her name in the world |
 | `MC_VERSION` | bridge | `1.21.4` | must match the server |
@@ -141,6 +167,10 @@ curl -s -X POST http://127.0.0.1:3010/session/end
 ```
 
 Each answer carries a one-sentence `summary` of what really changed.
+
+An action that runs out of time, or leaves a step still going that cannot be
+cancelled (eating, for one), ends with her logged out, so nothing in the world
+changes after the answer. Such an answer has `left_world` set.
 
 ## Versions
 
