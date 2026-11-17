@@ -335,8 +335,8 @@ git commit -m "<conventional commit message>"
 | `2026-10-28-timeline-ui-implementation.md` | Timeline home screen implementation — `core/timeline/` event log, `core/ui/timeline.py`, `core/ui/rail.py`, runner refactor, home screen |
 | `2026-11-14-blade-runner-theme-redesign.md` | Blade Runner 2049 skin proposal — replaces the candy arcade pixel skin with smoke, amber, ice and violet tokens, IBM Plex and Rajdhani type, kind tags instead of pixel icons; layout unchanged |
 | `2026-11-15-heartbeat-design.md` | Heartbeat spec — one shared Jenbina, continuous beats, sleep and wake, honest lost time, private conversations and a live home screen |
-| `2026-11-17-minecraft-world-design.md` | Minecraft world spec — a private server, a Node bridge with observe and act, a scene and action list built from the world, needs credited from real outcomes |
 | `2026-11-15-heartbeat-implementation.md` | Heartbeat implementation — shared storage, rhythm, host, state adoption, standalone runner, per-person chat privacy and live UI |
+| `2026-11-17-minecraft-world-design.md` | Minecraft world spec — a private server, a Node bridge with observe and act, a scene and action list built from the world, needs credited from real outcomes |
 
 ## graphify
 
