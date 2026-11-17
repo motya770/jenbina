@@ -16,6 +16,7 @@ const collectBlock = require('mineflayer-collectblock').plugin
 const { ACTIONS, stopMoving } = require('./actions')
 const { inventoryCounts, observe } = require('./observe')
 const { runRoutine } = require('./run')
+const { createSession } = require('./session')
 
 const MC_HOST = process.env.MC_HOST || '127.0.0.1'
 const MC_PORT = Number(process.env.MC_PORT || 25565)
@@ -30,8 +31,6 @@ const MAX_BUDGET_MS = 120000
 // Past its budget a routine has this long to notice and return by itself.
 const OVERRUN_GRACE_MS = 8000
 
-let bot = null
-let connecting = null
 let busy = false
 
 class BridgeError extends Error {
@@ -46,10 +45,6 @@ function log (message) {
   console.log(`[${new Date().toISOString()}] ${message}`)
 }
 
-function connected () {
-  return bot !== null && bot.entity != null
-}
-
 function startViewer (theBot) {
   if (VIEWER_PORT === null) return
   try {
@@ -61,7 +56,8 @@ function startViewer (theBot) {
   }
 }
 
-function login () {
+/** Join the world as her. `onGone(bot)` is called when that bot leaves by itself. */
+function login (onGone) {
   return new Promise((resolve, reject) => {
     const theBot = mineflayer.createBot({
       host: MC_HOST, port: MC_PORT, username: MC_USERNAME, auth: 'offline', version: MC_VERSION
@@ -86,7 +82,7 @@ function login () {
       theBot.on('kicked', reason => log(`kicked: ${JSON.stringify(reason)}`))
       theBot.on('end', reason => {
         log(`left the world (${reason})`)
-        if (bot === theBot) bot = null
+        onGone(theBot)
       })
       // Settling in can fail (no chunks, no ticks). That must reject this
       // login, not escape as an unhandled rejection; the watchdog above stays
@@ -108,21 +104,7 @@ function login () {
   })
 }
 
-async function startSession () {
-  if (connected()) return
-  if (connecting === null) {
-    connecting = login().then(theBot => {
-      bot = theBot
-      log(`joined ${MC_HOST}:${MC_PORT} as ${MC_USERNAME}`)
-    }).finally(() => { connecting = null })
-  }
-  await connecting
-}
-
-async function endSession () {
-  if (bot === null) return
-  const theBot = bot
-  bot = null
+async function leave (theBot) {
   stopMoving(theBot)
   if (theBot.viewer && theBot.viewer.close) {
     try { theBot.viewer.close() } catch (e) {}
@@ -134,8 +116,16 @@ async function endSession () {
   })
 }
 
+const session = createSession({
+  login: onGone => login(onGone).then(theBot => {
+    log(`joined ${MC_HOST}:${MC_PORT} as ${MC_USERNAME}`)
+    return theBot
+  }),
+  leave
+})
+
 function requireSession () {
-  if (!connected()) throw new BridgeError(409, 'no_session', 'Jenbina is not in the world. Start a session first.')
+  if (!session.connected()) throw new BridgeError(409, 'no_session', 'Jenbina is not in the world. Start a session first.')
 }
 
 async function act (name, args, budgetMs) {
@@ -145,7 +135,7 @@ async function act (name, args, budgetMs) {
   if (busy) throw new BridgeError(409, 'busy', 'She is already in the middle of something.')
   // Busy until the result has been read, so nothing else starts while pickups settle.
   busy = true
-  const theBot = bot
+  const theBot = session.bot()
   try {
     const outcome = await runRoutine({
       bot: theBot,
@@ -158,7 +148,7 @@ async function act (name, args, budgetMs) {
         inventoryCounts,
         observe,
         stop: stopMoving,
-        disconnect: async gone => { if (bot === gone) await endSession() }
+        disconnect: async gone => { if (session.bot() === gone) await session.end() }
       }
     })
     log(`${name}: ${outcome.ok ? 'ok' : 'not ok'} - ${outcome.summary}`)
@@ -193,18 +183,17 @@ function readJson (request) {
 async function route (request) {
   const path = new URL(request.url, 'http://localhost').pathname
   const key = `${request.method} ${path}`
-  if (key === 'GET /health') return { ok: true, connected: connected(), version: MC_VERSION }
+  if (key === 'GET /health') return { ok: true, connected: session.connected(), version: MC_VERSION }
   if (key === 'POST /session/start') {
-    await startSession()
-    return { ok: true, observation: observe(bot) }
+    return { ok: true, observation: observe(await session.start()) }
   }
   if (key === 'POST /session/end') {
-    await endSession()
+    await session.end()
     return { ok: true }
   }
   if (key === 'GET /observe') {
     requireSession()
-    return observe(bot)
+    return observe(session.bot())
   }
   if (key === 'POST /act') {
     const body = await readJson(request)
@@ -226,7 +215,7 @@ const server = http.createServer((request, response) => {
 
 async function shutdown () {
   log('shutting down')
-  await endSession().catch(() => {})
+  await session.end().catch(() => {})
   server.close(() => process.exit(0))
   setTimeout(() => process.exit(0), 2000).unref()
 }

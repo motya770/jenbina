@@ -23,12 +23,23 @@ function remaining (ctx) {
   return Math.max(0, ctx.deadline - Date.now())
 }
 
-/** Await `promise`, but no longer than `ms` or the time the routine has left. */
+/**
+ * Await `promise`, but no longer than `ms` or the time the routine has left.
+ *
+ * Giving up waiting does not stop the step itself. Until it settles it is
+ * counted in `ctx.unfinished`, so the runner knows something is still going on
+ * after the routine has returned and can take her out of the world.
+ */
 function within (ctx, ms, promise) {
   const limit = Math.min(ms, remaining(ctx))
   let timer
   const timeout = new Promise((resolve, reject) => {
-    timer = setTimeout(() => reject(new Error('timed out')), limit)
+    timer = setTimeout(() => {
+      ctx.unfinished = (ctx.unfinished || 0) + 1
+      const settled = () => { ctx.unfinished -= 1 }
+      Promise.resolve(promise).then(settled, settled)
+      reject(new Error('timed out'))
+    }, limit)
   })
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
 }
@@ -320,4 +331,4 @@ const ACTIONS = {
   rest
 }
 
-module.exports = { ACTIONS, stopMoving }
+module.exports = { ACTIONS, stopMoving, within }
