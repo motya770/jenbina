@@ -61,7 +61,15 @@ Start her mind; the world comes up with it. For one beat:
 JENBINA_WORLD=minecraft python run_heartbeat.py --once
 ```
 
-Or put `JENBINA_WORLD=minecraft` in `.env` and start the app as usual.
+Or with the app:
+
+```bash
+JENBINA_WORLD=minecraft streamlit run core/app.py
+```
+
+`run_heartbeat.py` also reads a `.env` file in the project root, so the
+variable can live there. The app reads only the environment it is started
+with.
 
 The first beat waits for the server, which takes about half a minute, and
 longer the first time, when it makes the world. What the server and the bridge
