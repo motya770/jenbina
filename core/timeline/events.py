@@ -97,13 +97,13 @@ def make_thought(mode: str, text: str) -> TimelineEvent:
 
 def make_action(action: str, reasoning: str, lessons, satisfaction_before: float,
                 satisfaction_after: float, location: str, time_of_day: str,
-                weather: str, temperature: float) -> TimelineEvent:
+                weather: str, temperature: float, outcome: str = "") -> TimelineEvent:
     if isinstance(lessons, str):
         lessons_list = [lessons] if lessons.strip() else []
     else:
         lessons_list = [str(item) for item in (lessons or [])]
     title = "Jenbina decided to " + shorten(str(action or "").lower(), ACTION_TITLE_LIMIT)
-    return TimelineEvent(ACTION, title, {
+    detail = {
         "action": action,
         "reasoning": reasoning or "",
         "lessons": lessons_list,
@@ -113,7 +113,11 @@ def make_action(action: str, reasoning: str, lessons, satisfaction_before: float
         "time_of_day": time_of_day,
         "weather": weather,
         "temperature": temperature,
-    })
+    }
+    if outcome:
+        # Only a real world reports what actually happened.
+        detail["outcome"] = str(outcome)
+    return TimelineEvent(ACTION, title, detail)
 
 
 def make_mood(changes: dict, source: str) -> Optional[TimelineEvent]:

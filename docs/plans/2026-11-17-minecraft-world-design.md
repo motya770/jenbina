@@ -1,7 +1,10 @@
 # Minecraft world: Jenbina lives in a real place
 
 Status: design. The owner asked for the design and the implementation in one
-request, so building proceeds from this document. Date: 2026-11-17.
+request, so building proceeds from this document; the build is then reviewed
+with Codex. Date: 2026-11-17. Revised the same day after a design review and a
+live test of the bridge (sleep offer, drinking, plans, the variety rule, when
+she is logged in, and monsters off by default).
 
 ## Intent
 
@@ -109,7 +112,11 @@ Minecraft server 1.21.4  <--game protocol-->  Node bridge  <--HTTP, localhost-->
 ```
 
 - **Server.** The official Mojang server for 1.21.4, in offline mode, bound to
-  `127.0.0.1`, with `pause-when-empty-seconds=10`. Version 1.21.4 is the newest
+  `127.0.0.1`, with `pause-when-empty-seconds=10`, `difficulty=easy` and
+  `spawn-monsters=false`. Easy difficulty gives her a body that gets hungry.
+  Monsters are off because the live test on 2026-11-17 showed what they do: at
+  night she was attacked while digging a shelter, died, and lost everything
+  she carried. An owner who wants that danger can switch them on. Version 1.21.4 is the newest
   one both Mineflayer and its browser viewer support; 26.1 was tried and
   crafting misbehaved. `minecraft/setup_server.sh` downloads it from Mojang,
   checks the checksum from Mojang's manifest, and writes `server.properties`.
@@ -124,10 +131,12 @@ The owner starts the server and the bridge. Python never launches them.
 
 ### One beat in Minecraft
 
-1. **Arrive.** The provider asks the bridge to start a session (log in if not
-   logged in) and to observe. If either fails, the beat fails here, before any
-   LLM call, with `WorldUnavailable`. The host's existing failure back-off
-   applies. She does not fall back to Palo Alto.
+1. **Look.** The provider asks the bridge to start a session (log in), takes
+   the observation that comes back, and ends the session again. If this fails,
+   the beat fails here, before any LLM call, with `WorldUnavailable`. The
+   host's existing failure back-off applies. She does not fall back to Palo
+   Alto. She is logged out while she thinks, so she never stands idle in a
+   running world for the minute her decision takes.
 2. **Body.** Her `hunger` need is set from the body's food bar
    (`food / 20 * 100`), and hunger is skipped in the real-time decay for this
    beat. The first observation ever stores her home position.
@@ -136,15 +145,25 @@ The owner starts the server and the bridge. Python never launches them.
    timeline work unchanged. Code also builds the scene description and the list
    of available actions. The world-description LLM call is skipped.
 4. **Decide.** The existing three-step decision chain picks one action from
-   that list, as today.
-5. **Act.** The chosen text is resolved to an offered action and sent to the
-   bridge, which runs a bounded routine and reports the outcome.
+   that list, as today. Its "choose something different from your recent
+   actions" rule is given only her single most recent action in this mode:
+   with about a dozen fixed labels, the usual six would forbid most of them.
+5. **Act.** The chosen text is resolved to an offered action. The provider
+   starts a session, sends the action to the bridge, which runs a bounded
+   routine and reports the outcome, and ends the session in a `finally`. With
+   nobody online the server pauses, so the world waits for her next beat.
 6. **Consequences.** Needs are credited from the action's need key only if the
-   outcome is ok. The outcome is added to the action record, the timeline and
-   her working memory, so the next beat knows what happened. Her location
-   becomes the place label of where she now stands.
-7. **Leave.** The session ends in a `finally`, whatever happened. With nobody
-   online the server pauses, so the world waits for her next beat.
+   outcome is ok. The outcome is added to the action record, the timeline, the
+   emotion analysis and her working memory, so the next beat knows what
+   happened. Her location becomes the place label of where she now stands.
+7. **Plans.** The planner is told which actions this world offers, so the
+   steps of new plans are things she can do here. Plans she brought from Palo
+   Alto are replaced by the planner's normal replan cycle.
+
+The safety (Asimov) check keeps its place after the action, as today. Every
+action here comes from a closed list written in code, and there are no people
+or other agents in the world to harm. When either of those changes, the check
+must move in front of the action.
 
 ### Two clocks
 
@@ -156,9 +175,11 @@ The Minecraft sky is described separately in the scene ("The sun is up here" /
 "It is dark here, and monsters are about"). It affects which actions are
 offered (shelter at night), not when she sleeps.
 
-"Go to sleep" is offered when her own clock says evening or night, or her sleep
-need is low. It maps to the existing `sleep` key, so the existing fall-asleep
-path runs and she leaves the world.
+"Go to sleep" is offered exactly when the existing rule (`should_fall_asleep`)
+would let her fall asleep: sleep is enabled and either her own clock says
+night or her sleep need is low. It maps to the existing `sleep` key, so
+choosing it always runs the existing fall-asleep path. It is never offered when
+choosing it would only credit sleep while she stays awake.
 
 ### Observation
 
@@ -167,7 +188,7 @@ path runs and she leaves the world.
 ```json
 {
   "position": {"x": -144, "y": 65, "z": 157},
-  "biome": "birch_forest",
+  "biome": "forest", "temperature": 0.7,
   "sky": {"is_day": true, "time_of_day": 2517, "raining": false},
   "health": 20, "food": 17,
   "inventory": {"oak_planks": 44, "wooden_pickaxe": 1},
@@ -200,7 +221,8 @@ the observation says it is possible.
 | `mine_stone` | Mine stone with the pickaxe | she holds a pickaxe and stone is near | `work_on_goals` |
 | `hunt` | Hunt the cow nearby for food | an animal is near | `work_on_goals` |
 | `eat` | Eat the beef you are carrying | she carries food and food is below 20 | `eat` |
-| `take_shelter` | Dig a burrow and shelter in it | it is dark or a monster is near, and she is not sheltered | `find_shelter` |
+| `drink` | Drink from the water nearby | water is near | `drink` |
+| `take_shelter` | Dig a burrow and shelter in it | a monster is near and she is not sheltered | `find_shelter` |
 | `go_home` | Walk back home | she is more than 24 blocks from home | `find_shelter` |
 | `rest` | Rest for a while | always | `rest` |
 | (no bridge call) | Go to sleep for the night | her clock says evening or night, or sleep is low | `sleep` |
@@ -208,6 +230,10 @@ the observation says it is possible.
 Craft whitelist: planks, stick, crafting table, wooden and stone pickaxe, axe
 and sword, furnace. The craft routine places her crafting table when a recipe
 needs one and none is within reach.
+
+Some needs have no action in this world: order, respect, creativity and love.
+They keep decaying and are met, as today, only through her conversations with
+people. This is accepted for the first version.
 
 `POST /act` returns:
 

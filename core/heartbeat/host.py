@@ -93,6 +93,7 @@ class JenbinaHost:
         iteration_fn: Callable = run_single_iteration_headless,
         meta_cognitive_system=None, config: RhythmConfig | None = None,
         owner: str | None = None, adopt_user_id: int | None = None,
+        world_provider=None,
     ):
         self.store = store
         self.user_db = user_db
@@ -108,6 +109,9 @@ class JenbinaHost:
         self.config = config if config is not None else RhythmConfig.from_env()
         self.owner = owner if owner is not None else make_owner_id()
         self.adopt_user_id = adopt_user_id
+        # A real world she lives in (see core/environment/minecraft); None
+        # keeps the described Palo Alto world.
+        self.world_provider = world_provider
         self.person: Person
         self.situation = Situation.fresh(clock())
         self.event_log = LifeEventLog(store)
@@ -319,6 +323,7 @@ class JenbinaHost:
                 "debug_iterations": self.debug_iterations, "user_db": self.user_db,
                 "event_log": self.event_log, "status": _StatusSink(self),
                 "sleep_config": self.config,
+                "world_provider": self.world_provider, "world_memory": s.world,
                 "proactive_target": choose_outreach_target(self.person, self.store.people(), now),
             }
             result = self.iteration_fn(

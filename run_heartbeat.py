@@ -30,6 +30,7 @@ os.environ["LANGSMITH_PROJECT"] = "jenbina"
 
 from core.auth.user_db import UserDatabase
 from core.connect import get_llm, get_json_llm
+from core.environment.minecraft import world_from_env
 from core.heartbeat.host import JenbinaHost
 from core.heartbeat.store import BeingStore
 
@@ -45,6 +46,8 @@ def build_host(adopt_user_id: int | None = None) -> JenbinaHost:
     return JenbinaHost(
         store=store, user_db=user_db, llm=llm, llm_json_mode=llm_json_mode,
         insight_llm=insight_llm, adopt_user_id=adopt_user_id,
+        # Only when JENBINA_WORLD names a real world; otherwise Palo Alto.
+        **({"world_provider": world} if (world := world_from_env()) is not None else {}),
     )
 
 
