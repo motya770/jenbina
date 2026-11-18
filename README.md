@@ -160,11 +160,12 @@ Jenbina lives in one of two worlds, chosen with `JENBINA_WORLD`.
 - She can look around, explore, chop wood, craft tools, mine stone, hunt, eat, drink, dig a shelter, walk home, rest, and sleep.
 - Her inventory, her body and everything she changed are still there on the next beat. Her hunger follows her food bar, so she has to find food and eat it.
 - Her world starts with her: her mind starts the Minecraft server and the bridge when it starts, and stops them when it stops.
+- She need not be alone there. Mira and Tobin, two [Mindcraft](https://github.com/mindcraft-bots/mindcraft) agents, can live in the same world. She sees who is near, is shown what they said, and can talk with one of them inside a beat; she remembers who she has met. Her lines there are written by a prompt that reads nothing told to her in private.
 - You can watch her in a browser, and no Minecraft account is needed.
 
 ```
-Her mind (Python)  ⇄  Bridge (Node, Mineflayer)  ⇄  Minecraft server 1.21.4
-  observe, decide       her body: observe and act      the world, on this machine only
+Her mind (Python)  ⇄  Bridge (Node, Mineflayer)  ⇄  Minecraft server 1.21.4  ⇄  Mira, Tobin (Mindcraft, optional)
+  observe, decide       her body: observe, act, say    the world, on this machine only    the others who live there
 ```
 
 Setup, settings and the world's rules are in **[minecraft/README.md](minecraft/README.md)**.
@@ -282,7 +283,13 @@ Or with the app:
 JENBINA_WORLD=minecraft streamlit run core/app.py
 ```
 
-See **[minecraft/README.md](minecraft/README.md)** for watching her in a browser and for every setting.
+To give her company there, set up Mira and Tobin once; after that they start and stop with her world:
+
+```bash
+./minecraft/setup_inhabitants.sh
+```
+
+See **[minecraft/README.md](minecraft/README.md)** for watching her in a browser, for the company she keeps, and for every setting.
 
 ### Settings
 
@@ -297,6 +304,8 @@ All settings are environment variables; `.env.example` lists them. `run_heartbea
 | `JENBINA_WORLD` | `palo_alto` | `minecraft` moves her into the Minecraft world |
 | `JENBINA_MINECRAFT_STAY_ONLINE` | `0` | `1` keeps her logged in to Minecraft between beats |
 | `JENBINA_MINECRAFT_AUTOSTART` | `1` | `0` if you start the Minecraft server and the bridge yourself |
+| `JENBINA_MINECRAFT_INHABITANTS` | `1` | `0` leaves Mira and Tobin out of her Minecraft world |
+| `JENBINA_MINECRAFT_TALKS_PER_DAY` | `12` | How many talks she may begin there in a day |
 
 ### Tests
 
@@ -331,7 +340,7 @@ The concept draws from electronic Tamagotchi toys of the 1990s — but instead o
 
 - Autobiographical memory of her own life, and memory consolidation during sleep
 - Real stakes: consequences when her needs go unmet
-- Other inhabitants in her world
+- More beings like her in her world, and things to do together with the ones who live there
 - Integrating multiple LLMs with different specializations into a unified system
 - Dynamic learning system that adds new actions and needs over time
 - Shifting persona focus to other roles (e.g., rescue robot, companion)

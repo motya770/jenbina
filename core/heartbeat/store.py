@@ -15,6 +15,11 @@ from uuid import uuid4
 from core.auth.user_db import UserDatabase
 
 
+# Person keys that start like this are never given to an account: they name
+# the inhabitants of her Minecraft world (core/environment/minecraft/conversation.py).
+RESERVED_KEY_PREFIX = "minecraft:"
+
+
 @dataclass
 class Lease:
     acquired: bool
@@ -235,6 +240,10 @@ class BeingStore:
             if row is not None:
                 return row["person_key"]
             base = (display_name or "").strip() or f"User {user_id}"
+            if base.lower().startswith(RESERVED_KEY_PREFIX):
+                # That name space belongs to the inhabitants of her Minecraft
+                # world; an account must never share a person model with one.
+                base = f"User {user_id}"
             used = {row["person_key"] for row in conn.execute("SELECT person_key FROM being_people")}
             key = base
             suffix = 2

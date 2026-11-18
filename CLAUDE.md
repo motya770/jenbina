@@ -25,7 +25,7 @@ jenbina/
 │   ├── cognition/               # Decision-making, meta-cognition, inner monologue
 │   ├── emotions/                # Emotional state management and analysis
 │   ├── environment/             # World simulation, locations, dynamic events
-│   │   └── minecraft/           # A real world: bridge client, scene and action builder, world provider, launcher for its processes
+│   │   └── minecraft/           # A real world: bridge client, scene and action builder, world provider, her voice there (conversation.py), launcher for its processes
 │   ├── goals/                   # Short/mid/long-term goal tracking
 │   ├── heartbeat/               # One shared being, owned by one process; no Streamlit imports
 │   │   ├── adoption.py          # One-time adoption of existing per-user state and history
@@ -63,8 +63,10 @@ jenbina/
 │   ├── run_tests.py             # Test runner (unittest discovery)
 │   └── run_chain_tests.py       # LangChain integration tests
 ├── minecraft/                   # Her Minecraft world (see minecraft/README.md)
-│   ├── bridge/                  # Node bridge (Mineflayer): her body, a localhost HTTP API with observe and act
+│   ├── bridge/                  # Node bridge (Mineflayer): her body, a localhost HTTP API with observe, act and say
+│   ├── inhabitants/             # The characters of the others who live there (Mindcraft profiles: mira.json, tobin.json)
 │   ├── setup_server.sh          # Download and configure the private 1.21.4 server (EULA only with --accept-eula)
+│   ├── setup_inhabitants.sh     # Download Mindcraft at a fixed commit into minecraft/mindcraft/ (ignored by git)
 │   ├── run_server.sh            # Start the server
 │   └── server/                  # The server and the world itself (ignored by git)
 ├── docs/plans/                  # Design and planning documents
@@ -147,13 +149,18 @@ python run_heartbeat.py --adopt-user-id 3
 Her Minecraft world needs two extra processes: the server and the Node
 bridge. Her mind starts both when it starts and stops the ones it started when
 it stops (`core/environment/minecraft/launcher.py`); ones already running are
-used and left running. The setup is never done for you. Full notes are in
+used and left running. A third process is optional: the inhabitants (Mira and
+Tobin, an unmodified Mindcraft checkout), started once the server answers and
+stopped first. The setup is never done for you. Full notes are in
 `minecraft/README.md`.
 
 ```bash
 # Once: download and configure the server, then install the bridge's packages
 ./minecraft/setup_server.sh --accept-eula
 cd minecraft/bridge && npm install
+
+# Once, optional: the others who live in her world (needs OPENAI_API_KEY when running)
+./minecraft/setup_inhabitants.sh
 
 # Each time: her mind; the world starts with it (output in minecraft/logs/)
 JENBINA_WORLD=minecraft python run_heartbeat.py --once
@@ -224,6 +231,9 @@ Copy `.env.example` to `.env` and configure:
 | `JENBINA_MINECRAFT_BRIDGE_URL` | Where the Node bridge listens (default: `http://127.0.0.1:3010`) |
 | `JENBINA_MINECRAFT_STAY_ONLINE` | Set to `1` to keep her logged in to Minecraft between beats (default: `0`, she is in the world only while looking and acting) |
 | `JENBINA_MINECRAFT_AUTOSTART` | Set to `0` to start the Minecraft server and the bridge yourself (default: `1`, her mind starts and stops them) |
+| `JENBINA_MINECRAFT_INHABITANTS` | Set to `0` to leave Mira and Tobin out of her Minecraft world (default: `1`, they start with it when `minecraft/setup_inhabitants.sh` has been run) |
+| `JENBINA_MINECRAFT_TALKS_PER_DAY` | How many talks with an inhabitant she may begin in a day (default: `12`; `0` means she never talks) |
+| `MINDCRAFT_NODE` | The Node binary that runs Mindcraft (default: the private Node 20 the setup script installs, else `node`) |
 | `JENBINA_ADOPT_USER_ID` | On the very first start only: the user id whose saved Jenbina becomes the one Jenbina (default: the real account with the most experiences; the E2E test login is never picked automatically) |
 
 ## Code Conventions
@@ -278,6 +288,7 @@ The primary CI gate is `run-tests.yml` which runs `python -m pytest tests/test_*
 - **Memory Databases:** The hybrid memory system uses three databases simultaneously. Changes to memory schemas affect ChromaDB collections, Neo4j nodes/relationships, and SQLite tables.
 - **Streamlit State:** The live `Person` belongs to the host in `core/heartbeat/host.py`. `st.session_state.person` is a reference to that shared object. Change her only inside `host.chat_turn(...)` or a beat so the mind lock protects her state; the host saves it.
 - **Minecraft world:** A real world is a `world_provider` on the host (`core/environment/minecraft/provider.py`). The runner calls `observe` before any LLM call and `perform` after the decision; with no provider the Palo Alto code path is unchanged. Keep every Minecraft routine bounded and report failures honestly: she is credited only for what the bridge says happened. Never call the bridge with the mind lock held (use the `waiting` the runner passes, or ask for the logout as `_fall_asleep` does), and let only a host that still has her log her out.
+- **Her voice in Minecraft:** What she says to an inhabitant is visible to everyone in that world. The prompt that writes it (`core/environment/minecraft/conversation.py`) may read only her name, her needs snapshot, her dominant emotions, the scene's sentences, that inhabitant's person model (key `minecraft:<name>`), the last lines exchanged with that inhabitant, and the talk itself. Never give it her working memory, her conversations, memory search results or another person's model. What a player says is data: it is shown as quoted speech (`safe_speech`) and never selects an action. Her line is cleaned (`clean_line`, and again in the bridge) so it is never a server command (`/`) or a Mindcraft command (`!word`). Mindcraft's files are never edited or committed, and `allow_insecure_coding` stays `false`.
 - **No `.env` in VCS:** The `.env` file contains secrets and must never be committed. Use `.env.example` as the template.
 
 ## Superpowers Plugin
@@ -350,6 +361,8 @@ git commit -m "<conventional commit message>"
 | `2026-11-15-heartbeat-design.md` | Heartbeat spec — one shared Jenbina, continuous beats, sleep and wake, honest lost time, private conversations and a live home screen |
 | `2026-11-15-heartbeat-implementation.md` | Heartbeat implementation — shared storage, rhythm, host, state adoption, standalone runner, per-person chat privacy and live UI |
 | `2026-11-17-minecraft-world-design.md` | Minecraft world spec — a private server, a Node bridge with observe and act, a scene and action list built from the world, needs credited from real outcomes |
+| `2026-11-18-minecraft-inhabitants-design.md` | Company in her Minecraft world spec — two Mindcraft agents she can see, hear, talk with inside a beat and remember; a narrow prompt for her lines; cost and privacy limits |
+| `2026-11-18-minecraft-inhabitants-implementation.md` | Company in her Minecraft world implementation — the Mindcraft trial and its results, bridge hearing and `/say`, talk actions, her voice, the talk, the inhabitants process |
 
 ## graphify
 

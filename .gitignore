@@ -100,3 +100,5 @@ graphify-out/.needs_update
 node_modules/
 minecraft/server/
 minecraft/logs/
+minecraft/mindcraft/
+minecraft/mindcraft-node/

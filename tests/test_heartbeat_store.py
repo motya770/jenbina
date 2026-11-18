@@ -274,6 +274,13 @@ class TestPeople(StoreTestCase):
         self.assertEqual(self.store.person_key(1, None), "Alex")
         self.assertEqual(BeingStore(self.db_path).people(), {1: "Alex"})
 
+    def test_an_account_cannot_take_the_key_of_someone_in_her_minecraft_world(self):
+        # Inhabitants of her Minecraft world are known as "minecraft:<name>".
+        key = self.store.person_key(7, "minecraft:Mira")
+        self.assertFalse(key.lower().startswith("minecraft:"))
+        self.assertEqual(self.store.person_key(7, "anything"), key)
+        self.assertFalse(self.store.person_key(8, "  MineCraft:Tobin ").lower().startswith("minecraft:"))
+
     def test_same_display_name_gets_a_distinct_key(self):
         self.assertEqual(self.store.person_key(1, "Alex"), "Alex")
         self.assertEqual(self.store.person_key(2, "Alex"), "Alex (2)")

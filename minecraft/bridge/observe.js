@@ -84,6 +84,29 @@ function nearbyCreatures (bot, names, range) {
     .slice(0, 5)
 }
 
+const PLAIN_NAME = /^[A-Za-z0-9_]{3,16}$/
+
+/**
+ * Other players in the world: those she can see, nearest first, and the
+ * names of those who are somewhere else. A name that is not a plain
+ * Minecraft name is left out, so a name can never carry other text.
+ */
+function playersAround (bot, range) {
+  const here = bot.entity.position
+  const near = []
+  const elsewhere = []
+  for (const [name, player] of Object.entries(bot.players || {})) {
+    if (name === bot.username || !PLAIN_NAME.test(name)) continue
+    const entity = player && player.entity
+    const distance = entity ? entity.position.distanceTo(here) : Infinity
+    if (distance <= range) near.push({ name, distance: Math.round(distance) })
+    else elsewhere.push(name)
+  }
+  near.sort((a, b) => a.distance - b.distance || a.name.localeCompare(b.name))
+  elsewhere.sort()
+  return { near: near.slice(0, 5), elsewhere: elsewhere.slice(0, 5) }
+}
+
 /** Biome name and Minecraft temperature (0.8 is plains) where she stands. */
 function biomeAt (bot, position) {
   // On 1.21 the block's own biome has no name; the server's registry does.
@@ -100,6 +123,7 @@ function observe (bot) {
   const position = bot.entity.position.floored()
   const biome = biomeAt(bot, position)
   const timeOfDay = bot.time.timeOfDay
+  const players = playersAround(bot, SIGHT)
   return {
     position: { x: position.x, y: position.y, z: position.z },
     biome: biome.name,
@@ -118,8 +142,10 @@ function observe (bot) {
       water: !!bot.findBlock({ matching: blockIds(bot, ['water']), maxDistance: 16 }),
       animals: nearbyCreatures(bot, ANIMALS, SIGHT),
       hostiles: nearbyCreatures(bot, HOSTILES, 24),
+      players: players.near,
       crafting_table: !!tableWithinReach(bot)
     },
+    elsewhere: players.elsewhere,
     craftable: craftable(bot),
     sheltered: isSheltered(bot)
   }
@@ -129,6 +155,7 @@ module.exports = {
   ANIMALS,
   CRAFT_WHITELIST,
   FOODS,
+  PLAIN_NAME,
   REACH,
   SIDES,
   SIGHT,
@@ -139,5 +166,6 @@ module.exports = {
   isSolid,
   logIds,
   observe,
+  playersAround,
   tableWithinReach
 }
