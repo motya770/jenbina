@@ -126,7 +126,10 @@ here. Its packages are whatever npm resolves on the day, except Mineflayer,
 which is pinned to the version Mindcraft patches.
 
 After that they start with her world, a little after the server answers, and
-stop with it. They need `OPENAI_API_KEY` in the environment her mind is
+stop with it. They take about half a minute to join. A single `--once` beat
+that has to start the world is over before they arrive, so to try a talk with
+`--once` beats keep the world up yourself (see [Run](#run)), or run her
+continuously. They need `OPENAI_API_KEY` in the environment her mind is
 started with; it is the only key of hers they are given. What they print goes
 to `minecraft/logs/inhabitants.log`.
 

@@ -512,10 +512,21 @@ class TestTalk(TalkCase):
         kept = json.dumps(self.own) + " ".join(note["content"] for note in self.person.working_memory.notes)
         self.assertNotIn("system prompt", outcome.summary + kept)
 
+    def test_quotation_marks_in_her_own_line_do_not_break_the_quoting(self):
+        self.bridge.replies = [["Sure."]]
+        outcome = self.talk(scripted_voice(('Call it "home"?', True)))
+        self.assertEqual(outcome.summary, "I talked with Mira. I said: \"Call it 'home'?\" Mira said: \"Sure.\"")
+        self.assertEqual(self.own["people"]["Mira"]["lines"][0], "me: Call it 'home'?")
+        self.assertIn(("say", "Mira", 'Call it "home"?'), self.bridge.calls)
+
     def test_a_long_talk_is_cut_in_her_summary(self):
         self.bridge.default_reply = ["x" * 250]
         outcome = self.talk(chatty_voice)
         self.assertLessEqual(len(outcome.summary), 600)
+        # Whole lines only: nothing is cut in the middle of what someone said.
+        self.assertEqual(outcome.summary.count('"') % 2, 0)
+        self.assertTrue(outcome.summary.endswith('" (and more was said.)'), outcome.summary[-40:])
+        self.assertEqual(len(self.own["people"]["Mira"]["lines"]), 6)
 
     def test_she_remembers_who_she_talked_with(self):
         self.bridge.replies = [["Hi!"], ["Bye."]]

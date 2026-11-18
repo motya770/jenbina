@@ -53,6 +53,7 @@ NO_WORDS = "I could not find the words to say to {name}."
 NO_ANSWER = "I spoke to {name} but got no answer."
 NOT_FOUND = "I looked for {name} but could not find them in the world."
 LOST_TOUCH = " Then I lost touch with the world."
+MORE_SAID = " (and more was said.)"
 
 
 @dataclass
@@ -367,7 +368,8 @@ class MinecraftWorld:
                     offline = True
                     break
                 said += 1
-                transcript.append((ME, line))
+                # Kept the way everything said is kept: quotable inside double quotes.
+                transcript.append((ME, line.replace('"', "'")))
                 theirs = [safe_speech(entry.get("text")) for entry in reply.get("heard") or []
                           if isinstance(entry, dict) and entry.get("from") == name]
                 theirs = [text for text in theirs if text][:REPLY_LINES]
@@ -407,9 +409,14 @@ class MinecraftWorld:
         place = place_label(observation, own.get("home")) if observation is not None else scene.place
         unseen = observation is None
         if answers:
-            spoken = " ".join(f'I said: "{text}"' if speaker == ME else f'{name} said: "{text}"'
-                              for speaker, text in transcript)
-            summary = f"I talked with {name}. {spoken}"[:TALK_SUMMARY_LIMIT].rstrip()
+            # Whole lines while they fit; never cut in the middle of what someone said.
+            summary = f"I talked with {name}."
+            for speaker, text in transcript:
+                piece = f' I said: "{text}"' if speaker == ME else f' {name} said: "{text}"'
+                if len(summary) + len(piece) + len(MORE_SAID) > TALK_SUMMARY_LIMIT:
+                    summary += MORE_SAID
+                    break
+                summary += piece
             if lost is not None:
                 summary += LOST_TOUCH
             return Outcome(True, summary, action.need_key, action, place=place,
