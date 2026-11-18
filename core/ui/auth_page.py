@@ -24,8 +24,11 @@ def _get_credentials_path() -> str:
     creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
     if creds_json:
         tmp = os.path.join(tempfile.gettempdir(), "google_credentials.json")
-        with open(tmp, "w") as f:
+        # The file holds the OAuth client secret: owner-only, even if it already exists.
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
             f.write(creds_json)
+        os.chmod(tmp, 0o600)
         return tmp
 
     raise FileNotFoundError(

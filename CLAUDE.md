@@ -75,7 +75,11 @@ jenbina/
 │   ├── portraits/               # Painterly Jenbina portraits, one per state (jenbina_<state>.png)
 │   └── sprites/                 # Committed pixel sprite sheets and 8x8 icons (python -m core.ui.sprites.build)
 ├── old/                         # Legacy/archived code
-├── requirements.txt             # Python dependencies
+├── requirements.txt             # Runtime Python dependencies (what Railway installs)
+├── requirements-dev.txt         # requirements.txt plus pytest, coverage, Playwright
+├── railway.toml                 # Railway service config: start command, health check (see DEPLOY.md)
+├── .railway/railway.ts          # Railway Infrastructure as Code: service + volume (replaces railway.toml, see DEPLOY.md)
+├── DEPLOY.md                    # How Jenbina is deployed to Railway: one-time setup, env vars, redeploy
 ├── run_app.py                   # Launcher script
 ├── run_heartbeat.py             # Standalone heartbeat host (alternative to the app process)
 ├── run_jenbina.py               # Alternative launcher
@@ -195,12 +199,16 @@ python clear_chromadb.py
 python clear_memory.py
 ```
 
+### Deploying
+
+The app runs on Railway; `DEPLOY.md` has the one-time setup, the env var table and the redeploy command (`railway up` from the repo root).
+
 ### Installation
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # app + test tooling; requirements.txt alone is the production set
 ```
 
 ## Environment Variables
@@ -258,7 +266,7 @@ GitHub Actions workflows (`.github/workflows/`):
 
 | Workflow | Trigger | What it does |
 |----------|---------|-------------|
-| `run-tests.yml` | PR to main/master/develop | Unit tests with coverage (Python 3.10, pytest) |
+| `run-tests.yml` | PR to main/master/develop | Unit tests with coverage (Python 3.10 and 3.11, pytest) |
 | `test-suite.yml` | Manual / scheduled | Full test suite execution |
 | `e2e-tests.yml` | Manual / scheduled | End-to-end tests with Playwright |
 | `feedback-loop-test.yml` | Manual / scheduled | Feedback loop testing |

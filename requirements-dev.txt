@@ -1,0 +1,6 @@
+# Everything the app needs, plus the test tooling. Production installs requirements.txt only.
+-r requirements.txt
+pytest==8.4.1
+pytest-cov==6.2.1
+pytest-playwright>=0.5.0
+pytest-timeout>=2.2.0

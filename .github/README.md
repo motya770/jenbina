@@ -53,8 +53,7 @@ Before pushing, you can run tests locally:
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
-pip install pytest pytest-cov
+pip install -r requirements-dev.txt
 
 # Run all tests
 cd tests
@@ -103,9 +102,7 @@ The workflows use these environment variables:
 
 ### Dependencies
 Required packages (installed automatically):
-- All packages from `requirements.txt`
-- `pytest` for test running
-- `pytest-cov` for coverage reporting
+- All packages from `requirements-dev.txt` (`requirements.txt` plus `pytest`, `pytest-cov` and the Playwright plugins)
 
 ## Contributing
 
