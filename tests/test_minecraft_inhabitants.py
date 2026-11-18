@@ -358,6 +358,17 @@ class TestTalk(TalkCase):
         self.assertTrue(outcome.ok)
         self.assertEqual(self.bridge.calls, ["start", ("say", "Tobin", "Hello Tobin"), "observe", "end"])
 
+    def test_a_walk_that_ran_out_of_time_does_not_end_the_talk(self):
+        # A routine that overruns ends with her logged out; she comes back to speak.
+        self.bridge.result = {"ok": False, "summary": "Ran out of time trying to approach player, and left the world.",
+                              "died": False, "left_world": True, "observation": None}
+        self.bridge.replies = [["Hi!"]]
+        outcome = self.talk(scripted_voice(("Hello", True)))
+        self.assertTrue(outcome.ok)
+        self.assertEqual(self.bridge.calls, [
+            "start", ("act", "approach_player", {"name": "Mira"}), "start",
+            ("say", "Mira", "Hello"), "observe", "end"])
+
     def test_three_exchanges_at_most(self):
         self.bridge.default_reply = ["Mm."]
         self.talk(chatty_voice)

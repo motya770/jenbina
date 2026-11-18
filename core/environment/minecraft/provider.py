@@ -344,6 +344,9 @@ class MinecraftWorld:
                     walked = self.bridge.act("approach_player", {"name": name}, APPROACH_BUDGET_MS)
                     if isinstance(walked.get("observation"), dict):
                         looks.append(walked["observation"])
+                    if walked.get("left_world"):
+                        # A walk that overran ended with her logged out.
+                        looks.append(self.bridge.start_session())
             while said < MAX_EXCHANGES and self.timer() - started < TALK_SECONDS:
                 if keep_going is not None and not keep_going():
                     # Her host no longer has her: she is not this process's to speak for.
