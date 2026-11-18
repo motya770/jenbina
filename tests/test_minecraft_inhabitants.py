@@ -17,6 +17,7 @@ from core.environment.minecraft import (
     MinecraftBridge, MinecraftWorld, Voice, WorldUnavailable, build_scene, inhabitant_key, world_from_env,
 )
 from core.environment.minecraft.conversation import MAX_LINE, clean_line, voice_prompt
+from core.environment.minecraft.launcher import repo_root
 from core.environment.minecraft.scene import (
     MAX_TALK_ACTIONS, TALK, UNREADABLE, plain_name, safe_speech, speech_line,
 )
@@ -694,6 +695,46 @@ class TestBeatWithCompany(unittest.TestCase):
         self.assertIsNone(result["matched_action"])
         self.assertEqual(result["action_decision"]["outcome"], "I spoke to Mira but got no answer.")
         self.assertEqual(self.kinds(), [])
+
+
+class TestProfiles(unittest.TestCase):
+    FOLDER = repo_root() / "minecraft" / "inhabitants"
+    MODES = {"self_preservation", "unstuck", "cowardice", "self_defense", "hunting", "item_collecting",
+             "torch_placing", "elbow_room", "idle_staring", "cheat"}
+
+    def profiles(self):
+        return {path.stem: json.loads(path.read_text(encoding="utf-8")) for path in sorted(self.FOLDER.glob("*.json"))}
+
+    def test_each_profile_is_a_plain_named_character(self):
+        names = set()
+        for stem, profile in self.profiles().items():
+            self.assertEqual(profile["name"].lower(), stem)
+            self.assertIsNotNone(plain_name(profile["name"]))
+            self.assertNotEqual(profile["name"], "Jenbina")
+            self.assertNotIn("allow_insecure_coding", profile)
+            names.add(profile["name"])
+        self.assertEqual(names, {"Mira", "Tobin"})
+
+    def test_each_one_is_told_never_to_take_an_endless_task(self):
+        for profile in self.profiles().values():
+            prompt = profile["conversing"]
+            self.assertIn("Never use !goal", prompt)
+            for variable in ("$NAME", "$MEMORY", "$STATS", "$INVENTORY", "$COMMAND_DOCS", "$EXAMPLES"):
+                self.assertIn(variable, prompt)
+            examples = json.dumps(profile["conversation_examples"])
+            self.assertNotIn("!goal", examples)
+            self.assertNotIn("!startConversation", examples)
+
+    def test_each_one_leaves_her_animals_alone_and_does_not_fight(self):
+        for profile in self.profiles().values():
+            self.assertEqual(set(profile["modes"]), self.MODES)
+            self.assertIs(profile["modes"]["hunting"], False)
+            self.assertIs(profile["modes"]["self_defense"], False)
+            self.assertIs(profile["modes"]["cheat"], False)
+
+    def test_each_one_runs_on_the_cheapest_model(self):
+        for profile in self.profiles().values():
+            self.assertEqual(profile["model"], {"model": "gpt-5-nano", "params": {"reasoning": {"effort": "low"}}})
 
 
 if __name__ == "__main__":
