@@ -49,6 +49,17 @@ def env_line_html(world_summary: dict | None) -> str:
         except (TypeError, ValueError):
             degrees = 0.0
         parts.append(f"{html.escape(weather)}, {degrees:.0f}°C")
+    body = world_summary.get("body")
+    if isinstance(body, dict):
+        # A real world reports her body: health and food out of 20.
+        try:
+            parts.append(f"Health {int(body['health'])}/20")
+            parts.append(f"Food {int(body['food'])}/20")
+        except (KeyError, TypeError, ValueError):
+            pass
+    if world_summary.get("last_seen"):
+        # She was cut off from a real world mid-action: this is from before it.
+        parts.append("as last seen")
     return '<div class="px-env-line">' + " · ".join(parts) + "</div>"
 
 

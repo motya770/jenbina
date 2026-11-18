@@ -60,6 +60,7 @@ def record_action(log: EventLog, action_response: dict, satisfaction_before: flo
         time_of_day,
         weather,
         temperature,
+        outcome=str(response.get("outcome", "") or ""),
     ))
 
 

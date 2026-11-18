@@ -95,5 +95,8 @@ dmypy.json
 graphify-out/.graphify_*
 graphify-out/cache/
 graphify-out/.needs_update
+# Minecraft world (see minecraft/README.md); node_modules/ also covers the
 # Railway IaC SDK (npm install --prefix .railway)
-.railway/node_modules/
+node_modules/
+minecraft/server/
+minecraft/logs/

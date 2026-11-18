@@ -14,9 +14,9 @@ __pycache__/
 .vscode/
 .ipynb_checkpoints/
 graphify-out/
-old/
-tests/
-docs/
+/old/
+/tests/
+/docs/
 .env.*
 *.pem
 *.key
@@ -24,3 +24,6 @@ docs/
 .github/
 requirements-dev.txt
 .railway/
+# Her Minecraft world needs a Java server and a Node bridge, which this service does not run
+/minecraft/
+node_modules/

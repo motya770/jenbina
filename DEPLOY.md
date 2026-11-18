@@ -184,6 +184,11 @@ host. What follows from it:
   as the one Jenbina: by default the real account with the most experiences, or the
   user id in `JENBINA_ADOPT_USER_ID`. This happens once.
 
+**The Minecraft world is not part of this deploy.** `JENBINA_WORLD=minecraft` needs a
+Java Minecraft server and a Node bridge beside her mind; the Railway service runs
+Python only and `.railwayignore` leaves the top-level `minecraft/` folder out of the
+upload. Leave `JENBINA_WORLD` unset on Railway so she lives in the described world.
+
 The heartbeat settings (`JENBINA_BEAT_MINUTES`, `JENBINA_MAX_BEATS_PER_DAY`,
 `JENBINA_LLM_TIMEOUT_SECONDS`, `JENBINA_DISABLE_SLEEP`, `JENBINA_ADOPT_USER_ID`) are
 optional and described in `CLAUDE.md`.
