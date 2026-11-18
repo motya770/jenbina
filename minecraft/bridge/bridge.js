@@ -1,21 +1,27 @@
 'use strict'
 // Jenbina's body in Minecraft. A small HTTP server on localhost that logs in
-// as her with Mineflayer and offers two verbs to her Python mind: observe and
-// act. It reads no chat and says nothing in the game.
+// as her with Mineflayer and offers three verbs to her Python mind: observe,
+// act and say. It keeps what other players say, hands it over with each
+// observation, and says only the one line it is given, as a whisper.
 //
 //   GET  /health          -> { ok, connected, version }
 //   POST /session/start   -> log in if needed, then { ok, observation }
 //   POST /session/end     -> log out
 //   GET  /observe         -> the current observation
 //   POST /act             -> { name, args?, budget_ms? } -> the outcome
+//   POST /say             -> { to, text, wait_ms? } -> { ok, answered, heard }
+//
+// Every observation carries `heard`: what was said since the last one.
 
 const http = require('node:http')
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements } = require('mineflayer-pathfinder')
 const collectBlock = require('mineflayer-collectblock').plugin
 const { ACTIONS, stopMoving } = require('./actions')
-const { inventoryCounts, observe } = require('./observe')
+const { createHearing } = require('./hearing')
+const { PLAIN_NAME, inventoryCounts, observe } = require('./observe')
 const { runRoutine } = require('./run')
+const { cleanLine, sayAndListen } = require('./say')
 const { createSession } = require('./session')
 
 const MC_HOST = process.env.MC_HOST || '127.0.0.1'
@@ -30,8 +36,12 @@ const DEFAULT_BUDGET_MS = 45000
 const MAX_BUDGET_MS = 120000
 // Past its budget a routine has this long to notice and return by itself.
 const OVERRUN_GRACE_MS = 8000
+const DEFAULT_ANSWER_WAIT_MS = 30000
+const MAX_ANSWER_WAIT_MS = 45000
 
 let busy = false
+// What other players have said since her mind last looked.
+const hearing = createHearing({ self: MC_USERNAME })
 
 class BridgeError extends Error {
   constructor (status, code, message) {
@@ -84,6 +94,8 @@ function login (onGone) {
         log(`left the world (${reason})`)
         onGone(theBot)
       })
+      theBot.on('chat', (from, text) => hearing.hear(from, text, false))
+      theBot.on('whisper', (from, text) => hearing.hear(from, text, true))
       // Settling in can fail (no chunks, no ticks). That must reject this
       // login, not escape as an unhandled rejection; the watchdog above stays
       // armed until it is done.
@@ -124,6 +136,11 @@ const session = createSession({
   leave
 })
 
+/** What she perceives now, with what she has heard since the last look. */
+function look (theBot) {
+  return { ...observe(theBot), heard: hearing.drain() }
+}
+
 function requireSession () {
   if (!session.connected()) throw new BridgeError(409, 'no_session', 'Jenbina is not in the world. Start a session first.')
 }
@@ -146,7 +163,7 @@ async function act (name, args, budgetMs) {
       graceMs: OVERRUN_GRACE_MS,
       deps: {
         inventoryCounts,
-        observe,
+        observe: look,
         stop: stopMoving,
         disconnect: async gone => { if (session.bot() === gone) await session.end() }
       }
@@ -156,6 +173,32 @@ async function act (name, args, budgetMs) {
   } catch (e) {
     if (e instanceof BridgeError) throw e
     throw new BridgeError(503, 'world_unreachable', `She was cut off from the world during the action: ${e.message}`)
+  } finally {
+    busy = false
+  }
+}
+
+/** Whisper one line to another player and wait for what they say back. */
+async function say (to, text, waitMs) {
+  const line = cleanLine(text)
+  if (typeof to !== 'string' || !PLAIN_NAME.test(to) || to === MC_USERNAME || !line) {
+    throw new BridgeError(400, 'bad_request', 'A line needs a player to say it to and something to say.')
+  }
+  requireSession()
+  if (busy) throw new BridgeError(409, 'busy', 'She is already in the middle of something.')
+  busy = true
+  const theBot = session.bot()
+  try {
+    const result = await sayAndListen({
+      hearing,
+      whisper: (name, words) => theBot.whisper(name, words),
+      isOnline: name => !!theBot.players[name],
+      to,
+      text: line,
+      waitMs: Math.min(Math.max(Number(waitMs) || DEFAULT_ANSWER_WAIT_MS, 1000), MAX_ANSWER_WAIT_MS)
+    })
+    log(`say to ${to}: ${result.answered ? `answered (${result.heard.length} line(s))` : (result.reason || 'no answer')}`)
+    return result
   } finally {
     busy = false
   }
@@ -185,7 +228,7 @@ async function route (request) {
   const key = `${request.method} ${path}`
   if (key === 'GET /health') return { ok: true, connected: session.connected(), version: MC_VERSION }
   if (key === 'POST /session/start') {
-    return { ok: true, observation: observe(await session.start()) }
+    return { ok: true, observation: look(await session.start()) }
   }
   if (key === 'POST /session/end') {
     await session.end()
@@ -193,11 +236,15 @@ async function route (request) {
   }
   if (key === 'GET /observe') {
     requireSession()
-    return observe(session.bot())
+    return look(session.bot())
   }
   if (key === 'POST /act') {
     const body = await readJson(request)
     return act(String(body.name || ''), body.args, body.budget_ms)
+  }
+  if (key === 'POST /say') {
+    const body = await readJson(request)
+    return say(body.to, body.text, body.wait_ms)
   }
   throw new BridgeError(404, 'not_found', `No such endpoint: ${key}`)
 }

@@ -289,7 +289,8 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
             let a chat message be answered meanwhile.
             Optional: status (stage sink), sleep_config (RhythmConfig),
             proactive_target ((user_id, person_key)), world_provider (a real
-            world such as MinecraftWorld) with world_memory (its saved dict),
+            world such as MinecraftWorld) with world_memory (its saved dict);
+            its perform is given her voice for a talk and still_hosting,
             still_hosting (callable; when it returns False the beat raises
             BeatAbandoned instead of acting in a real world). Without an event_log,
             user_db and user_id provide the legacy event-log fallback.
@@ -562,7 +563,13 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
             # Her host stopped while this beat was thinking. She is no longer
             # this process's to move, so nothing more is done in the world.
             raise BeatAbandoned("Her host stopped hosting her during this beat.")
-        outcome = provider.perform(scene, chosen, person, context["world_memory"], waiting=waiting)
+        # Should she choose to talk with someone there, her lines are hers:
+        # written by a voice that reads nothing told to her in private.
+        from .environment.minecraft.conversation import Voice
+        outcome = provider.perform(
+            scene, chosen, person, context["world_memory"], waiting=waiting,
+            voice=Voice(person, llm_json_mode), keep_going=still_hosting,
+        )
         if isinstance(action_response, dict):
             action_response["outcome"] = outcome.summary
             action_response["outcome_ok"] = outcome.ok
@@ -589,7 +596,11 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     else:
         print(f"  No need-satisfaction mapping for action: {chosen}")
 
-    if matched_action in _SOCIAL_ACTION_KEYS and getattr(person, "social_interaction_tracker", None) is not None:
+    # A talk in a real world was already recorded by the world, once, with who it was.
+    talked_in_world = (outcome is not None and outcome.action is not None
+                       and outcome.action.name == "talk")
+    if (matched_action in _SOCIAL_ACTION_KEYS and not talked_in_world
+            and getattr(person, "social_interaction_tracker", None) is not None):
         dominant = person.emotion_system.get_dominant_emotions(1)
         emotion = dominant[0]["name"].lower() if dominant else "neutral"
         person.social_interaction_tracker.record_social_action(

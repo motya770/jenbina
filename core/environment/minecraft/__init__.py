@@ -5,6 +5,7 @@ Turned on with ``JENBINA_WORLD=minecraft``. See ``minecraft/README.md`` and
 """
 
 from .bridge_client import DEFAULT_BRIDGE_URL, MinecraftBridge, WorldUnavailable
+from .conversation import Voice, inhabitant_key
 from .provider import MinecraftWorld, Outcome, world_from_env
 from .scene import Scene, WorldAction, build_scene, resolve_action
 
@@ -14,9 +15,11 @@ __all__ = [
     "MinecraftWorld",
     "Outcome",
     "Scene",
+    "Voice",
     "WorldAction",
     "WorldUnavailable",
     "build_scene",
+    "inhabitant_key",
     "resolve_action",
     "world_from_env",
 ]

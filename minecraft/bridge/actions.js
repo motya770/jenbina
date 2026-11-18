@@ -7,13 +7,14 @@ const { goals } = require('mineflayer-pathfinder')
 const { Vec3 } = require('vec3')
 const { DIRECTIONS, bestTool } = require('./words')
 const {
-  ANIMALS, CRAFT_WHITELIST, FOODS, SIDES, SIGHT, STONE_BLOCKS,
+  ANIMALS, CRAFT_WHITELIST, FOODS, PLAIN_NAME, SIDES, SIGHT, STONE_BLOCKS,
   blockIds, inventoryCounts, isSheltered, isSolid, logIds, tableWithinReach
 } = require('./observe')
 
 const EXPLORE_DISTANCE = 32
 const WOOD_TARGET = 4
 const STONE_TARGET = 6
+const TALK_DISTANCE = 3
 const FILLERS = ['dirt', 'cobblestone', 'stone', 'andesite', 'diorite', 'granite', 'sand', 'gravel']
 
 const done = sentence => ({ ok: true, sentence })
@@ -312,6 +313,17 @@ async function goHome (bot, args, ctx) {
   return arrived ? done('Walked back home.') : failed('Could not find a way home in time.')
 }
 
+/** Walk up to another player she can see, close enough to talk. */
+async function approachPlayer (bot, args, ctx) {
+  const name = typeof args.name === 'string' && PLAIN_NAME.test(args.name) ? args.name : null
+  const entity = name && bot.players[name] && bot.players[name].entity
+  if (!entity) return failed(`Could not see ${name || 'them'}.`)
+  if (entity.position.distanceTo(bot.entity.position) <= TALK_DISTANCE) return done(`Walked up to ${name}.`)
+  const { x, y, z } = entity.position
+  const arrived = await walkTo(bot, ctx, new goals.GoalNear(x, y, z, TALK_DISTANCE), 20000)
+  return arrived ? done(`Walked up to ${name}.`) : failed(`Could not get to ${name}.`)
+}
+
 async function rest (bot) {
   await bot.waitForTicks(100)
   return done('Rested for a while.')
@@ -328,6 +340,7 @@ const ACTIONS = {
   drink,
   take_shelter: takeShelter,
   go_home: goHome,
+  approach_player: approachPlayer,
   rest
 }
 

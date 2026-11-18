@@ -2,17 +2,22 @@
 """Tests for the launcher that starts and stops her Minecraft world's
 processes. Nothing here starts a real process or opens a real port."""
 
+import json
 import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from core.environment.minecraft import WorldUnavailable
-from core.environment.minecraft.launcher import WorldLauncher, is_local, server_port
+from core.environment.minecraft.launcher import (
+    DEFAULT_MINDSERVER_PORT, INHABITANT_CALLS_PER_HOUR, WorldLauncher, inhabitant_settings, is_local,
+    server_port,
+)
 
 
 class FakeProcess:
@@ -21,12 +26,14 @@ class FakeProcess:
         self.returncode = None
         self.signals = []
         self.stubborn = False
+        self.stopped = []
 
     def poll(self):
         return self.returncode
 
     def terminate(self):
         self.signals.append("terminate")
+        self.stopped.append(self)
         if not self.stubborn:
             self.returncode = 0
 
@@ -66,6 +73,8 @@ class LauncherCase(unittest.TestCase):
         (self.server_dir / "server.properties").write_text("server-ip=127.0.0.1\nserver-port=25570\n")
         self.bridge = FakeBridge()
         self.server_up = False
+        self.inhabitants_up = False
+        self.stopped = []
         self.spawned = []
         self.installed = {"java", "node"}
         self.time = 0.0
@@ -74,6 +83,7 @@ class LauncherCase(unittest.TestCase):
     def spawn(self, command, **kwargs):
         process = FakeProcess(command)
         process.kwargs = kwargs
+        process.stopped = self.stopped
         self.spawned.append(process)
         return process
 
@@ -84,12 +94,15 @@ class LauncherCase(unittest.TestCase):
     def launcher(self, env=None):
         launcher = WorldLauncher(
             self.root, self.bridge, env=env or {},
-            spawn=self.spawn, is_port_open=lambda host, port: self.server_up,
+            spawn=self.spawn, is_port_open=self.port_open,
             which=lambda name: f"/usr/bin/{name}" if name in self.installed else None,
-            sleep=self.sleep, clock=lambda: self.time,
+            sleep=self.sleep, clock=lambda: self.time, watch_seconds=None,
         )
         self.addCleanup(launcher.stop)
         return launcher
+
+    def port_open(self, host, port):
+        return self.inhabitants_up if port == DEFAULT_MINDSERVER_PORT else self.server_up
 
     def commands(self):
         return [Path(p.command[-1]).name for p in self.spawned]
@@ -272,6 +285,359 @@ class TestHelpers(unittest.TestCase):
             self.assertEqual(server_port(properties, {}), 25570)
             self.assertEqual(server_port(properties, {"MC_PORT": "25580"}), 25580)
             self.assertEqual(server_port(properties, {"MC_PORT": "nonsense"}), 25565)
+
+
+class InhabitantsCase(LauncherCase):
+    """A world that is up, with Mindcraft set up beside it."""
+
+    ENV = {"OPENAI_API_KEY": "test-key", "PATH": "/usr/bin", "SERPAPI_API_KEY": "other-secret"}
+
+    def setUp(self):
+        super().setUp()
+        self.server_up = self.bridge.alive = True
+        self.mindcraft = self.root / "minecraft" / "mindcraft"
+        self.profiles = self.root / "minecraft" / "inhabitants"
+        self.log = self.root / "minecraft" / "logs" / "inhabitants.log"
+        self.set_up_inhabitants()
+
+    def set_up_inhabitants(self):
+        (self.mindcraft / "node_modules").mkdir(parents=True)
+        (self.mindcraft / "main.js").write_text("// mindcraft")
+        (self.mindcraft / ".jenbina-ready").write_text("e1c1fc3\n")
+        self.profiles.mkdir(parents=True)
+        for name in ("tobin", "mira"):
+            (self.profiles / f"{name}.json").write_text(json.dumps({"name": name.capitalize()}))
+
+    def inhabitants(self):
+        return [p for p in self.spawned if "main.js" in p.command]
+
+    def ready(self, env=None, launcher=None):
+        launcher = launcher or self.launcher(dict(self.ENV) if env is None else env)
+        launcher.ensure_ready()
+        return launcher
+
+    def say_in_log(self, text):
+        with open(self.log, "ab") as handle:
+            handle.write(text.encode())
+
+
+class TestInhabitants(InhabitantsCase):
+    def test_settings_never_allow_code_and_stay_local(self):
+        settings = inhabitant_settings(25570, 3011)
+        self.assertIs(settings["allow_insecure_coding"], False)
+        self.assertIs(settings["allow_vision"], False)
+        self.assertIs(settings["auto_open_ui"], False)
+        self.assertIs(settings["narrate_behavior"], False)
+        self.assertIs(settings["load_memory"], True)
+        self.assertEqual((settings["host"], settings["port"], settings["auth"]), ("127.0.0.1", 25570, "offline"))
+        self.assertEqual((settings["minecraft_version"], settings["base_profile"]), ("1.21.4", "survival"))
+        self.assertEqual((settings["only_chat_with"], settings["init_message"]), ([], ""))
+        self.assertEqual((settings["max_commands"], settings["mindserver_port"]), (3, 3011))
+        for command in ("!startConversation", "!attackPlayer", "!newAction",
+                        "!checkBlueprint", "!checkBlueprintLevel", "!getBlueprint", "!getBlueprintLevel"):
+            self.assertIn(command, settings["blocked_actions"])
+
+    def test_inhabitants_start_only_after_the_server_answers(self):
+        self.server_up = self.bridge.alive = False
+        launcher = self.launcher(dict(self.ENV))
+        launcher.start()
+        self.assertEqual(self.inhabitants(), [])
+        self.server_up = self.bridge.alive = True
+        launcher.ensure_ready()
+        (process,) = self.inhabitants()
+        self.assertEqual(process.command, [
+            "node", "main.js", "--profiles",
+            str(self.profiles / "mira.json"), str(self.profiles / "tobin.json")])
+        self.assertEqual(process.kwargs["cwd"], str(self.mindcraft))
+        self.assertEqual(json.loads(process.kwargs["env"]["SETTINGS_JSON"]), inhabitant_settings(25570, 3011))
+        self.assertTrue(process.kwargs["start_new_session"])
+        self.assertTrue(self.log.exists())
+
+    def test_they_are_given_her_openai_key_and_no_other_secret(self):
+        self.ready()
+        env = self.inhabitants()[0].kwargs["env"]
+        self.assertEqual(env["OPENAI_API_KEY"], "test-key")
+        self.assertEqual(env["PATH"], "/usr/bin")
+        self.assertNotIn("SERPAPI_API_KEY", env)
+
+    def test_a_world_that_is_already_up_gets_them_too(self):
+        self.ready()
+        self.assertEqual(len(self.spawned), 1)
+        self.assertEqual(len(self.inhabitants()), 1)
+
+    def test_looking_twice_starts_them_once(self):
+        launcher = self.ready()
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 1)
+
+    def test_not_set_up_means_she_lives_alone_and_nothing_fails(self):
+        (self.mindcraft / "main.js").unlink()
+        with self.assertLogs("jenbina.minecraft", level="INFO") as logs:
+            launcher = self.ready()
+            launcher.ensure_ready()
+        self.assertEqual(self.inhabitants(), [])
+        said = [line for line in logs.output if "setup_inhabitants.sh" in line]
+        self.assertEqual(len(said), 1)
+
+    def test_a_setup_that_did_not_finish_means_alone(self):
+        # The script writes this file last; without it the checkout may be half installed.
+        (self.mindcraft / ".jenbina-ready").unlink()
+        with self.assertLogs("jenbina.minecraft", level="INFO") as logs:
+            self.ready()
+        self.assertEqual(self.inhabitants(), [])
+        self.assertIn("setup_inhabitants.sh", " ".join(logs.output))
+
+    def test_no_profiles_means_alone(self):
+        for profile in self.profiles.glob("*.json"):
+            profile.unlink()
+        self.ready()
+        self.assertEqual(self.inhabitants(), [])
+
+    def test_no_key_means_alone(self):
+        with self.assertLogs("jenbina.minecraft", level="INFO") as logs:
+            launcher = self.ready(env={"PATH": "/usr/bin"})
+            launcher.ensure_ready()
+        self.assertEqual(self.inhabitants(), [])
+        self.assertEqual(len([line for line in logs.output if "OPENAI_API_KEY" in line]), 1)
+        self.assertNotIn("test-key", " ".join(logs.output))
+
+    def test_switched_off_means_alone(self):
+        with self.assertNoLogs("jenbina.minecraft", level="INFO"):
+            self.ready(env={**self.ENV, "JENBINA_MINECRAFT_INHABITANTS": "0"})
+        self.assertEqual(self.inhabitants(), [])
+
+    def test_no_node_means_alone(self):
+        self.installed = {"java"}
+        self.ready()
+        self.assertEqual(self.inhabitants(), [])
+
+    def test_already_running_inhabitants_are_used_and_left_running(self):
+        self.inhabitants_up = True
+        launcher = self.ready()
+        self.assertEqual(self.inhabitants(), [])
+        launcher.stop()
+        self.assertEqual(self.stopped, [])
+
+    def test_a_crashing_inhabitants_process_is_not_restarted_in_a_loop(self):
+        launcher = self.ready()
+        self.inhabitants()[0].returncode = 1
+        self.time = 60.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 1)
+        self.time = 601.0
+        launcher.ensure_ready()
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 2)
+
+    def test_a_chosen_node_runs_them(self):
+        self.ready(env={**self.ENV, "MINDCRAFT_NODE": "/opt/node20/bin/node"})
+        self.assertEqual(self.inhabitants()[0].command[0], "/opt/node20/bin/node")
+
+    def test_the_node_the_setup_installed_is_used_before_the_machines_own(self):
+        private = self.root / "minecraft" / "mindcraft-node" / "node_modules" / "node" / "bin" / "node"
+        private.parent.mkdir(parents=True)
+        private.write_text("")
+        self.ready()
+        self.assertEqual(self.inhabitants()[0].command[0], str(private))
+
+    def test_a_node_that_cannot_be_run_fails_nothing(self):
+        def broken(command, **kwargs):
+            if "main.js" in command:
+                raise FileNotFoundError(command[0])
+            return self.spawn(command, **kwargs)
+
+        launcher = WorldLauncher(self.root, self.bridge, env=dict(self.ENV), spawn=broken,
+                                 is_port_open=self.port_open, which=lambda name: f"/usr/bin/{name}",
+                                 sleep=self.sleep, clock=lambda: self.time, watch_seconds=None)
+        self.addCleanup(launcher.stop)
+        launcher.ensure_ready()
+        launcher.ensure_ready()
+        self.assertEqual(self.inhabitants(), [])
+
+    def test_they_are_stopped_first(self):
+        self.server_up = self.bridge.alive = False
+        launcher = self.launcher(dict(self.ENV))
+        self.on_sleep = lambda: setattr(self, "server_up", True) or setattr(self.bridge, "alive", True)
+        launcher.ensure_ready()
+        self.assertEqual(self.commands(), ["run_server.sh", "bridge.js", "tobin.json"])
+        launcher.stop()
+        self.assertEqual([Path(p.command[-1]).name for p in self.stopped],
+                         ["tobin.json", "bridge.js", "run_server.sh"])
+
+    def test_they_come_back_with_her_after_a_stop(self):
+        launcher = self.ready()
+        launcher.stop()
+        self.time = 5.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 2)
+
+    def test_a_remote_server_gets_no_inhabitants(self):
+        self.ready(env={**self.ENV, "MC_HOST": "10.0.0.5"})
+        self.assertEqual(self.inhabitants(), [])
+
+
+class TestInhabitantsWatch(InhabitantsCase):
+    CALL = "Awaiting openai api response from model gpt-5-nano\n"
+
+    def test_ordinary_talk_leaves_them_running(self):
+        launcher = self.ready()
+        self.say_in_log(self.CALL * INHABITANT_CALLS_PER_HOUR)
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, [])
+
+    def test_too_many_llm_calls_in_an_hour_stops_them_for_good(self):
+        launcher = self.ready()
+        self.say_in_log(self.CALL * 40)
+        launcher.check_inhabitants()
+        self.time = 1800.0
+        self.say_in_log(self.CALL * 21)
+        with self.assertLogs("jenbina.minecraft", level="ERROR") as logs:
+            launcher.check_inhabitants()
+        self.assertEqual(self.stopped, self.inhabitants())
+        self.assertIn("inhabitants.log", " ".join(logs.output))
+        self.time = 9000.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 1)
+
+    def test_calls_older_than_an_hour_are_forgotten(self):
+        launcher = self.ready()
+        self.say_in_log(self.CALL * 40)
+        launcher.check_inhabitants()
+        self.time = 3700.0
+        self.say_in_log(self.CALL * 40)
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, [])
+
+    def test_what_was_in_the_log_before_they_started_is_not_counted(self):
+        self.log.parent.mkdir(parents=True)
+        self.say_in_log(self.CALL * 500)
+        launcher = self.ready()
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, [])
+
+    def test_a_line_still_being_written_is_counted_once(self):
+        launcher = self.ready()
+        self.say_in_log(self.CALL * 60 + "Awaiting openai api")
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, [])
+        self.say_in_log(" response from model gpt-5-nano\n")
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, self.inhabitants())
+
+    def test_an_inhabitant_that_dropped_out_brings_a_restart_but_not_at_once(self):
+        launcher = self.ready()
+        self.say_in_log("Agent process exited too quickly and will not be restarted.\n")
+        self.time = 120.0
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, self.inhabitants())
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 1)
+        self.time = 700.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 2)
+
+    def test_calls_made_before_a_restart_still_count(self):
+        launcher = self.ready()
+        self.say_in_log(self.CALL * 40)
+        launcher.check_inhabitants()
+        self.inhabitants()[0].returncode = 1
+        self.say_in_log(self.CALL * 5)          # printed just before it died
+        self.time = 601.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 2)
+        self.say_in_log(self.CALL * 16)
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, [self.inhabitants()[1]])
+        self.time = 9000.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 2)
+
+    def test_too_many_calls_by_ones_that_already_died_keeps_them_stopped(self):
+        launcher = self.ready()
+        self.say_in_log(self.CALL * 61)
+        self.inhabitants()[0].returncode = 1
+        self.time = 601.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 1)
+
+    def test_what_is_said_in_the_world_is_not_mistaken_for_a_log_record(self):
+        launcher = self.ready()
+        said = "The world will not be restarted. Awaiting openai api response from model x"
+        self.say_in_log(f"Tobin received message from Jenbina : {said}\n" * 80)
+        self.say_in_log(f'Tobin full response to Jenbina: ""{said}""\n' * 80)
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, [])
+
+    def test_a_log_that_was_emptied_is_read_from_its_start(self):
+        launcher = self.ready()
+        self.say_in_log("Mode item_collecting finished executing\n" * 500)
+        launcher.check_inhabitants()
+        self.log.write_text("")
+        self.say_in_log(self.CALL * 61)
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, self.inhabitants())
+
+    def test_a_log_that_cannot_be_read_stops_them(self):
+        # Unwatched, nothing would bound what they spend.
+        launcher = self.ready()
+        self.log.unlink()
+        with self.assertLogs("jenbina.minecraft", level="ERROR"):
+            launcher.check_inhabitants()
+        self.assertEqual(self.stopped, self.inhabitants())
+        self.time = 9000.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 1)
+
+    def test_checking_never_raises(self):
+        self.launcher().check_inhabitants()
+        launcher = self.ready()
+        self.log.unlink()
+        self.log.mkdir()
+        launcher.check_inhabitants()
+
+
+class TestInhabitantsWatcher(InhabitantsCase):
+    """The real watcher thread, ticking fast, against fake processes."""
+
+    CALL = TestInhabitantsWatch.CALL
+
+    def watched(self):
+        launcher = WorldLauncher(
+            self.root, self.bridge, env=dict(self.ENV), spawn=self.spawn, is_port_open=self.port_open,
+            which=lambda name: f"/usr/bin/{name}", sleep=self.sleep, clock=lambda: self.time,
+            watch_seconds=0.01)
+        self.addCleanup(launcher.stop)
+        launcher.ensure_ready()
+        return launcher
+
+    def wait_for(self, condition, seconds=3.0):
+        deadline = time.monotonic() + seconds
+        while not condition() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        return condition()
+
+    def test_they_are_watched_between_her_looks(self):
+        self.watched()
+        self.say_in_log(self.CALL * 61)
+        self.assertTrue(self.wait_for(lambda: self.stopped == self.inhabitants()))
+
+    def test_each_start_has_its_own_watcher(self):
+        launcher = self.watched()
+        launcher.stop()
+        launcher.ensure_ready()
+        launcher.stop()
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 3)
+        self.stopped.clear()
+        self.say_in_log(self.CALL * 61)
+        self.assertTrue(self.wait_for(lambda: self.stopped == [self.inhabitants()[2]]))
+
+    def test_stopping_her_world_ends_the_watching(self):
+        launcher = self.watched()
+        watcher = launcher._watcher
+        launcher.stop()
+        watcher.join(timeout=3.0)
+        self.assertFalse(watcher.is_alive())
 
 
 if __name__ == "__main__":

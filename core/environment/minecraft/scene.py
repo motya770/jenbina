@@ -24,6 +24,13 @@ FAR_FROM_HOME = 24
 MAX_CRAFT_ACTIONS = 4
 RESOLVE_CUTOFF = 0.6
 SLEEP = "sleep"
+TALK = "talk"
+MAX_TALK_ACTIONS = 3
+MAX_PLAYERS = 5
+MAX_SPEECH = 200
+# Shown in place of a line that reads like an attempt to give her orders.
+UNREADABLE = "(something she could not make sense of)"
+PLAIN_NAME = re.compile(r"[A-Za-z0-9_]{3,16}")
 
 # Best first; the same order the bridge uses when she eats.
 FOODS = (
@@ -150,7 +157,60 @@ def best_food(inventory: dict) -> str | None:
     return next((food for food in FOODS if _whole(inventory.get(food), 0) > 0), None)
 
 
-def describe(observation: dict, place: str, home) -> list[str]:
+def plain_name(name) -> str | None:
+    """The name if it is a plain Minecraft name, else ``None``.
+
+    Only a plain name is ever shown to her or put in a prompt, so a name can
+    never carry other text.
+    """
+    return name if isinstance(name, str) and PLAIN_NAME.fullmatch(name) else None
+
+
+def safe_speech(text) -> str:
+    """What someone said, made safe to quote: one short line without double
+    quotes. A line that reads like instructions is not repeated at all."""
+    if not isinstance(text, str):
+        return ""
+    line = " ".join(text.split()).replace('"', "'")
+    if not line:
+        return ""
+    from ...interaction.guardrails import check_injection  # imported late: it loads the chat stack
+    if any(check_injection(line)):
+        return UNREADABLE
+    return line[:MAX_SPEECH].rstrip()
+
+
+def speech_line(entry) -> str | None:
+    """One heard line as quoted speech, or ``None`` when it cannot be shown."""
+    if not isinstance(entry, dict):
+        return None
+    name = plain_name(entry.get("from"))
+    text = safe_speech(entry.get("text"))
+    if not name or not text:
+        return None
+    return f'{name} said to you: "{text}"' if entry.get("whisper") else f'{name} said: "{text}"'
+
+
+def players(observation: dict) -> tuple[list[tuple[str, int]], list[str]]:
+    """Other players by plain name: those in sight with their distance, and
+    those somewhere else. Nobody is listed twice."""
+    seen: set[str] = set()
+    near: list[tuple[str, int]] = []
+    for entry in (observation.get("nearby") or {}).get("players") or []:
+        name = plain_name(entry.get("name")) if isinstance(entry, dict) else None
+        if name and name not in seen:
+            seen.add(name)
+            near.append((name, _whole(entry.get("distance"), 0)))
+    elsewhere: list[str] = []
+    for entry in observation.get("elsewhere") or []:
+        name = plain_name(entry)
+        if name and name not in seen:
+            seen.add(name)
+            elsewhere.append(name)
+    return near[:MAX_PLAYERS], elsewhere[:MAX_PLAYERS]
+
+
+def describe(observation: dict, place: str, home, heard=()) -> list[str]:
     inventory = observation.get("inventory") or {}
     nearby = observation.get("nearby") or {}
     sky = observation.get("sky") or {}
@@ -183,6 +243,13 @@ def describe(observation: dict, place: str, home) -> list[str]:
     for hostile in nearby.get("hostiles") or []:
         lines.append(f"Danger: {_article(_words(hostile.get('name', 'monster')))} is "
                      f"{_whole(hostile.get('distance'), 0)} blocks away.")
+    near, elsewhere = players(observation)
+    for name, distance in near:
+        lines.append(f"{name} is {distance} blocks away.")
+    for name in elsewhere:
+        lines.append(f"{name} is somewhere else in this world.")
+    # What was said is data: it is quoted here and never selects an action.
+    lines.extend(line for line in map(speech_line, heard or ()) if line)
     return lines
 
 
@@ -190,7 +257,17 @@ def _craft_label(item: str) -> str:
     return CRAFT_LABELS.get(item) or f"Craft {_article(_words(item))}"
 
 
-def available_actions(observation: dict, home, can_sleep: bool) -> list[WorldAction]:
+def talk_actions(observation: dict) -> list[WorldAction]:
+    """A talk with each player in sight, then a message to each one elsewhere."""
+    near, elsewhere = players(observation)
+    actions = [WorldAction(f"Talk with {name}", TALK, "socialize", {"player": name, "near": True})
+               for name, _ in near]
+    actions += [WorldAction(f"Send a message to {name}, who is elsewhere in the world", TALK, "socialize",
+                            {"player": name, "near": False}) for name in elsewhere]
+    return actions[:MAX_TALK_ACTIONS]
+
+
+def available_actions(observation: dict, home, can_sleep: bool, can_talk: bool = True) -> list[WorldAction]:
     """What she can do right now, most pressing first. Each label is unique."""
     inventory = observation.get("inventory") or {}
     nearby = observation.get("nearby") or {}
@@ -201,6 +278,8 @@ def available_actions(observation: dict, home, can_sleep: bool) -> list[WorldAct
     food = best_food(inventory)
     if food and _whole(observation.get("food"), 20) < 20:
         actions.append(WorldAction(f"Eat the {_words(food)} you are carrying", "eat", "eat"))
+    if can_talk:
+        actions.extend(talk_actions(observation))
     animals = nearby.get("animals") or []
     if animals:
         animal = _words(animals[0].get("name", "animal"))
@@ -274,14 +353,17 @@ def build_world_state(observation: dict, place: str, descriptions: list[str], no
     )
 
 
-def build_scene(observation: dict, home, now: datetime, can_sleep: bool = False) -> Scene:
+def build_scene(observation: dict, home, now: datetime, can_sleep: bool = False,
+                heard=(), can_talk: bool = True) -> Scene:
+    """``heard`` is what other players said since she last looked; ``can_talk``
+    is false once she has had her talks for the day."""
     place = place_label(observation, home)
-    descriptions = describe(observation, place, home)
+    descriptions = describe(observation, place, home, heard)
     return Scene(
         observation=observation,
         place=place,
         descriptions=descriptions,
-        actions=available_actions(observation, home, can_sleep),
+        actions=available_actions(observation, home, can_sleep, can_talk),
         world_state=build_world_state(observation, place, descriptions, now),
     )
 
