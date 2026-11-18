@@ -15,6 +15,8 @@
 
 Jenbina is a self-sustaining virtual persona that simulates human-like cognition using LLMs, a hybrid memory system, and Maslow's Hierarchy of Needs. Unlike standard chatbots, Jenbina has her own personality, internal drives, emotions, and long-term memory of people and events.
 
+There is one Jenbina. She lives on her own clock whether or not anyone is watching: she takes a moment of life every few minutes, sleeps at night, and is the same being for everyone who talks to her. She can live in a described town or in a real Minecraft world.
+
 Community Discord: https://discord.gg/e6sRPpyc
 
 ## How It Works
@@ -31,65 +33,90 @@ The result is something between a Tamagotchi and HAL — a virtual being with it
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         PRESENTATION LAYER                          │
+│                          PRESENTATION LAYER                          │
 │                                                                      │
-│   Streamlit Web UI — Chat, Simulation View, Debug Pages              │
+│   Streamlit home screen: chat timeline + live status rail            │
+│   Environment, Console, Debug Info and Admin pages                   │
 │   Firebase Authentication + Google OAuth                             │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               │
-┌──────────────────────────────┼───────────────────────────────────────┐
-│                        COGNITION LAYER                               │
+└──────────────────────────────────────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────────────────────────────────────────┐
+│                              HEARTBEAT                               │
 │                                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
-│  │ Meta-Cognition│  │Inner Monologue│  │  Curiosity   │              │
-│  │ Self-reflect  │  │ Stream of    │  │  System      │              │
-│  │ Bias detect   │  │ consciousness│  │              │              │
-│  └──────────────┘  └──────────────┘  └──────────────┘               │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
-│  │Action Decision│  │State Analysis│  │ Asimov Check │              │
-│  │ Need-based    │  │ Growth stage │  │ Safety guard │              │
-│  │ prioritization│  │ assessment   │  │ rails        │              │
-│  └──────────────┘  └──────────────┘  └──────────────┘               │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               │
-┌──────────────────────────────┼───────────────────────────────────────┐
-│                          CORE SYSTEMS                                │
+│   One shared Jenbina, hosted by one process at a time                │
+│   A beat every 15 minutes, sleep and wake, private chat turns        │
+└──────────────────────────────────────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────────────────────────────────────────┐
+│                           COGNITION LAYER                            │
 │                                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
-│  │    Person     │  │  Emotions    │  │   Goals &    │              │
-│  │ Needs, state, │  │ Mood, affect │  │   Learning   │              │
-│  │ conversations │  │ on behavior  │  │              │              │
-│  └──────────────┘  └──────────────┘  └──────────────┘               │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
-│  │  Environment  │  │   Social     │  │  Identity &  │              │
-│  │ Locations,    │  │  Cognition   │  │  Self-       │              │
-│  │ weather, events│  │ Relationships│  │  Narrative   │              │
-│  └──────────────┘  └──────────────┘  └──────────────┘               │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               │
-┌──────────────────────────────┼───────────────────────────────────────┐
-│                     HYBRID MEMORY SYSTEM                             │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐    │
+│  │ Meta-Cognition   │  │ Inner Monologue  │  │ Curiosity        │    │
+│  │ Self-reflection  │  │ Stream of        │  │ Exploration and  │    │
+│  │ Bias detection   │  │ consciousness    │  │ learning         │    │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘    │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐    │
+│  │ Action Decision  │  │ State Analysis   │  │ Asimov Check     │    │
+│  │ Need-based       │  │ Growth stage     │  │ Safety           │    │
+│  │ prioritization   │  │ assessment       │  │ guardrails       │    │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘    │
+└──────────────────────────────────────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────────────────────────────────────────┐
+│                             CORE SYSTEMS                             │
 │                                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
-│  │   ChromaDB   │  │    Neo4j     │  │    SQLite    │               │
-│  │              │  │              │  │              │               │
-│  │ Semantic     │  │ Relationship │  │ Time-series  │               │
-│  │ memory via   │  │ graph between│  │ events,      │               │
-│  │ vector       │  │ people,      │  │ needs history,│               │
-│  │ embeddings   │  │ places,      │  │ user accounts,│               │
-│  │ & similarity │  │ events       │  │ conversations │               │
-│  │ search       │  │              │  │              │               │
-│  └──────────────┘  └──────────────┘  └──────────────┘               │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               │
-┌──────────────────────────────┼───────────────────────────────────────┐
-│                       LLM PROVIDERS                                  │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐    │
+│  │ Person           │  │ Emotions         │  │ Goals, Planning  │    │
+│  │ Needs, state,    │  │ Mood, effect on  │  │ and Learning     │    │
+│  │ conversations    │  │ behavior         │  │                  │    │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘    │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐    │
+│  │ World            │  │ Social Cognition │  │ Identity         │    │
+│  │ Palo Alto        │  │ Relationships    │  │ Self-narrative   │    │
+│  │ or Minecraft     │  │                  │  │                  │    │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘    │
+└──────────────────────────────────────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────────────────────────────────────────┐
+│                         HYBRID MEMORY SYSTEM                         │
 │                                                                      │
-│  OpenAI (gpt-5.2 / gpt-5-nano)                                       │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐    │
+│  │ ChromaDB         │  │ Neo4j            │  │ SQLite           │    │
+│  │                  │  │                  │  │                  │    │
+│  │ Semantic memory  │  │ Relationship     │  │ Her saved state, │    │
+│  │ via vector       │  │ graph between    │  │ life events,     │    │
+│  │ embeddings and   │  │ people, places,  │  │ needs history,   │    │
+│  │ similarity       │  │ events           │  │ accounts,        │    │
+│  │ search           │  │                  │  │ conversations    │    │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘    │
+└──────────────────────────────────────────────────────────────────────┘
+                                   │
+┌──────────────────────────────────────────────────────────────────────┐
+│                         OUTSIDE HER PROCESS                          │
+│                                                                      │
+│   OpenAI (gpt-5.2 / gpt-5-nano): every LLM call                      │
+│   Minecraft, optional: Node bridge (Mineflayer) + private server     │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Key Systems
+
+### A Continuous Life (the heartbeat)
+Jenbina is one being, not a simulation someone steps through:
+
+- **One Jenbina** — every account talks to the same being and sees the same life. One process hosts her at a time: the app, or the standalone `run_heartbeat.py`.
+- **Beats** — while her host is running she takes a moment of life (a "beat") every 15 minutes: she looks at her world, thinks, decides, acts, and her needs and mood move with what happened.
+- **Sleep and wake** — she falls asleep and wakes on her own rhythm. Asleep, she takes no decisions and makes no LLM calls; a message can wake her.
+- **Honest lost time** — when her host was not running, she notices the gap on return instead of pretending it did not happen, and is not punished for it.
+- **Private conversations** — what one person says to her stays out of her conversations with everyone else, and chat stays responsive while a beat is under way.
+- **A bounded bill** — beats are capped per day (80 by default) and back off when the LLM provider is failing.
+
+### The Home Screen
+One screen answers two questions: what is she doing right now, and what happened between you and in her day.
+
+- **Timeline** — your conversation interleaved with her persisted life events: thoughts, actions, mood changes, goals, plans, moves, sleep, waking, and gaps.
+- **Status rail** — live cards for what she is doing now (with her portrait and vitals), her heartbeat, and her mind (goals, plans, lessons, and what she knows about you).
+- A Blade Runner 2049-inspired skin; debug material lives on separate pages.
 
 ### Maslow's Hierarchy of Needs
 The core motivation engine. Jenbina progresses through five levels of needs, each with satisfaction tracking, decay rates, and growth stage progression:
@@ -109,7 +136,7 @@ Three databases working together to mirror how human memory works:
 
 - **ChromaDB** — Vector database for semantic/contextual memory. Stores conversations as embeddings and retrieves relevant context via similarity search.
 - **Neo4j** — Graph database tracking relationships between people, locations, and events. Knows who Jenbina has met, where she's been, and how interactions connect.
-- **SQLite** — Time-series storage for chronological events, needs history, user accounts, and conversation persistence.
+- **SQLite** — Her saved state and the log of her life, needs history, user accounts, and conversation persistence.
 
 ### Cognition Layer
 - **Meta-Cognition** — Self-reflection, cognitive bias detection, strategy optimization
@@ -117,19 +144,37 @@ Three databases working together to mirror how human memory works:
 - **Action Decision Chain** — Selects actions based on need priority and world state
 - **Asimov Safety Check** — Validates actions against ethical guardrails
 - **Curiosity System** — Drives exploration and learning behavior
+- **Goals, Planning and Working Memory** — Short-, mid- and long-term goals, plans toward them, and a short-term context for the current moment
 
-### Environment Simulation
-Jenbina exists in a simulated world (based on Palo Alto, CA) with:
+### Her World
+Jenbina lives in one of two worlds, chosen with `JENBINA_WORLD`.
+
+**Palo Alto (default)** — a world described to her, based on Palo Alto, CA:
 - Real location data (parks, cafes, libraries, venues)
 - Weather simulation and day/night cycles
 - Dynamic event generation
 - Mood factors influenced by environment
+
+**Minecraft (`JENBINA_WORLD=minecraft`)** — a real, persistent world on a private server:
+- Each beat she looks at the actual world, picks one of the actions it makes possible, does it there, and is credited only for what really happened.
+- She can look around, explore, chop wood, craft tools, mine stone, hunt, eat, drink, dig a shelter, walk home, rest, and sleep.
+- Her inventory, her body and everything she changed are still there on the next beat. Her hunger follows her food bar, so she has to find food and eat it.
+- Her world starts with her: her mind starts the Minecraft server and the bridge when it starts, and stops them when it stops.
+- You can watch her in a browser, and no Minecraft account is needed.
+
+```
+Her mind (Python)  ⇄  Bridge (Node, Mineflayer)  ⇄  Minecraft server 1.21.4
+  observe, decide       her body: observe and act      the world, on this machine only
+```
+
+Setup, settings and the world's rules are in **[minecraft/README.md](minecraft/README.md)**.
 
 ### Emotion & Social Systems
 - Emotional state tracking that influences behavior and responses
 - Social cognition with relationship strength tracking
 - Identity and self-narrative that evolve with experiences
 - Insight generation for personal growth recommendations
+- Proactive messages: she can reach out first to someone she has talked with recently
 
 ## Tech Stack
 
@@ -144,7 +189,8 @@ Jenbina exists in a simulated world (based on Palo Alto, CA) with:
 | Relational DB | SQLite | ![SQLite](https://img.shields.io/badge/-SQLite-003B57?logo=sqlite&logoColor=white) |
 | Auth | Firebase + Google OAuth | ![Firebase](https://img.shields.io/badge/-Firebase-FFCA28?logo=firebase&logoColor=black) |
 | Web Search | SerpAPI | ![SerpAPI](https://img.shields.io/badge/-SerpAPI-23B5E5) |
-| Testing | pytest, pytest-playwright | ![pytest](https://img.shields.io/badge/-pytest-0A9EDC?logo=pytest&logoColor=white) ![Playwright](https://img.shields.io/badge/-Playwright-2EAD33?logo=playwright&logoColor=white) |
+| Minecraft world (optional) | Minecraft Java server 1.21.4, Node 18+, Mineflayer | ![Node.js](https://img.shields.io/badge/-Node.js-5FA04E?logo=nodedotjs&logoColor=white) |
+| Testing | pytest, pytest-playwright, `node --test` | ![pytest](https://img.shields.io/badge/-pytest-0A9EDC?logo=pytest&logoColor=white) ![Playwright](https://img.shields.io/badge/-Playwright-2EAD33?logo=playwright&logoColor=white) |
 | CI/CD | GitHub Actions | ![GitHub Actions](https://img.shields.io/badge/-GitHub_Actions-2088FF?logo=githubactions&logoColor=white) |
 
 ## Project Structure
@@ -152,28 +198,43 @@ Jenbina exists in a simulated world (based on Palo Alto, CA) with:
 ```
 jenbina/
 ├── core/                     # Main application
-│   ├── app.py                # Streamlit entry point
+│   ├── app.py                # Streamlit entry point: the home screen
+│   ├── simulation_runner.py  # One beat of her life, with no UI
 │   ├── connect.py            # LLM provider connections
+│   ├── heartbeat/            # One shared being: host, rhythm, sleep, storage
+│   ├── timeline/             # The log of her life events
 │   ├── person/               # Persona representation & state
 │   ├── needs/                # Maslow's hierarchy implementation
 │   ├── memory/               # Hybrid memory (Chroma + Neo4j + SQLite)
+│   ├── working_memory/       # Short-term context
 │   ├── cognition/            # Meta-cognition, decisions, safety checks
-│   ├── environment/          # World simulation, locations, weather
+│   ├── environment/          # The Palo Alto world: locations, weather, events
+│   │   └── minecraft/        # The Minecraft world: bridge client, scene, launcher
 │   ├── emotions/             # Emotional state tracking
 │   ├── social/               # Social cognition & relationships
 │   ├── identity/             # Self-narrative & personal identity
 │   ├── goals/                # Goal setting & prioritization
+│   ├── planning/             # Plans toward goals
 │   ├── learning/             # Experience tracking & lesson extraction
 │   ├── insights/             # Growth insights & recommendations
+│   ├── research/             # Research on the people she talks to
 │   ├── interaction/          # Chat handler & guardrails
 │   ├── auth/                 # Firebase auth & user database
-│   ├── ui/                   # Streamlit UI components
-│   └── pages/                # Multi-page app (Chat, Environment, Debug)
+│   ├── ui/                   # Timeline, status rail, theme, sprites
+│   └── pages/                # Environment, Console, Debug Info, Admin
+├── minecraft/                # Her Minecraft world
+│   ├── bridge/               # Node bridge (Mineflayer): her body in the world
+│   ├── setup_server.sh       # Download and configure the private server
+│   ├── run_server.sh         # Start the server by hand
+│   └── README.md             # Setup, settings, the world's rules
 ├── tests/                    # Unit, integration, and E2E tests
-├── assets/                   # Images and static files
-├── docs/                     # Documentation
+├── assets/                   # Portraits, sprites and static files
+├── docs/plans/               # Design and implementation documents
 ├── jenbina_memory/           # Persistent data directory (gitignored)
+├── run_app.py                # Launcher for the app
+├── run_heartbeat.py          # Host her without a UI
 ├── requirements.txt
+├── .env.example              # Template for settings and keys
 ├── INSTALL.md                # Detailed installation guide
 └── system_design_schema.md   # System design documentation
 ```
@@ -185,10 +246,64 @@ git clone https://github.com/motya770/jenbina
 cd jenbina
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+export OPENAI_API_KEY="your_openai_api_key_here"
 streamlit run core/app.py
 ```
 
-For detailed setup instructions (Neo4j, environment variables, API keys), see **[INSTALL.md](INSTALL.md)**.
+Her heart beats for as long as the app is running. For detailed setup instructions (Neo4j, environment variables, API keys), see **[INSTALL.md](INSTALL.md)**.
+
+### Without the UI
+
+`run_heartbeat.py` hosts her with no browser. Only one process can host her at a time, so stop the app first.
+
+```bash
+python run_heartbeat.py          # keep her heart running
+python run_heartbeat.py --once   # take one beat and exit
+```
+
+### In Minecraft
+
+This needs Java 21 or newer and Node 18 or newer. Set the world up once; the server will not start until you accept the [Minecraft EULA](https://www.minecraft.net/en-us/eula), which is what `--accept-eula` does.
+
+```bash
+./minecraft/setup_server.sh --accept-eula
+cd minecraft/bridge && npm install && cd ../..
+```
+
+Then start her with the Minecraft world switched on. The server and the bridge start with her and stop with her.
+
+```bash
+JENBINA_WORLD=minecraft python run_heartbeat.py
+```
+
+Or with the app:
+
+```bash
+JENBINA_WORLD=minecraft streamlit run core/app.py
+```
+
+See **[minecraft/README.md](minecraft/README.md)** for watching her in a browser and for every setting.
+
+### Settings
+
+All settings are environment variables; `.env.example` lists them. `run_heartbeat.py` also reads a `.env` file in the project root; the app reads only the environment it is started with. The ones that shape her life:
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `OPENAI_API_KEY` | — | Required for every LLM call |
+| `JENBINA_BEAT_MINUTES` | `15` | Minutes between beats while she is awake |
+| `JENBINA_MAX_BEATS_PER_DAY` | `80` | Daily cap on beats |
+| `JENBINA_DISABLE_SLEEP` | `0` | `1` keeps her awake |
+| `JENBINA_WORLD` | `palo_alto` | `minecraft` moves her into the Minecraft world |
+| `JENBINA_MINECRAFT_STAY_ONLINE` | `0` | `1` keeps her logged in to Minecraft between beats |
+| `JENBINA_MINECRAFT_AUTOSTART` | `1` | `0` if you start the Minecraft server and the bridge yourself |
+
+### Tests
+
+```bash
+python -m pytest tests/test_*.py -v --tb=short --cov=core   # Python unit tests (what CI runs)
+cd minecraft/bridge && npm test                             # the bridge's unit tests
+```
 
 ## The Two-Brain Architecture
 
@@ -204,7 +319,7 @@ Jenbina's cognition is split into two modules inspired by neuroscience:
 - LLM-powered logical reasoning and language
 - Interprets commands from the Reptile Brain
 - Considers personal preferences and past experiences
-- Interacts with the simulated environment
+- Interacts with her world
 
 ## Background
 
@@ -214,6 +329,9 @@ The concept draws from electronic Tamagotchi toys of the 1990s — but instead o
 
 ## Future Directions
 
+- Autobiographical memory of her own life, and memory consolidation during sleep
+- Real stakes: consequences when her needs go unmet
+- Other inhabitants in her world
 - Integrating multiple LLMs with different specializations into a unified system
 - Dynamic learning system that adds new actions and needs over time
 - Shifting persona focus to other roles (e.g., rescue robot, companion)

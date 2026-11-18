@@ -1,0 +1,24 @@
+{
+  "name": "jenbina-minecraft-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local HTTP bridge that lets Jenbina's Python mind observe and act in a Minecraft world through Mineflayer.",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js",
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "mineflayer": "4.39.0",
+    "mineflayer-collectblock": "1.6.0",
+    "mineflayer-pathfinder": "2.4.5",
+    "vec3": "0.1.10"
+  },
+  "optionalDependencies": {
+    "canvas": "3.2.3",
+    "prismarine-viewer": "1.33.0"
+  }
+}

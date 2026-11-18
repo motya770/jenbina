@@ -17,6 +17,7 @@ from core.heartbeat.host import JenbinaHost, process_host
 from core.heartbeat.store import BeingStore
 from core.memory.conversation_memory import ChromaMemoryManager
 from core.environment.environment_simulator import EnvironmentSimulator
+from core.environment.minecraft import world_from_env
 from core.auth.user_db import UserDatabase
 from core.ui.auth_page import render_auth_page, render_user_header
 
@@ -37,11 +38,17 @@ def _adopt_user_id() -> int | None:
         return None
 
 
+def _world_kwargs() -> dict:
+    """``world_provider`` for the host only when JENBINA_WORLD names a real world."""
+    world = world_from_env()
+    return {"world_provider": world} if world is not None else {}
+
+
 def _build_host() -> JenbinaHost:
     llm, llm_json_mode = init_llm()
     insight_llm = get_llm(provider="openai-advanced", temperature=0.8, max_tokens=500)
     return JenbinaHost(BeingStore(), UserDatabase(), llm, llm_json_mode, insight_llm,
-                       adopt_user_id=_adopt_user_id())
+                       adopt_user_id=_adopt_user_id(), **_world_kwargs())
 
 
 def get_host() -> JenbinaHost:

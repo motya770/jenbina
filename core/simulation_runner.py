@@ -55,6 +55,10 @@ _tone_map = {
 }
 
 
+class BeatAbandoned(RuntimeError):
+    """Her host stopped hosting her in the middle of this beat."""
+
+
 def get_person_dict(person):
     """Get person state as dictionary."""
     return {
@@ -284,13 +288,17 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
             only waits for the LLM calls it runs in parallel, so the host can
             let a chat message be answered meanwhile.
             Optional: status (stage sink), sleep_config (RhythmConfig),
-            proactive_target ((user_id, person_key)). Without an event_log,
+            proactive_target ((user_id, person_key)), world_provider (a real
+            world such as MinecraftWorld) with world_memory (its saved dict),
+            still_hosting (callable; when it returns False the beat raises
+            BeatAbandoned instead of acting in a real world). Without an event_log,
             user_db and user_id provide the legacy event-log fallback.
 
     Returns:
         Dict with needs_response, world_description, action_decision,
         state_response, person_dict, world_summary, iteration_duration,
-        satisfaction_delta, matched_action, fell_asleep, proactive_sent_to.
+        satisfaction_delta, matched_action, fell_asleep, proactive_sent_to,
+        world_outcome (``None`` without a world provider).
     """
     event_log = context.get("event_log")
     if event_log is None:
@@ -309,6 +317,16 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
 
     iteration_start_time = datetime.now()
     iter_num = iteration + 1
+
+    # A real world, when the host supplies one, is looked at before anything
+    # else: if it cannot be reached the beat stops here, before any LLM call.
+    provider = context.get("world_provider")
+    scene = None
+    if provider is not None:
+        stage("arriving in the world…")
+        scene = provider.observe(
+            person, context.setdefault("world_memory", {}), context.get("sleep_config"), waiting=waiting,
+        )
     print(f"{'='*60}")
     print(f"  ITERATION {iter_num}")
     print(f"{'='*60}")
@@ -328,8 +346,13 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     print(f"{'─'*40}")
     person_dict = get_person_dict(person)
     current_location = context.get("jenbina_location", "Jenbina's House")
-    world = create_comprehensive_world_state(person_location=current_location)
+    if scene is not None:
+        world = scene.world_state
+    else:
+        world = create_comprehensive_world_state(person_location=current_location)
     world_summary = get_world_state_summary(world)
+    if scene is not None:
+        world_summary["body"] = scene.body
     print(f"  Person: {person.name} | Satisfaction: {satisfaction_before:.1f}%")
     print(f"  Location: {world_summary['location']['name']}")
     print(f"  Time: {world_summary['time']['time_of_day']}")
@@ -350,7 +373,8 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         if action:
             prev_actions_list.append(action)
     recent_actions_str = "\n".join(f"- {a}" for a in prev_actions_list) or "None yet."
-    world_chain = create_world_description_system(llm_json_mode)
+    # A real world describes itself: no LLM is asked to imagine the scene.
+    world_chain = create_world_description_system(llm_json_mode) if scene is None else None
 
     # Plan, goals, working memory
     active_plan_step = None
@@ -455,7 +479,10 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     print(f"  [2] Running needs, world, monologue in parallel...")
     with ThreadPoolExecutor(max_workers=3) as executor:
         needs_future = executor.submit(create_basic_needs_chain, llm_json_mode, person.maslow_needs)
-        world_future = executor.submit(world_chain, person, world, recent_actions=recent_actions_str)
+        world_future = (
+            executor.submit(world_chain, person, world, recent_actions=recent_actions_str)
+            if world_chain is not None else None
+        )
         if monologue_kwargs is not None:
             monologue_future = executor.submit(person.inner_monologue.think, **monologue_kwargs)
         else:
@@ -463,7 +490,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
 
         with waiting():
             needs_response = needs_future.result()
-            world_response = world_future.result()
+            world_response = (
+                world_future.result() if world_future is not None else json.dumps(scene.description_data())
+            )
             if monologue_future is not None:
                 monologue_future.result()
     record_thought(event_log, person.inner_monologue)
@@ -512,7 +541,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         world_description=world_response,
         meta_cognitive_system=meta_cognitive_system,
         world_state=world,
-        recent_actions=recent_actions,
+        # A real world offers about a dozen fixed actions: forbidding the last
+        # six would forbid most of them, so only the latest counts as recent.
+        recent_actions=recent_actions[-1:] if scene is not None else recent_actions,
     )
     chosen = action_response.get('chosen_action', '?') if isinstance(action_response, dict) else str(action_response)[:50]
     print(f"  Action chosen: {chosen}")
@@ -521,9 +552,25 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         person.curiosity_system.update_after_action(action_response.get("chosen_action", ""))
     _print_json("Action Response", action_response)
 
-    # Apply action effects to needs via keyword matching
     action_executor = create_maslow_action_executor(person.maslow_needs)
-    matched_action = match_action_key(chosen)
+    outcome = None
+    if scene is not None:
+        # In a real world she is credited for what happened, not for what she said.
+        stage("acting in the world…")
+        still_hosting = context.get("still_hosting")
+        if still_hosting is not None and not still_hosting():
+            # Her host stopped while this beat was thinking. She is no longer
+            # this process's to move, so nothing more is done in the world.
+            raise BeatAbandoned("Her host stopped hosting her during this beat.")
+        outcome = provider.perform(scene, chosen, person, context["world_memory"], waiting=waiting)
+        if isinstance(action_response, dict):
+            action_response["outcome"] = outcome.summary
+            action_response["outcome_ok"] = outcome.ok
+        matched_action = outcome.need_key
+        print(f"  World outcome ({'ok' if outcome.ok else 'not ok'}): {outcome.summary}")
+    else:
+        # Apply action effects to needs via keyword matching
+        matched_action = match_action_key(chosen)
     sleep_config = context.get("sleep_config")
     fell_asleep = sleep_config is not None and should_fall_asleep(
         matched_action,
@@ -536,6 +583,9 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     elif matched_action:
         effect_result = action_executor(matched_action)
         print(f"  Action effect applied: {matched_action} -> satisfied {effect_result.get('satisfied_needs', {})}")
+        if outcome is not None:
+            # Some effects carry a little hunger; in a real world only her body decides that.
+            provider.sync_body(person, outcome.observation or scene.observation)
     else:
         print(f"  No need-satisfaction mapping for action: {chosen}")
 
@@ -548,7 +598,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         )
 
     # Detect location change
-    new_location = _detect_location_from_action(chosen)
+    new_location = outcome.place if outcome is not None else _detect_location_from_action(chosen)
     if new_location:
         old_location = context.get("jenbina_location", "Jenbina's House")
         if new_location != old_location:
@@ -565,6 +615,8 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     print(f"{'─'*40}")
     asimov_chain = create_asimov_check_system(llm_json_mode)
     action_situation = f"Action taken: {action_response.get('chosen_action', 'unknown')}. Reasoning: {action_response.get('reasoning', '')}"
+    if outcome is not None and outcome.summary:
+        action_situation += f" What happened: {outcome.summary}"
 
     print(f"  [4] Running safety check + emotion analysis in parallel...")
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -610,7 +662,10 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     print(f"  Stage 5: Learning & Updates")
     print(f"{'─'*40}")
     print(f"  Updating needs & decaying emotions...")
-    person.update_all_needs()
+    if scene is not None:
+        person.update_all_needs(skip_needs=provider.skip_needs)
+    else:
+        person.update_all_needs()
 
     needs_after = person.get_needs_snapshot()
     emotions_after = person.get_emotions_snapshot()
@@ -624,6 +679,8 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         "time_of_day": world_summary.get("time", {}).get("time_of_day", "unknown"),
         "weather": world_summary.get("weather", {}).get("description", "unknown"),
     }
+    # The planner is told what this world offers, so plan steps are doable here.
+    plan_ctx = dict(world_ctx, possible_actions="; ".join(scene.labels)) if scene is not None else world_ctx
 
     lesson_stats = {}
     experience = None
@@ -690,7 +747,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
                 print(f"  Plan step overridden by urgent needs.")
 
             replan_result = person.planning_system.check_for_replan(
-                needs=needs_after, world_context=world_ctx,
+                needs=needs_after, world_context=plan_ctx,
             )
             if replan_result is not None:
                 record_replan(event_log, replan_result)
@@ -716,7 +773,7 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
                             goal_id=idx,
                             needs=needs_after,
                             emotions=emotions_after,
-                            world_context=world_ctx,
+                            world_context=plan_ctx,
                             lessons=lesson_stats.get("lessons", []),
                         )
 
@@ -800,6 +857,16 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
     except Exception as e:
         print(f"  Proactive message check failed: {e}")
 
+    if outcome is not None and outcome.observation is not None:
+        # What the rail shows until the next beat is where she is and how her
+        # body is now, after the action, not what she saw before it.
+        after = provider.scene_after(outcome.observation, context["world_memory"])
+        world_summary = get_world_state_summary(after.world_state)
+        world_summary["body"] = after.body
+    elif outcome is not None and outcome.unseen:
+        # She did not see how the action ended; this is the world from before it.
+        world_summary["last_seen"] = True
+
     iteration_duration = (datetime.now() - iteration_start_time).total_seconds()
     print(f"{'='*60}")
     print(f"  ITERATION {iter_num} COMPLETE — {iteration_duration:.2f}s")
@@ -817,4 +884,5 @@ def run_single_iteration_headless(person, llm_json_mode, meta_cognitive_system, 
         "matched_action": matched_action,
         "fell_asleep": fell_asleep,
         "proactive_sent_to": proactive_sent_to,
+        "world_outcome": outcome.to_dict() if outcome is not None else None,
     }

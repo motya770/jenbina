@@ -80,6 +80,8 @@ class Situation:
     woken_by_message_at: datetime | None = None
     history: list = field(default_factory=list)
     last_responses: dict = field(default_factory=dict)
+    # What a real world needs remembered between beats, keyed by world name.
+    world: dict = field(default_factory=dict)
 
     @classmethod
     def fresh(cls, now: datetime) -> Situation:
@@ -120,6 +122,8 @@ class Situation:
             situation.history = data["history"]
         if isinstance(data.get("last_responses"), dict):
             situation.last_responses = data["last_responses"]
+        if isinstance(data.get("world"), dict):
+            situation.world = data["world"]
         return situation
 
 

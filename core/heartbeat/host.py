@@ -154,6 +154,7 @@ class JenbinaHost:
         iteration_fn: Callable = run_single_iteration_headless,
         meta_cognitive_system=None, config: RhythmConfig | None = None,
         owner: str | None = None, adopt_user_id: int | None = None,
+        world_provider=None,
     ):
         self.store = store
         self.user_db = user_db
@@ -169,6 +170,9 @@ class JenbinaHost:
         self.config = config if config is not None else RhythmConfig.from_env()
         self.owner = owner if owner is not None else make_owner_id()
         self.adopt_user_id = adopt_user_id
+        # A real world she lives in (see core/environment/minecraft); None
+        # keeps the described Palo Alto world.
+        self.world_provider = world_provider
         self.person: Person
         self.situation = Situation.fresh(clock())
         self.event_log = LifeEventLog(store)
@@ -192,6 +196,8 @@ class JenbinaHost:
         self._alive_lock = threading.Lock()
         self._last_alive = None
         self._pending_gap = None
+        # Set under the mind lock; she is logged out once it has been let go.
+        self._leave_asked = False
 
     def _watch(self, llm) -> None:
         """Attach the lock-releasing callback to an LLM the beats use."""
@@ -247,6 +253,7 @@ class JenbinaHost:
             self._pending_gap = None
             self._stop = threading.Event()
             self.hosting = True
+            self._start_world()
             if threads:
                 self._register_stop()
                 self._start_thread(self._heart_loop, "jenbina-heart")
@@ -279,6 +286,18 @@ class JenbinaHost:
         self._stop.set()
         # Never join a heart thread while holding the lock it may be waiting for.
         self._join_threads(patience)
+        try:
+            # Whatever happens below, she is not left standing in a running
+            # world. Only a host that still has her may log her out: once this
+            # one has stopped, the session there may belong to the next host.
+            if self.hosting:
+                self._leave_world()
+            self._stop_hosting(patience)
+        finally:
+            # Last, and every time: only what this process started is stopped.
+            self._stop_world()
+
+    def _stop_hosting(self, patience: float | None) -> None:
         if not self.lock.acquire(timeout=-1 if patience is None else patience):
             if self.hosting:
                 # hosting = False first, so the beat in flight cannot save.
@@ -357,6 +376,12 @@ class JenbinaHost:
 
     def tick(self) -> Step:
         try:
+            return self._tick()
+        finally:
+            self._leave_world_if_asked()
+
+    def _tick(self) -> Step:
+        try:
             with self.lock:
                 if not self.hosting or not self.pulse():
                     return Step(WAIT, "not_hosting")
@@ -399,6 +424,10 @@ class JenbinaHost:
                 "debug_iterations": self.debug_iterations, "user_db": self.user_db,
                 "event_log": self.event_log, "status": _StatusSink(self),
                 "sleep_config": self.config, "waiting": self._llm_wait.waiting,
+                "world_provider": self.world_provider, "world_memory": s.world,
+                # The mind lock is let go during a beat's waits, so this host
+                # can stop in the middle of one; she must not act after that.
+                "still_hosting": lambda: self.hosting,
                 "proactive_target": choose_outreach_target(self.person, self.store.people(), now),
             }
             result = self.iteration_fn(
@@ -438,6 +467,10 @@ class JenbinaHost:
             # before it saves, and stops being the one allowed to let go.
             self._llm_wait.retake()
             self._beat_thread = None
+            if not self.hosting:
+                # Abandoned mid-beat: a call to the world that was already
+                # under way may have left her logged in there.
+                self._leave_asked = True
             del self.debug_iterations[:-self.config.debug_limit]
             self._busy, self._stage = False, "idle"
             self.save()
@@ -447,7 +480,48 @@ class JenbinaHost:
         event.created_at = now
         self.event_log.record(event)
 
+    def _start_world(self) -> None:
+        """Start a real world's own processes; a described world has none."""
+        start = getattr(self.world_provider, "start", None)
+        if start is not None:
+            try:
+                start()
+            except Exception as err:
+                # Her beats report the world as unreachable until it is there.
+                logger.warning("Jenbina's world did not start: %s", err)
+
+    def _stop_world(self) -> None:
+        stop = getattr(self.world_provider, "stop", None)
+        if stop is not None:
+            try:
+                stop()
+            except Exception:
+                logger.exception("Could not stop Jenbina's world.")
+
+    def _leave_world(self) -> None:
+        """Log her out of a real world; a described world has nothing to leave.
+
+        It waits on the world, so it is never called with the mind lock held:
+        see ``_leave_world_if_asked``.
+        """
+        close = getattr(self.world_provider, "close", None)
+        if close is not None:
+            try:
+                close()
+            except Exception:
+                logger.exception("Could not take Jenbina out of her world.")
+
+    def _leave_world_if_asked(self) -> None:
+        """Log her out if that was asked for while the mind lock was held."""
+        if self._leave_asked:
+            self._leave_asked = False
+            self._leave_world()
+
     def _fall_asleep(self, now: datetime, reason: str) -> None:
+        # Asleep she is not in the world, however she came to fall asleep. The
+        # logout itself waits until the mind lock is free, so a stalled world
+        # cannot hold up a message to her.
+        self._leave_asked = True
         s = self.situation
         same_sleep = (
             s.woken_by_message_at is not None
@@ -471,7 +545,10 @@ class JenbinaHost:
         self.person.maslow_needs.satisfy_need(
             "sleep", self.config.sleep_recovery_per_hour * hours, source="sleeping",
         )
-        self.person.update_all_needs(now=now, skip_needs=("sleep",))
+        # A real world owns some needs (her body's hunger): the clock must not
+        # move them while she is away from it.
+        owned = tuple(getattr(self.world_provider, "skip_needs", ()))
+        self.person.update_all_needs(now=now, skip_needs=("sleep",) + owned)
         s.last_sleep_tick_at = now
         self.save()
 
@@ -575,6 +652,12 @@ class JenbinaHost:
                 and beats_today(self.situation, now) < self.config.max_beats_per_day)
 
     def step_once(self) -> str:
+        try:
+            return self._step_once()
+        finally:
+            self._leave_world_if_asked()
+
+    def _step_once(self) -> str:
         with self.lock:
             if not self.hosting or not self.pulse():
                 return "not_hosting"

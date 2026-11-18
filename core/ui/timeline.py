@@ -123,10 +123,13 @@ def build_timeline(messages, events, person_name: str = "Jenbina", filter_name: 
     return out
 
 
-def action_details_text(reasoning, lessons) -> str:
-    """The body of an action row's "why?" details: the reasoning, then the
-    lessons applied on their own line."""
+def action_details_text(reasoning, lessons, outcome="") -> str:
+    """The body of an action row's "why?" details: what happened in the world
+    (when a real world reported it), the reasoning, then the lessons applied
+    on their own line."""
     body = str(reasoning or "")
+    if outcome:
+        body = "What happened: " + str(outcome) + ("\n" + body if body else "")
     lessons_line = lessons_text(lessons)
     if lessons_line:
         body = (body + "\n" if body else "") + "Lessons applied: " + lessons_line
@@ -146,7 +149,7 @@ def _event_row_html(item: TimelineItem) -> str:
         head, rest = first_sentence(item.text)
         return event_html(THOUGHT, head, meta=item.meta, details=("more", item.text) if rest else None)
     if item.kind == ACTION:
-        body = action_details_text(detail.get("reasoning", ""), detail.get("lessons"))
+        body = action_details_text(detail.get("reasoning", ""), detail.get("lessons"), detail.get("outcome", ""))
         return event_html(
             ACTION,
             item.text,
