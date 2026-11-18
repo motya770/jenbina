@@ -1,6 +1,15 @@
 # Inhabitants: someone to talk to in her Minecraft world
 
-Status: design, awaiting approval. Date: 2026-11-18.
+Status: implemented on branch `claude/minecraft-inhabitants`. Date: 2026-11-18.
+
+What the trial changed is recorded under "Trial results" in
+`2026-11-18-minecraft-inhabitants-implementation.md`. In short: Mindcraft
+needs Node 20; `!goal` cannot be blocked, so a standing goal is bounded by
+the profiles' wording, by cleaning `!` out of her lines, and by a limit of 60
+inhabitant LLM calls an hour kept by the launcher; `hunting` and
+`self_defense` are off in both profiles; her line is cut at 200 characters in
+the bridge too; and Mindcraft is started with her OpenAI key and none of her
+other environment.
 
 Builds on `2026-11-17-minecraft-world-design.md` (pull request 47). Read that
 first; this document only describes what changes.
