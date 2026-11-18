@@ -3,8 +3,9 @@ aloud to another inhabitant.
 
 What she says there is seen by everyone in the world, so this prompt is kept
 deliberately narrow. It reads her name, her lowest needs, her strongest
-feelings, the scene, what she knows of the one she is talking to, and their
-own words to each other. It never reads her working memory, her
+feelings, the scene, how things stand between her and the one she is talking
+to (numbers and fixed words, never free text), and their own words to each
+other. It never reads her working memory, her
 conversations with people, memory search results, or her model of anyone
 else: nothing a person told her in private can reach the game through here.
 """
@@ -22,13 +23,19 @@ logger = logging.getLogger("jenbina.minecraft")
 MAX_LINE = 200
 LOWEST_NEEDS = 5
 STRONGEST_EMOTIONS = 3
+TOP_INTERESTS = 3
 ME = "me"
+# The words her social memory uses for a mood or a topic are a fixed
+# vocabulary; anything else is not repeated.
+FIXED_WORD = re.compile(r"[a-z_]{2,24}")
+# Must stay the prefix that core/heartbeat/store.py never gives to an account.
+INHABITANT_PREFIX = "minecraft:"
 
 
 def inhabitant_key(name: str) -> str:
     """The name she knows an inhabitant of the world by in her social memory,
     kept apart from the people she talks with in the app."""
-    return f"minecraft:{name}"
+    return f"{INHABITANT_PREFIX}{name}"
 
 
 def clean_line(text) -> str:
@@ -61,6 +68,31 @@ def _state_lines(person) -> list[str]:
     return lines
 
 
+def _known_lines(person, partner: str) -> list[str]:
+    """How things stand between her and ``partner``, from her social memory.
+
+    Only numbers and words from a fixed vocabulary are read. The model's
+    beliefs are free text taken from what someone said, so they are left out:
+    what was said reaches the prompt only as quoted speech.
+    """
+    social = getattr(person, "social_cognition", None)
+    models = getattr(social, "models", None) if social is not None else None
+    model = models.get(inhabitant_key(partner)) if isinstance(models, dict) else None
+    if model is None:
+        return [f"- You have not talked with {partner} before."]
+    relation = model.relationship
+    lines = [f"- Between you (0 to 100): trust {relation.trust:.0f}, closeness {relation.closeness:.0f}, "
+             f"conflict {relation.conflict:.0f}."]
+    mood = model.inferred_emotional_state
+    if isinstance(mood, str) and FIXED_WORD.fullmatch(mood) and mood != "neutral":
+        lines.append(f"- The last time you talked they seemed {mood}.")
+    topics = [topic for topic, _ in sorted(model.interests.items(), key=lambda item: -item[1])
+              if isinstance(topic, str) and FIXED_WORD.fullmatch(topic)][:TOP_INTERESTS]
+    if topics:
+        lines.append(f"- They seem interested in: {', '.join(topics)}.")
+    return lines
+
+
 def voice_prompt(person, scene_lines: list[str], partner: str, last_lines: list[str],
                  transcript: list[tuple[str, str]]) -> str:
     """The whole prompt for her next line to ``partner``.
@@ -72,17 +104,14 @@ def voice_prompt(person, scene_lines: list[str], partner: str, last_lines: list[
     if plain_name(partner) is None:
         raise ValueError("She only talks with someone who has a plain name.")
     name = person.name
-    social = getattr(person, "social_cognition", None)
-    known = social.format_for_prompt(inhabitant_key(partner)) if social is not None else ""
 
     parts = [
         f"You are {name}, a warm and curious person who lives in a Minecraft world. "
         f"{partner} lives in this world too, and you are about to say one thing to them.",
         "How you are right now:\n" + "\n".join(_state_lines(person)),
         "What is around you:\n" + "\n".join(f"- {line}" for line in scene_lines or ["(nothing in particular)"]),
+        f"You and {partner}:\n" + "\n".join(_known_lines(person, partner)),
     ]
-    if known:
-        parts.append(f"What you know of {partner}:\n{known}")
     before = [safe_speech(line) for line in last_lines or []]
     parts.append(
         f"The last things you and {partner} said to each other before now:\n"

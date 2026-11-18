@@ -61,8 +61,12 @@ INHABITANT_CALLS_PER_HOUR = 60
 WATCH_SECONDS = 60.0
 # What Mindcraft prints for each request to its LLM, and when it gives up on
 # an agent that keeps leaving the world. Both belong to the pinned commit.
+# A record is recognised by how its line begins, so the words can never be
+# put there by something said in the world (Mindcraft logs what is said).
 LLM_CALL_MARK = b"Awaiting openai api response"
-DROPPED_MARK = b"will not be restarted"
+DROPPED_MARK = b"Agent process exited too quickly"
+# Written by setup_inhabitants.sh as its last step.
+READY_MARK = ".jenbina-ready"
 # Mindcraft's own defaults, then what an inhabitant of her world must never do:
 # start talks by itself, attack her, or write code. (`!goal` cannot be blocked.)
 BLOCKED_ACTIONS = (
@@ -158,7 +162,9 @@ class WorldLauncher:
         self._inhabitants: subprocess.Popen | None = None
         self._inhabitants_started: float | None = None
         self._inhabitants_stopped_for_good = False
-        self._log_offset = 0
+        # Where in their log the counting has got to; ``None`` until they are
+        # first started, so nothing printed before that is counted.
+        self._log_offset: int | None = None
         self._llm_calls: list[float] = []
         self._said: set[str] = set()
         # How often the inhabitants are checked between beats; ``None`` leaves
@@ -304,6 +310,8 @@ class WorldLauncher:
         """Mindcraft is installed and there is at least one character to play."""
         return ((self.mindcraft_dir / "main.js").is_file()
                 and (self.mindcraft_dir / "node_modules").is_dir()
+                # A setup that stopped half-way leaves the first two behind.
+                and (self.mindcraft_dir / READY_MARK).is_file()
                 and any(self.profiles_dir.glob("*.json")))
 
     def inhabitants_running(self) -> bool:
@@ -369,36 +377,51 @@ class WorldLauncher:
         profiles = sorted(str(path) for path in self.profiles_dir.glob("*.json"))
         log = self.log_dir / INHABITANTS_LOG
         self.log_dir.mkdir(parents=True, exist_ok=True)
-        # Only what they print from now on is counted against them.
-        self._log_offset = log.stat().st_size if log.exists() else 0
-        self._llm_calls = []
+        if self._log_offset is None:
+            # Only what is printed from their first start on is counted. Later
+            # starts go on counting where the last one stopped: a restart does
+            # not wipe the hour's bill.
+            self._log_offset = log.stat().st_size if log.exists() else 0
         logger.info("Starting the inhabitants of her world (%s).",
                     ", ".join(Path(profile).stem for profile in profiles))
         self._inhabitants = self._launch(
             [node, "main.js", "--profiles", *profiles], INHABITANTS_LOG, env, cwd=self.mindcraft_dir)
-        self._watch()
+        self._watch(self._inhabitants)
         return True
 
-    def _watch(self) -> None:
-        if self._watch_seconds is None or (self._watcher is not None and self._watcher.is_alive()):
+    def _watch(self, process) -> None:
+        """Check on this start of the inhabitants every so often.
+
+        Each start has a watcher of its own, which ends when that process is
+        no longer the one running, so none is ever left unwatched.
+        """
+        if self._watch_seconds is None:
             return
+        self._watch_stop.set()
         self._watch_stop = stop = threading.Event()
 
         def watch() -> None:
             while not stop.wait(self._watch_seconds):
+                if self._inhabitants is not process:
+                    return
                 self.check_inhabitants()
 
         self._watcher = threading.Thread(target=watch, name="jenbina-inhabitants-watch", daemon=True)
         self._watcher.start()
 
-    def _new_log_lines(self) -> bytes:
-        """What the inhabitants printed since the last check, whole lines only."""
+    def _new_log_lines(self) -> bytes | None:
+        """What the inhabitants printed since the last check, whole lines only.
+
+        ``None`` when their log cannot be read.
+        """
         try:
             with open(self.log_dir / INHABITANTS_LOG, "rb") as handle:
+                if os.fstat(handle.fileno()).st_size < self._log_offset:
+                    self._log_offset = 0        # the log was emptied: read it from its start
                 handle.seek(self._log_offset)
                 data = handle.read()
         except OSError:
-            return b""
+            return None
         data = data[:data.rfind(b"\n") + 1]
         self._log_offset += len(data)
         return data
@@ -411,25 +434,35 @@ class WorldLauncher:
         """
         try:
             with self._lock:
+                if self._log_offset is None:
+                    return          # never started here: nothing to count
                 process = self._inhabitants
-                if process is None or process.poll() is not None:
-                    return
+                alive = process is not None and process.poll() is None
+                # Read even when they have just died: what they printed on the
+                # way out still counts toward the hour.
                 printed = self._new_log_lines()
                 now = self._clock()
                 self._llm_calls = [at for at in self._llm_calls if now - at < 3600.0]
-                self._llm_calls.extend([now] * printed.count(LLM_CALL_MARK))
+                lines = (printed or b"").splitlines()
+                self._llm_calls.extend([now] * sum(line.startswith(LLM_CALL_MARK) for line in lines))
+                dropped = any(line.startswith(DROPPED_MARK) for line in lines)
                 too_many = len(self._llm_calls) > INHABITANT_CALLS_PER_HOUR
-                dropped = DROPPED_MARK in printed
-                if not (too_many or dropped):
-                    return
-                self._inhabitants = None
-                self._inhabitants_stopped_for_good = too_many
-            if too_many:
+                # Unwatched, nothing would bound what they spend.
+                unwatched = printed is None and alive
+                newly_stopped = (too_many or unwatched) and not self._inhabitants_stopped_for_good
+                if too_many or unwatched:
+                    self._inhabitants_stopped_for_good = True
+                if alive and (too_many or unwatched or dropped):
+                    self._inhabitants = None
+                else:
+                    process = None
+            if newly_stopped:
                 logger.error(
-                    "The inhabitants of her world made more than %s LLM calls in an hour and were stopped. "
+                    "The inhabitants of her world %s and were stopped. "
                     "They stay stopped until her mind is started again; see minecraft/logs/%s.",
-                    INHABITANT_CALLS_PER_HOUR, INHABITANTS_LOG)
-            else:
+                    f"made more than {INHABITANT_CALLS_PER_HOUR} LLM calls in an hour" if too_many
+                    else "can no longer be watched (their log cannot be read)", INHABITANTS_LOG)
+            elif process is not None:
                 logger.warning("An inhabitant dropped out of her world; they will all be started again.")
             self._end(process, INHABITANTS_STOP_SECONDS)
         except Exception:

@@ -31,6 +31,9 @@ if [ ! -d "$MINDCRAFT_DIR/.git" ]; then
   echo "Downloading Mindcraft into minecraft/mindcraft/ ..."
   git clone --quiet "$REPOSITORY" "$MINDCRAFT_DIR"
 fi
+# Her mind starts the inhabitants only when this file exists; it is written
+# again as the last step, so a setup that stops half-way is not started.
+rm -f "$MINDCRAFT_DIR/.jenbina-ready"
 if [ "$(git -C "$MINDCRAFT_DIR" rev-parse HEAD)" != "$COMMIT" ]; then
   git -C "$MINDCRAFT_DIR" fetch --quiet origin "$COMMIT" 2>/dev/null || git -C "$MINDCRAFT_DIR" fetch --quiet origin
   git -C "$MINDCRAFT_DIR" -c advice.detachedHead=false checkout --quiet "$COMMIT"
@@ -52,6 +55,7 @@ cd "$MINDCRAFT_DIR"
 npm install --no-audit --no-fund --loglevel=error
 npm install --no-save --no-audit --no-fund --loglevel=error "mineflayer@$MINEFLAYER"
 npx --no-install patch-package
+echo "$COMMIT" > "$MINDCRAFT_DIR/.jenbina-ready"
 
 cat <<'DONE'
 

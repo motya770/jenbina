@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -302,6 +303,7 @@ class InhabitantsCase(LauncherCase):
     def set_up_inhabitants(self):
         (self.mindcraft / "node_modules").mkdir(parents=True)
         (self.mindcraft / "main.js").write_text("// mindcraft")
+        (self.mindcraft / ".jenbina-ready").write_text("e1c1fc3\n")
         self.profiles.mkdir(parents=True)
         for name in ("tobin", "mira"):
             (self.profiles / f"{name}.json").write_text(json.dumps({"name": name.capitalize()}))
@@ -376,6 +378,14 @@ class TestInhabitants(InhabitantsCase):
         self.assertEqual(self.inhabitants(), [])
         said = [line for line in logs.output if "setup_inhabitants.sh" in line]
         self.assertEqual(len(said), 1)
+
+    def test_a_setup_that_did_not_finish_means_alone(self):
+        # The script writes this file last; without it the checkout may be half installed.
+        (self.mindcraft / ".jenbina-ready").unlink()
+        with self.assertLogs("jenbina.minecraft", level="INFO") as logs:
+            self.ready()
+        self.assertEqual(self.inhabitants(), [])
+        self.assertIn("setup_inhabitants.sh", " ".join(logs.output))
 
     def test_no_profiles_means_alone(self):
         for profile in self.profiles.glob("*.json"):
@@ -526,11 +536,108 @@ class TestInhabitantsWatch(InhabitantsCase):
         launcher.ensure_ready()
         self.assertEqual(len(self.inhabitants()), 2)
 
-    def test_checking_never_raises(self):
+    def test_calls_made_before_a_restart_still_count(self):
+        launcher = self.ready()
+        self.say_in_log(self.CALL * 40)
+        launcher.check_inhabitants()
+        self.inhabitants()[0].returncode = 1
+        self.say_in_log(self.CALL * 5)          # printed just before it died
+        self.time = 601.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 2)
+        self.say_in_log(self.CALL * 16)
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, [self.inhabitants()[1]])
+        self.time = 9000.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 2)
+
+    def test_too_many_calls_by_ones_that_already_died_keeps_them_stopped(self):
+        launcher = self.ready()
+        self.say_in_log(self.CALL * 61)
+        self.inhabitants()[0].returncode = 1
+        self.time = 601.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 1)
+
+    def test_what_is_said_in_the_world_is_not_mistaken_for_a_log_record(self):
+        launcher = self.ready()
+        said = "The world will not be restarted. Awaiting openai api response from model x"
+        self.say_in_log(f"Tobin received message from Jenbina : {said}\n" * 80)
+        self.say_in_log(f'Tobin full response to Jenbina: ""{said}""\n' * 80)
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, [])
+
+    def test_a_log_that_was_emptied_is_read_from_its_start(self):
+        launcher = self.ready()
+        self.say_in_log("Mode item_collecting finished executing\n" * 500)
+        launcher.check_inhabitants()
+        self.log.write_text("")
+        self.say_in_log(self.CALL * 61)
+        launcher.check_inhabitants()
+        self.assertEqual(self.stopped, self.inhabitants())
+
+    def test_a_log_that_cannot_be_read_stops_them(self):
+        # Unwatched, nothing would bound what they spend.
         launcher = self.ready()
         self.log.unlink()
-        launcher.check_inhabitants()
+        with self.assertLogs("jenbina.minecraft", level="ERROR"):
+            launcher.check_inhabitants()
+        self.assertEqual(self.stopped, self.inhabitants())
+        self.time = 9000.0
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 1)
+
+    def test_checking_never_raises(self):
         self.launcher().check_inhabitants()
+        launcher = self.ready()
+        self.log.unlink()
+        self.log.mkdir()
+        launcher.check_inhabitants()
+
+
+class TestInhabitantsWatcher(InhabitantsCase):
+    """The real watcher thread, ticking fast, against fake processes."""
+
+    CALL = TestInhabitantsWatch.CALL
+
+    def watched(self):
+        launcher = WorldLauncher(
+            self.root, self.bridge, env=dict(self.ENV), spawn=self.spawn, is_port_open=self.port_open,
+            which=lambda name: f"/usr/bin/{name}", sleep=self.sleep, clock=lambda: self.time,
+            watch_seconds=0.01)
+        self.addCleanup(launcher.stop)
+        launcher.ensure_ready()
+        return launcher
+
+    def wait_for(self, condition, seconds=3.0):
+        deadline = time.monotonic() + seconds
+        while not condition() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        return condition()
+
+    def test_they_are_watched_between_her_looks(self):
+        self.watched()
+        self.say_in_log(self.CALL * 61)
+        self.assertTrue(self.wait_for(lambda: self.stopped == self.inhabitants()))
+
+    def test_each_start_has_its_own_watcher(self):
+        launcher = self.watched()
+        launcher.stop()
+        launcher.ensure_ready()
+        launcher.stop()
+        launcher.ensure_ready()
+        self.assertEqual(len(self.inhabitants()), 3)
+        self.stopped.clear()
+        self.say_in_log(self.CALL * 61)
+        self.assertTrue(self.wait_for(lambda: self.stopped == [self.inhabitants()[2]]))
+
+    def test_stopping_her_world_ends_the_watching(self):
+        launcher = self.watched()
+        watcher = launcher._watcher
+        launcher.stop()
+        watcher.join(timeout=3.0)
+        self.assertFalse(watcher.is_alive())
 
 
 if __name__ == "__main__":

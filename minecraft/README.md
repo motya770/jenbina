@@ -137,6 +137,8 @@ to `minecraft/logs/inhabitants.log`.
 in the world, and quotes what they said since she last looked. She can choose
 to talk with one: she walks up if they are near, or messages them across the
 world, and they exchange up to three lines each inside that one beat. She
+begins no new line after 90 seconds; she can stay logged in a little longer
+than that while a line of hers is still being written. She
 remembers who she has met and the last things they said to each other, and a
 talk counts as social contact only when she was answered. A talk appears on
 her timeline as an action whose outcome is what was said.
@@ -151,8 +153,9 @@ reaches her only as quoted speech; it never chooses her actions.
 **What it costs.** An inhabitant asks its LLM only when it is spoken to: one
 call for each line of hers. Ten idle minutes cost nothing. She begins at most
 twelve talks a day. As a last guard, her mind counts the inhabitants' LLM
-calls from their log and stops them when they make more than 60 in an hour;
-they then stay stopped until her mind is started again.
+calls from their log and stops them when they make more than 60 in an hour,
+counted across restarts, or when that log can no longer be read; they then
+stay stopped until her mind is started again.
 
 **Talking to them yourself.** If you own Minecraft, join `127.0.0.1:25565`
 and whisper: `/msg Mira hello`. They answer in the public chat. With both in

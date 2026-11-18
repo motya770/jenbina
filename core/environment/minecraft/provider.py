@@ -268,6 +268,7 @@ class MinecraftWorld:
         return outcome
 
     def _act(self, scene: Scene, action: WorldAction, person, memory: dict, waiting=nullcontext) -> Outcome:
+        arrived = None
         try:
             # An action can take most of a minute: nothing of hers is touched
             # while this thread only waits for the bridge.
@@ -278,6 +279,8 @@ class MinecraftWorld:
                 finally:
                     self._leave()
         except WorldUnavailable as err:
+            # What she heard on arriving has left the bridge; it is kept here.
+            self._stash_heard(self._memory(memory), arrived, self.clock())
             # The action may have begun before the world was lost.
             return Outcome(False, f"I could not reach the world to do it ({err}).",
                            action=action, place=scene.place, unseen=True)
@@ -337,6 +340,10 @@ class MinecraftWorld:
         offline = abandoned = False
         lost: WorldUnavailable | None = None
         started = self.timer()
+
+        def hosting() -> bool:
+            return keep_going is None or bool(keep_going())
+
         try:
             with waiting():
                 looks.append(self.bridge.start_session())
@@ -349,11 +356,16 @@ class MinecraftWorld:
                         # A walk that overran ended with her logged out.
                         looks.append(self.bridge.start_session())
             while said < MAX_EXCHANGES and self.timer() - started < TALK_SECONDS:
-                if keep_going is not None and not keep_going():
+                if not hosting():
                     # Her host no longer has her: she is not this process's to speak for.
                     abandoned = True
                     break
                 line, end = voice(name, scene.descriptions, last_lines, transcript)
+                if not hosting():
+                    # Her mind was free while the words were found, and her host
+                    # changed hands meanwhile: they are not said.
+                    abandoned = True
+                    break
                 left = TALK_SECONDS - (self.timer() - started)
                 if not line or left <= 0:
                     break
@@ -370,12 +382,17 @@ class MinecraftWorld:
                 said += 1
                 # Kept the way everything said is kept: quotable inside double quotes.
                 transcript.append((ME, line.replace('"', "'")))
-                theirs = [safe_speech(entry.get("text")) for entry in reply.get("heard") or []
-                          if isinstance(entry, dict) and entry.get("from") == name]
-                theirs = [text for text in theirs if text][:REPLY_LINES]
+                pieces = [entry for entry in reply.get("heard") or []
+                          if isinstance(entry, dict) and entry.get("from") == name
+                          and safe_speech(entry.get("text"))]
+                theirs = [safe_speech(entry["text"]) for entry in pieces[:REPLY_LINES]]
+                # More pieces than a reply holds are not lost: she overheard them.
+                looks.append({"heard": pieces[REPLY_LINES:]})
                 transcript.extend((name, text) for text in theirs)
                 if not theirs or end:
                     break
+            if not abandoned and not hosting():
+                abandoned = True
             if not abandoned:
                 with waiting():
                     observation = self.bridge.observe()
@@ -442,8 +459,14 @@ class MinecraftWorld:
         key = inhabitant_key(name)
         social = getattr(person, "social_cognition", None)
         if social is not None:
+            model = social.get_or_create_model(key)
+            beliefs = list(model.beliefs)
             for text in answers:
                 social.observe_entity_message(key, text)
+            # A belief is free text lifted from what was said, and is shown
+            # unquoted wherever a person model is printed. What someone says
+            # in the game is kept only as quoted speech, so none is kept here.
+            model.beliefs[:] = beliefs
         tracker = getattr(person, "social_interaction_tracker", None)
         if tracker is not None:
             from ...social.social_interaction_tracker import infer_emotional_tone
