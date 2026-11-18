@@ -354,9 +354,9 @@
     "semantic_hash": "911168c2351058f5f68136c9c3628d38"
   },
   "core/simulation_runner.py": {
-    "mtime": 1794887775.8924198,
-    "seen": 1794910132.249877,
-    "ast_hash": "745a3abe8efa24d702036d6c9030e765",
+    "mtime": 1795027865.557909,
+    "seen": 1795028677.162272,
+    "ast_hash": "5b22f0bf91a04c4dbc2b59f3fb24e066",
     "semantic_hash": ""
   },
   "core/social/__init__.py": {
@@ -714,9 +714,9 @@
     "semantic_hash": "84ecd6773e6e01508f36ca4090e042d3"
   },
   "CLAUDE.md": {
-    "mtime": 1794887985.3921933,
-    "seen": 1794910132.249978,
-    "ast_hash": "35ca840109f77b41a1e8b0e12db8712d",
+    "mtime": 1795028476.3853555,
+    "seen": 1795028677.16239,
+    "ast_hash": "e92720fe176cb72df1462d1aa6b636ee",
     "semantic_hash": ""
   },
   "CURRENT_ARCHITECTURE_DIAGRAMS.md": {
@@ -732,9 +732,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1794787156.861149,
-    "seen": 1794881927.381335,
-    "ast_hash": "73290d089c1542782cfc8463dcaee5ab",
+    "mtime": 1795028476.3847067,
+    "seen": 1795028677.1623921,
+    "ast_hash": "717c95a5f467845c334d825bda9ebb00",
     "semantic_hash": ""
   },
   "docs/plans/2026-02-07-goal-system-design.md": {
@@ -1314,9 +1314,9 @@
     "semantic_hash": ""
   },
   "core/heartbeat/store.py": {
-    "mtime": 1794787156.859102,
-    "seen": 1794881927.381232,
-    "ast_hash": "45a8e2d49c0d37ace74c37f7ae1e18d7",
+    "mtime": 1795029485.2263284,
+    "seen": 1795029631.4710479,
+    "ast_hash": "930b3e2c57a37ace1d4ec7e7702f4f9f",
     "semantic_hash": ""
   },
   "core/ui/admin.py": {
@@ -1362,9 +1362,9 @@
     "semantic_hash": ""
   },
   "tests/test_heartbeat_store.py": {
-    "mtime": 1794787156.8549287,
-    "seen": 1794881927.381304,
-    "ast_hash": "61b69bed8e8eb9a8b6677d5580a777fc",
+    "mtime": 1795029399.179269,
+    "seen": 1795029631.4711459,
+    "ast_hash": "3ed89cf9ed0c2332219ce2f82580cc6e",
     "semantic_hash": ""
   },
   "tests/test_live.py": {
@@ -1416,45 +1416,45 @@
     "semantic_hash": ""
   },
   "core/environment/minecraft/__init__.py": {
-    "mtime": 1794880119.4292886,
-    "seen": 1794881927.38122,
-    "ast_hash": "8fcf2aee0cab85d98f7d09d47c0e246c",
+    "mtime": 1795027507.015215,
+    "seen": 1795028677.162224,
+    "ast_hash": "3a7f01324dc7eb84a3d586968b44a911",
     "semantic_hash": ""
   },
   "core/environment/minecraft/bridge_client.py": {
-    "mtime": 1794881455.4896085,
-    "seen": 1794881927.381221,
-    "ast_hash": "7c3d759e858651e75db8b5842e9b337d",
+    "mtime": 1795027375.939267,
+    "seen": 1795028677.162225,
+    "ast_hash": "4f12cd4a66828e7dc0d13255aefd3593",
     "semantic_hash": ""
   },
   "core/environment/minecraft/provider.py": {
-    "mtime": 1794887775.8926759,
-    "seen": 1794910132.249838,
-    "ast_hash": "789c41412580d05e1fc500d070b7df3b",
+    "mtime": 1795029473.429715,
+    "seen": 1795029631.471036,
+    "ast_hash": "4641a2539db2ccf38882ad5c7151cf23",
     "semantic_hash": ""
   },
   "core/environment/minecraft/scene.py": {
-    "mtime": 1794880095.8916123,
-    "seen": 1794881927.381223,
-    "ast_hash": "dadf0f7d06b06a58fb4b12ba2e8f7e66",
+    "mtime": 1795027375.927219,
+    "seen": 1795028677.16223,
+    "ast_hash": "1cef2602ae9e627a05d22a806a2fdd74",
     "semantic_hash": ""
   },
   "minecraft/bridge/actions.js": {
-    "mtime": 1794887589.952325,
-    "seen": 1794910132.2499042,
-    "ast_hash": "e5bd53c44de1a8828be4c0a927831805",
+    "mtime": 1795027237.7039495,
+    "seen": 1795028677.1622982,
+    "ast_hash": "102588473d25cca8e3248b5ed69dfd92",
     "semantic_hash": ""
   },
   "minecraft/bridge/bridge.js": {
-    "mtime": 1794887609.3777928,
-    "seen": 1794910132.2499049,
-    "ast_hash": "479b7276f7aa0ceac55619d43a4e971f",
+    "mtime": 1795027237.7044697,
+    "seen": 1795028677.162299,
+    "ast_hash": "31f2898cac02f1b9bdd13fc5842cb839",
     "semantic_hash": ""
   },
   "minecraft/bridge/observe.js": {
-    "mtime": 1794879903.7563334,
-    "seen": 1794881927.3812768,
-    "ast_hash": "e08ef2be2bc581766d49f546cd1dfa5a",
+    "mtime": 1795027237.703499,
+    "seen": 1795028677.1623008,
+    "ast_hash": "80d36c91ce2a0ef6f41a33bc6eccd59a",
     "semantic_hash": ""
   },
   "minecraft/bridge/package.json": {
@@ -1518,15 +1518,15 @@
     "semantic_hash": ""
   },
   "minecraft/README.md": {
-    "mtime": 1794887985.391167,
-    "seen": 1794910132.249998,
-    "ast_hash": "67fab90c2fb632d21d09c34d53c7a789",
+    "mtime": 1795029500.7804356,
+    "seen": 1795029631.471209,
+    "ast_hash": "43695f59e309eef1d16b784fa022bca7",
     "semantic_hash": ""
   },
   "core/environment/minecraft/launcher.py": {
-    "mtime": 1794887767.0959604,
-    "seen": 1794910132.249836,
-    "ast_hash": "56d432942aa0001ba216c084ebb9951f",
+    "mtime": 1795029473.430554,
+    "seen": 1795029631.4710348,
+    "ast_hash": "c5c4b412b3c40116fc0ac86909819e7d",
     "semantic_hash": ""
   },
   "minecraft/bridge/session.js": {
@@ -1548,9 +1548,81 @@
     "semantic_hash": ""
   },
   "tests/test_minecraft_launcher.py": {
-    "mtime": 1794887882.541665,
-    "seen": 1794910132.2499552,
-    "ast_hash": "6e460926eaedd841285a3aecd4f99fd5",
+    "mtime": 1795029399.180732,
+    "seen": 1795029631.4711602,
+    "ast_hash": "b0c22abba0e07f48e803732a2c327c0d",
+    "semantic_hash": ""
+  },
+  "core/environment/minecraft/conversation.py": {
+    "mtime": 1795029473.4292006,
+    "seen": 1795029631.471034,
+    "ast_hash": "98ea49f05ab7fbade7ae83fb53b7be77",
+    "semantic_hash": ""
+  },
+  "minecraft/bridge/hearing.js": {
+    "mtime": 1795027287.71957,
+    "seen": 1795028677.1622999,
+    "ast_hash": "3230c1a43e922826771d65a90904f452",
+    "semantic_hash": ""
+  },
+  "minecraft/bridge/say.js": {
+    "mtime": 1795027237.4392812,
+    "seen": 1795028677.162304,
+    "ast_hash": "f76d2facd0caf074ae8fec2840e4caed",
+    "semantic_hash": ""
+  },
+  "minecraft/bridge/test/hearing.test.js": {
+    "mtime": 1795027287.7197669,
+    "seen": 1795028677.162305,
+    "ast_hash": "1a078451ea8a4343ef0a2bc265837054",
+    "semantic_hash": ""
+  },
+  "minecraft/bridge/test/players.test.js": {
+    "mtime": 1795027144.1543071,
+    "seen": 1795028677.162307,
+    "ast_hash": "a368ba6b7e27bcd8fc0b2805a034f6fd",
+    "semantic_hash": ""
+  },
+  "minecraft/bridge/test/say.test.js": {
+    "mtime": 1795027208.4739914,
+    "seen": 1795028677.162312,
+    "ast_hash": "b35b912a82223e8ef5f5462b56b9343f",
+    "semantic_hash": ""
+  },
+  "minecraft/inhabitants/mira.json": {
+    "mtime": 1795028078.669761,
+    "seen": 1795028677.162317,
+    "ast_hash": "0430d6643d315234c8072817fda99c1b",
+    "semantic_hash": ""
+  },
+  "minecraft/inhabitants/tobin.json": {
+    "mtime": 1795028078.670205,
+    "seen": 1795028677.162318,
+    "ast_hash": "2db90e1b80bdb5fdee4c7b4c18517b32",
+    "semantic_hash": ""
+  },
+  "minecraft/setup_inhabitants.sh": {
+    "mtime": 1795029473.4309483,
+    "seen": 1795029631.4711192,
+    "ast_hash": "8fa9e56fddc6a6596e80625d91576d0d",
+    "semantic_hash": ""
+  },
+  "tests/test_minecraft_inhabitants.py": {
+    "mtime": 1795029500.7799,
+    "seen": 1795029631.471159,
+    "ast_hash": "2af1b8160c702856c76fc1adce9527d2",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-11-18-minecraft-inhabitants-design.md": {
+    "mtime": 1795028476.3858101,
+    "seen": 1795028677.1624079,
+    "ast_hash": "bee71570a81654e1eb70d92211ac6409",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-11-18-minecraft-inhabitants-implementation.md": {
+    "mtime": 1795027792.2146845,
+    "seen": 1795028677.162409,
+    "ast_hash": "e80518b91332076dc7ac813da052f609",
     "semantic_hash": ""
   }
 }
