@@ -1,7 +1,7 @@
 """HTTP client for the Node bridge that is Jenbina's body in Minecraft.
 
 The bridge (``minecraft/bridge/bridge.js``) listens on localhost and offers a
-session, an observation and bounded actions. Every failure to reach it or to
+session, an observation, bounded actions and one spoken line. Every failure to reach it or to
 get a usable answer is raised as ``WorldUnavailable``.
 """
 
@@ -20,6 +20,9 @@ SESSION_TIMEOUT_SECONDS = 30.0
 REQUEST_TIMEOUT_SECONDS = 15.0
 # How long past an action's budget the bridge may take to answer.
 ACT_GRACE_SECONDS = 30.0
+DEFAULT_ANSWER_WAIT_MS = 30000
+# How long past the wait for an answer the bridge may take to reply.
+SAY_GRACE_SECONDS = 15.0
 
 
 class WorldUnavailable(RuntimeError):
@@ -83,4 +86,15 @@ class MinecraftBridge:
         return self._call(
             "POST", "/act", {"name": name, "args": args or {}, "budget_ms": budget_ms},
             budget_ms / 1000 + ACT_GRACE_SECONDS,
+        )
+
+    def say(self, to: str, text: str, wait_ms: int = DEFAULT_ANSWER_WAIT_MS) -> dict[str, Any]:
+        """Whisper one line to another player and wait for what they say back.
+
+        Returns ``{"ok", "answered", "heard"}``; ``ok`` is false with a
+        ``reason`` when the player is not in the world.
+        """
+        return self._call(
+            "POST", "/say", {"to": to, "text": text, "wait_ms": wait_ms},
+            wait_ms / 1000 + SAY_GRACE_SECONDS,
         )
